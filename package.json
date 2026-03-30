@@ -1,0 +1,27 @@
+{
+  "name": "tutarbu",
+  "version": "1.0.0",
+  "description": "Football Prediction Engine with Interactive Dashboard",
+  "main": "src/server.js",
+  "type": "commonjs",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "server": "node src/server.js",
+    "start": "npm run server"
+  },
+  "dependencies": {
+    "playwright": "^1.58.2",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "axios": "^1.6.2",
+    "lucide-react": "^0.294.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.2.1",
+    "vite": "^5.0.0"
+  }
+}

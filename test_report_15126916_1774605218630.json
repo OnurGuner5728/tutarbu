@@ -1,0 +1,1584 @@
+{
+  "match": "Türkiye vs Romania",
+  "eventId": 15126916,
+  "timestamp": "2026-03-27T09:53:38.628Z",
+  "summary": {
+    "total": 168,
+    "working": 96,
+    "zeroValue": 29,
+    "broken": 43,
+    "successRate": "74%"
+  },
+  "prediction": {
+    "homeWinProbability": 22.98,
+    "drawProbability": 20.65,
+    "awayWinProbability": 56.37,
+    "mostLikelyScore": "1-2",
+    "mostLikelyScoreProbability": 9.52,
+    "over15": 85.9,
+    "over25": 67.02,
+    "over35": 45.27,
+    "btts": 64.48,
+    "lambdaHome": 1.31,
+    "lambdaAway": 2.14,
+    "top5Scores": [
+      {
+        "score": "1-2",
+        "probability": 9.53
+      },
+      {
+        "score": "1-1",
+        "probability": 8.9
+      },
+      {
+        "score": "0-2",
+        "probability": 7.27
+      },
+      {
+        "score": "1-3",
+        "probability": 6.81
+      },
+      {
+        "score": "0-1",
+        "probability": 6.78
+      }
+    ]
+  },
+  "metrics": [
+    {
+      "key": "M001",
+      "description": "Maç Başı Atılan Gol Ortalaması",
+      "status": "✅ OK",
+      "working": true,
+      "value": 1.55,
+      "homeValue": 1.55,
+      "awayValue": 1.8
+    },
+    {
+      "key": "M002",
+      "description": "Ev/Deplasman Gol Ortalaması",
+      "status": "✅ OK",
+      "working": true,
+      "value": 2,
+      "homeValue": 2,
+      "awayValue": 2
+    },
+    {
+      "key": "M003",
+      "description": "İlk Yarı Gol Ortalaması",
+      "status": "✅ OK",
+      "working": true,
+      "value": 1,
+      "homeValue": 1,
+      "awayValue": 1
+    },
+    {
+      "key": "M004",
+      "description": "İkinci Yarı Gol Ortalaması",
+      "status": "✅ OK",
+      "working": true,
+      "value": 1.67,
+      "homeValue": 1.6666666666666667,
+      "awayValue": 1
+    },
+    {
+      "key": "M005",
+      "description": "Gol Dağılımı 0-15dk (%)",
+      "status": "⚠️ SIFIR",
+      "working": true,
+      "value": 0,
+      "reason": "Sıfır değer — veri kısıtlı olabilir veya gerçekten 0",
+      "homeValue": 0,
+      "awayValue": 0
+    },
+    {
+      "key": "M006",
+      "description": "Gol Dağılımı 16-30dk (%)",
+      "status": "✅ OK",
+      "working": true,
+      "value": 12.5,
+      "homeValue": 12.5,
+      "awayValue": 33.33333333333333
+    },
+    {
+      "key": "M007",
+      "description": "Gol Dağılımı 31-45dk (%)",
+      "status": "✅ OK",
+      "working": true,
+      "value": 25,
+      "homeValue": 25,
+      "awayValue": 16.666666666666664
+    },
+    {
+      "key": "M008",
+      "description": "Gol Dağılımı 46-60dk (%)",
+      "status": "✅ OK",
+      "working": true,
+      "value": 12.5,
+      "homeValue": 12.5,
+      "awayValue": 16.666666666666664
+    },
+    {
+      "key": "M009",
+      "description": "Gol Dağılımı 61-75dk (%)",
+      "status": "✅ OK",
+      "working": true,
+      "value": 12.5,
+      "homeValue": 12.5,
+      "awayValue": 0
+    },
+    {
+      "key": "M010",
+      "description": "Gol Dağılımı 76-90dk (%)",
+      "status": "✅ OK",
+      "working": true,
+      "value": 37.5,
+      "homeValue": 37.5,
+      "awayValue": 33.33333333333333
+    },
+    {
+      "key": "M011",
+      "description": "Şut/Gol Dönüşüm Oranı (%)",
+      "status": "✅ OK",
+      "working": true,
+      "value": 20,
+      "homeValue": 20,
+      "awayValue": 10.526315789473683
+    },
+    {
+      "key": "M012",
+      "description": "İsabetli Şut/Gol Dönüşüm (%)",
+      "status": "✅ OK",
+      "working": true,
+      "value": 42.11,
+      "homeValue": 42.10526315789473,
+      "awayValue": 27.27272727272727
+    },
+    {
+      "key": "M013",
+      "description": "Maç Başı Toplam Şut",
+      "status": "✅ OK",
+      "working": true,
+      "value": 13.33,
+      "homeValue": 13.333333333333334,
+      "awayValue": 19
+    },
+    {
+      "key": "M014",
+      "description": "Maç Başı İsabetli Şut",
+      "status": "✅ OK",
+      "working": true,
+      "value": 6.33,
+      "homeValue": 6.333333333333333,
+      "awayValue": 7.333333333333333
+    },
+    {
+      "key": "M015",
+      "description": "Maç Başı xG Ortalaması",
+      "status": "⚠️ SIFIR",
+      "working": true,
+      "value": 0,
+      "reason": "Sıfır değer — veri kısıtlı olabilir veya gerçekten 0",
+      "homeValue": 0,
+      "awayValue": 0
+    },
+    {
+      "key": "M016",
+      "description": "xG Üstü/Altı Performans",
+      "status": "✅ OK",
+      "working": true,
+      "value": 1,
+      "homeValue": 1,
+      "awayValue": 1
+    },
+    {
+      "key": "M017",
+      "description": "Maç Başı Büyük Şans",
+      "status": "✅ OK",
+      "working": true,
+      "value": 5,
+      "homeValue": 5,
+      "awayValue": 2
+    },
+    {
+      "key": "M018",
+      "description": "Büyük Şans Değerlendirme (%)",
+      "status": "✅ OK",
+      "working": true,
+      "value": 46.67,
+      "homeValue": 46.666666666666664,
+      "awayValue": 50
+    },
+    {
+      "key": "M019",
+      "description": "Maç Başı Penaltı Kazanma",
+      "status": "✅ OK",
+      "working": true,
+      "value": 0.33,
+      "homeValue": 0.3333333333333333,
+      "awayValue": 0.3333333333333333
+    },
+    {
+      "key": "M020",
+      "description": "Penaltı Dönüşüm Oranı (%)",
+      "status": "✅ OK",
+      "working": true,
+      "value": 100,
+      "homeValue": 100,
+      "awayValue": 100
+    },
+    {
+      "key": "M021",
+      "description": "Hücum Baskı İndeksi",
+      "status": "✅ OK",
+      "working": true,
+      "value": 0.27,
+      "homeValue": 0.27421445404556166,
+      "awayValue": 0.2920183104452767
+    },
+    {
+      "key": "M022",
+      "description": "Maç Başı Korner",
+      "status": "✅ OK",
+      "working": true,
+      "value": 5,
+      "homeValue": 5,
+      "awayValue": 6.333333333333333
+    },
+    {
+      "key": "M023",
+      "description": "Kornerden Gol Oranı (%)",
+      "status": "⚠️ SIFIR",
+      "working": true,
+      "value": 0,
+      "reason": "Sıfır değer — veri kısıtlı olabilir veya gerçekten 0",
+      "homeValue": 0,
+      "awayValue": 0
+    },
+    {
+      "key": "M024",
+      "description": "Serbest Vuruş Gol Oranı (%)",
+      "status": "✅ OK",
+      "working": true,
+      "value": 50,
+      "homeValue": 50,
+      "awayValue": 0
+    },
+    {
+      "key": "M025",
+      "description": "Hücum Bölge Pas Başarısı (%)",
+      "status": "⚠️ SIFIR",
+      "working": true,
+      "value": 0,
+      "reason": "Sıfır değer — veri kısıtlı olabilir veya gerçekten 0",
+      "homeValue": 0,
+      "awayValue": 0
+    },
+    {
+      "key": "M026",
+      "description": "Maç Başı Yenilen Gol Ortalaması",
+      "status": "✅ OK",
+      "working": true,
+      "value": 1.35,
+      "homeValue": 1.35,
+      "awayValue": 0.8
+    },
+    {
+      "key": "M027",
+      "description": "Ev/Dep Yenilen Gol Ortalaması",
+      "status": "✅ OK",
+      "working": true,
+      "value": 0.86,
+      "homeValue": 0.8571428571428571,
+      "awayValue": 0.75
+    },
+    {
+      "key": "M028",
+      "description": "Clean Sheet Oranı (%)",
+      "status": "✅ OK",
+      "working": true,
+      "value": 30,
+      "homeValue": 30,
+      "awayValue": 45
+    },
+    {
+      "key": "M029",
+      "description": "İlk Yarı Yenilen Gol Ortalaması",
+      "status": "✅ OK",
+      "working": true,
+      "value": 0.33,
+      "homeValue": 0.3333333333333333,
+      "awayValue": 0
+    },
+    {
+      "key": "M030",
+      "description": "İkinci Yarı Yenilen Gol Ort.",
+      "status": "✅ OK",
+      "working": true,
+      "value": 0.33,
+      "homeValue": 0.3333333333333333,
+      "awayValue": 0
+    },
+    {
+      "key": "M031",
+      "description": "İlk 15dk Gol Yeme Oranı (%)",
+      "status": "✅ OK",
+      "working": true,
+      "value": 50,
+      "homeValue": 50,
+      "awayValue": 0
+    },
+    {
+      "key": "M032",
+      "description": "Son 15dk Gol Yeme Oranı (%)",
+      "status": "⚠️ SIFIR",
+      "working": true,
+      "value": 0,
+      "reason": "Sıfır değer — veri kısıtlı olabilir veya gerçekten 0",
+      "homeValue": 0,
+      "awayValue": 0
+    },
+    {
+      "key": "M033",
+      "description": "Rakip xG Ortalaması",
+      "status": "⚠️ SIFIR",
+      "working": true,
+      "value": 0,
+      "reason": "Sıfır değer — veri kısıtlı olabilir veya gerçekten 0",
+      "homeValue": 0,
+      "awayValue": 0
+    },
+    {
+      "key": "M034",
+      "description": "Şut Bloklama Oranı (%)",
+      "status": "✅ OK",
+      "working": true,
+      "value": 10.81,
+      "homeValue": 10.81081081081081,
+      "awayValue": 63.1578947368421
+    },
+    {
+      "key": "M035",
+      "description": "Düello Kazanma Oranı (%)",
+      "status": "✅ OK",
+      "working": true,
+      "value": 50,
+      "homeValue": 50,
+      "awayValue": 50
+    },
+    {
+      "key": "M036",
+      "description": "Hava Topu Kazanma (%)",
+      "status": "⚠️ SIFIR",
+      "working": true,
+      "value": 0,
+      "reason": "Sıfır değer — veri kısıtlı olabilir veya gerçekten 0",
+      "homeValue": 0,
+      "awayValue": 0
+    },
+    {
+      "key": "M037",
+      "description": "Maç Başı Top Kesme",
+      "status": "✅ OK",
+      "working": true,
+      "value": 8.67,
+      "homeValue": 8.666666666666666,
+      "awayValue": 6
+    },
+    {
+      "key": "M038",
+      "description": "Maç Başı Faul Yapma",
+      "status": "✅ OK",
+      "working": true,
+      "value": 9.67,
+      "homeValue": 9.666666666666666,
+      "awayValue": 8
+    },
+    {
+      "key": "M039",
+      "description": "Maç Başı Sarı Kart",
+      "status": "✅ OK",
+      "working": true,
+      "value": 4.67,
+      "homeValue": 4.666666666666667,
+      "awayValue": 1.3333333333333333
+    },
+    {
+      "key": "M040",
+      "description": "Maç Başı Kırmızı Kart",
+      "status": "⚠️ SIFIR",
+      "working": true,
+      "value": 0,
+      "reason": "Sıfır değer — veri kısıtlı olabilir veya gerçekten 0",
+      "homeValue": 0,
+      "awayValue": 0
+    },
+    {
+      "key": "M041",
+      "description": "Baskı Altında Gol Yeme (%)",
+      "status": "⚠️ SIFIR",
+      "working": true,
+      "value": 0,
+      "reason": "Sıfır değer — veri kısıtlı olabilir veya gerçekten 0",
+      "homeValue": 0,
+      "awayValue": 0
+    },
+    {
+      "key": "M042",
+      "description": "Önde Gidip Kaybetme (%)",
+      "status": "⚠️ SIFIR",
+      "working": true,
+      "value": 0,
+      "reason": "Sıfır değer — veri kısıtlı olabilir veya gerçekten 0",
+      "homeValue": 0,
+      "awayValue": 0
+    },
+    {
+      "key": "M043",
+      "description": "Öne Geçince Kapatma (%)",
+      "status": "✅ OK",
+      "working": true,
+      "value": 100,
+      "homeValue": 100,
+      "awayValue": 100
+    },
+    {
+      "key": "M044",
+      "description": "Gol Yedikten Sonra Tepki (dk)",
+      "status": "✅ OK",
+      "working": true,
+      "value": 27.5,
+      "homeValue": 27.5,
+      "awayValue": 90
+    },
+    {
+      "key": "M045",
+      "description": "Rakip Korner Engelleme (%)",
+      "status": "⚠️ SIFIR",
+      "working": true,
+      "value": 0,
+      "reason": "Sıfır değer — veri kısıtlı olabilir veya gerçekten 0",
+      "homeValue": 0,
+      "awayValue": 0
+    },
+    {
+      "key": "M046",
+      "description": "Son 5 Maç Form Puanı (%)",
+      "status": "✅ OK",
+      "working": true,
+      "value": 66.67,
+      "homeValue": 66.66666666666666,
+      "awayValue": 86.66666666666667
+    },
+    {
+      "key": "M047",
+      "description": "Son 10 Maç Form Puanı (%)",
+      "status": "✅ OK",
+      "working": true,
+      "value": 46.67,
+      "homeValue": 46.666666666666664,
+      "awayValue": 63.33333333333333
+    },
+    {
+      "key": "M048",
+      "description": "Son 20 Maç Form Puanı (%)",
+      "status": "✅ OK",
+      "working": true,
+      "value": 56.67,
+      "homeValue": 56.666666666666664,
+      "awayValue": 63.33333333333333
+    },
+    {
+      "key": "M049",
+      "description": "Art Arda Galibiyet Serisi",
+      "status": "✅ OK",
+      "working": true,
+      "value": 3,
+      "homeValue": 3,
+      "awayValue": 1
+    },
+    {
+      "key": "M050",
+      "description": "Yenilmezlik Serisi",
+      "status": "✅ OK",
+      "working": true,
+      "value": 4,
+      "homeValue": 4,
+      "awayValue": 6
+    },
+    {
+      "key": "M051",
+      "description": "Art Arda Gol Atma Serisi",
+      "status": "✅ OK",
+      "working": true,
+      "value": 4,
+      "homeValue": 4,
+      "awayValue": 1
+    },
+    {
+      "key": "M052",
+      "description": "Art Arda Clean Sheet Serisi",
+      "status": "✅ OK",
+      "working": true,
+      "value": 2,
+      "homeValue": 2,
+      "awayValue": 3
+    },
+    {
+      "key": "M053",
+      "description": "Gol Atma Trend Yönü",
+      "status": "✅ OK",
+      "working": true,
+      "value": 0.8,
+      "homeValue": 0.8,
+      "awayValue": 0.5000000000000001
+    },
+    {
+      "key": "M054",
+      "description": "Gol Yeme Trend Yönü",
+      "status": "✅ OK",
+      "working": true,
+      "value": -0.67,
+      "homeValue": -0.6666666666666666,
+      "awayValue": -0.7500000000000001
+    },
+    {
+      "key": "M055",
+      "description": "Puan Durumu Skoru (%)",
+      "status": "✅ OK",
+      "working": true,
+      "value": 75,
+      "homeValue": 75,
+      "awayValue": 50
+    },
+    {
+      "key": "M056",
+      "description": "Ev Sahibi Puan Durumu (%)",
+      "status": "✅ OK",
+      "working": true,
+      "value": 75,
+      "homeValue": 75,
+      "awayValue": 75
+    },
+    {
+      "key": "M057",
+      "description": "Deplasman Puan Durumu (%)",
+      "status": "✅ OK",
+      "working": true,
+      "value": 75,
+      "homeValue": 75,
+      "awayValue": 50
+    },
+    {
+      "key": "M058",
+      "description": "Gol Farkı (Goal Diff)",
+      "status": "✅ OK",
+      "working": true,
+      "value": 5,
+      "homeValue": 5,
+      "awayValue": 9
+    },
+    {
+      "key": "M059",
+      "description": "Üst 2.5 Oranı (%)",
+      "status": "✅ OK",
+      "working": true,
+      "value": 65,
+      "homeValue": 65,
+      "awayValue": 55.00000000000001
+    },
+    {
+      "key": "M060",
+      "description": "Alt 2.5 Oranı (%)",
+      "status": "✅ OK",
+      "working": true,
+      "value": 35,
+      "homeValue": 35,
+      "awayValue": 45
+    },
+    {
+      "key": "M061",
+      "description": "KG Var (BTTS) Oranı (%)",
+      "status": "✅ OK",
+      "working": true,
+      "value": 60,
+      "homeValue": 60,
+      "awayValue": 40
+    },
+    {
+      "key": "M062",
+      "description": "İlk Golü Atma Oranı (%)",
+      "status": "✅ OK",
+      "working": true,
+      "value": 66.67,
+      "homeValue": 66.66666666666666,
+      "awayValue": 66.66666666666666
+    },
+    {
+      "key": "M063",
+      "description": "İlk Golü Atınca Kazanma (%)",
+      "status": "✅ OK",
+      "working": true,
+      "value": 100,
+      "homeValue": 100,
+      "awayValue": 100
+    },
+    {
+      "key": "M064",
+      "description": "Geriden Gelme Oranı (%)",
+      "status": "⚠️ SIFIR",
+      "working": true,
+      "value": 0,
+      "reason": "Sıfır değer — veri kısıtlı olabilir veya gerçekten 0",
+      "homeValue": 0,
+      "awayValue": 0
+    },
+    {
+      "key": "M065",
+      "description": "Fişi Çekme İndeksi (%)",
+      "status": "✅ OK",
+      "working": true,
+      "value": 50,
+      "homeValue": 50,
+      "awayValue": 72.72727272727273
+    },
+    {
+      "key": "M066",
+      "description": "İlk 11 Ortalama Rating",
+      "status": "❌ NULL",
+      "working": false,
+      "value": null,
+      "reason": "Veri bulunamadı veya hesaplanamadı"
+    },
+    {
+      "key": "M067",
+      "description": "Yedek Ortalama Rating",
+      "status": "❌ NULL",
+      "working": false,
+      "value": null,
+      "reason": "Veri bulunamadı veya hesaplanamadı"
+    },
+    {
+      "key": "M068",
+      "description": "Rating Farkı (Max-Min)",
+      "status": "❌ NULL",
+      "working": false,
+      "value": null,
+      "reason": "Veri bulunamadı veya hesaplanamadı"
+    },
+    {
+      "key": "M069",
+      "description": "Forvet Gol Katkısı (%)",
+      "status": "❌ NULL",
+      "working": false,
+      "value": null,
+      "reason": "Veri bulunamadı veya hesaplanamadı"
+    },
+    {
+      "key": "M070",
+      "description": "Orta Saha Yaratıcılık İndeksi",
+      "status": "❌ NULL",
+      "working": false,
+      "value": null,
+      "reason": "Veri bulunamadı veya hesaplanamadı"
+    },
+    {
+      "key": "M071",
+      "description": "Defans Stability Skoru",
+      "status": "❌ NULL",
+      "working": false,
+      "value": null,
+      "reason": "Veri bulunamadı veya hesaplanamadı"
+    },
+    {
+      "key": "M072",
+      "description": "xG Bağımlılık Oranı",
+      "status": "❌ NULL",
+      "working": false,
+      "value": null,
+      "reason": "Veri bulunamadı veya hesaplanamadı"
+    },
+    {
+      "key": "M073",
+      "description": "Kilit Oyuncu Bağımlılık (%)",
+      "status": "❌ NULL",
+      "working": false,
+      "value": null,
+      "reason": "Veri bulunamadı veya hesaplanamadı"
+    },
+    {
+      "key": "M074",
+      "description": "Dribling Başarı Oranı (%)",
+      "status": "❌ NULL",
+      "working": false,
+      "value": null,
+      "reason": "Veri bulunamadı veya hesaplanamadı"
+    },
+    {
+      "key": "M075",
+      "description": "Pas Tamamlama Oranı (%)",
+      "status": "❌ NULL",
+      "working": false,
+      "value": null,
+      "reason": "Veri bulunamadı veya hesaplanamadı"
+    },
+    {
+      "key": "M076",
+      "description": "Hava Topu Gücü (%)",
+      "status": "❌ NULL",
+      "working": false,
+      "value": null,
+      "reason": "Veri bulunamadı veya hesaplanamadı"
+    },
+    {
+      "key": "M077",
+      "description": "Sakatlık Etkisi Skoru",
+      "status": "❌ NULL",
+      "working": false,
+      "value": null,
+      "reason": "Veri bulunamadı veya hesaplanamadı"
+    },
+    {
+      "key": "M078",
+      "description": "Ceza Etkisi Skoru",
+      "status": "❌ NULL",
+      "working": false,
+      "value": null,
+      "reason": "Veri bulunamadı veya hesaplanamadı"
+    },
+    {
+      "key": "M079",
+      "description": "Kadro Derinliği İndeksi",
+      "status": "❌ NULL",
+      "working": false,
+      "value": null,
+      "reason": "Veri bulunamadı veya hesaplanamadı"
+    },
+    {
+      "key": "M080",
+      "description": "Dakika Dağılımı Farkı",
+      "status": "❌ NULL",
+      "working": false,
+      "value": null,
+      "reason": "Veri bulunamadı veya hesaplanamadı"
+    },
+    {
+      "key": "M081",
+      "description": "Forvet xG/Şut Verimi",
+      "status": "❌ NULL",
+      "working": false,
+      "value": null,
+      "reason": "Veri bulunamadı veya hesaplanamadı"
+    },
+    {
+      "key": "M082",
+      "description": "Hücum Nitelik Puanı",
+      "status": "❌ NULL",
+      "working": false,
+      "value": null,
+      "reason": "Veri bulunamadı veya hesaplanamadı"
+    },
+    {
+      "key": "M083",
+      "description": "Defans Nitelik Puanı",
+      "status": "❌ NULL",
+      "working": false,
+      "value": null,
+      "reason": "Veri bulunamadı veya hesaplanamadı"
+    },
+    {
+      "key": "M084",
+      "description": "Teknik Nitelik Puanı",
+      "status": "❌ NULL",
+      "working": false,
+      "value": null,
+      "reason": "Veri bulunamadı veya hesaplanamadı"
+    },
+    {
+      "key": "M085",
+      "description": "Ort. Güçlü Yön Sayısı",
+      "status": "❌ NULL",
+      "working": false,
+      "value": null,
+      "reason": "Veri bulunamadı veya hesaplanamadı"
+    },
+    {
+      "key": "M086",
+      "description": "Ort. Zayıf Yön Sayısı",
+      "status": "❌ NULL",
+      "working": false,
+      "value": null,
+      "reason": "Veri bulunamadı veya hesaplanamadı"
+    },
+    {
+      "key": "M087",
+      "description": "İlk 11 Toplam Piyasa Değeri",
+      "status": "❌ NULL",
+      "working": false,
+      "value": null,
+      "reason": "Veri bulunamadı veya hesaplanamadı"
+    },
+    {
+      "key": "M088",
+      "description": "Yedek/İlk 11 Değer Oranı",
+      "status": "❌ NULL",
+      "working": false,
+      "value": null,
+      "reason": "Veri bulunamadı veya hesaplanamadı"
+    },
+    {
+      "key": "M089",
+      "description": "Rakibe Karşı Geçmiş Rating",
+      "status": "❌ NULL",
+      "working": false,
+      "value": null,
+      "reason": "Veri bulunamadı veya hesaplanamadı"
+    },
+    {
+      "key": "M090",
+      "description": "Gol Tutarlılığı (StdDev)",
+      "status": "❌ NULL",
+      "working": false,
+      "value": null,
+      "reason": "Veri bulunamadı veya hesaplanamadı"
+    },
+    {
+      "key": "M091",
+      "description": "Asist Tutarlılığı (StdDev)",
+      "status": "❌ NULL",
+      "working": false,
+      "value": null,
+      "reason": "Veri bulunamadı veya hesaplanamadı"
+    },
+    {
+      "key": "M092",
+      "description": "Son 5 Maç Rating Trendi",
+      "status": "❌ NULL",
+      "working": false,
+      "value": null,
+      "reason": "Veri bulunamadı veya hesaplanamadı"
+    },
+    {
+      "key": "M093",
+      "description": "Güçlüye Gol Atma Oranı (%)",
+      "status": "❌ NULL",
+      "working": false,
+      "value": null,
+      "reason": "Veri bulunamadı veya hesaplanamadı"
+    },
+    {
+      "key": "M094",
+      "description": "Güçsüzden Gol Yeme Oranı (%)",
+      "status": "❌ NULL",
+      "working": false,
+      "value": null,
+      "reason": "Veri bulunamadı veya hesaplanamadı"
+    },
+    {
+      "key": "M095",
+      "description": "Şansa Gol Atma İndeksi (%)",
+      "status": "❌ NULL",
+      "working": false,
+      "value": null,
+      "reason": "Veri bulunamadı veya hesaplanamadı"
+    },
+    {
+      "key": "M096",
+      "description": "Kurtarış Yüzdesi (%)",
+      "status": "✅ OK",
+      "working": true,
+      "value": 56.52,
+      "homeValue": 56.52173913043478,
+      "awayValue": 42.857142857142854
+    },
+    {
+      "key": "M097",
+      "description": "Maç Başı Kurtarış Ort.",
+      "status": "✅ OK",
+      "working": true,
+      "value": 2.17,
+      "homeValue": 2.1666666666666665,
+      "awayValue": 1
+    },
+    {
+      "key": "M098",
+      "description": "xG Bazlı Kurtarış Verimi",
+      "status": "⚠️ SIFIR",
+      "working": true,
+      "value": 0,
+      "reason": "Sıfır değer — veri kısıtlı olabilir veya gerçekten 0",
+      "homeValue": 0,
+      "awayValue": 0
+    },
+    {
+      "key": "M099",
+      "description": "Penaltı Kurtarma Oranı (%)",
+      "status": "⚠️ SIFIR",
+      "working": true,
+      "value": 0,
+      "reason": "Sıfır değer — veri kısıtlı olabilir veya gerçekten 0",
+      "homeValue": 0,
+      "awayValue": 0
+    },
+    {
+      "key": "M100",
+      "description": "1v1 Kurtarma Oranı (%)",
+      "status": "✅ OK",
+      "working": true,
+      "value": 57.89,
+      "homeValue": 57.89473684210527,
+      "awayValue": 40
+    },
+    {
+      "key": "M101",
+      "description": "Kaleci Dağıtım Başarısı",
+      "status": "✅ OK",
+      "working": true,
+      "value": 72.77,
+      "homeValue": 72.76785714285714,
+      "awayValue": 60.71428571428571
+    },
+    {
+      "key": "M102",
+      "description": "Kaleci Sezon Rating",
+      "status": "✅ OK",
+      "working": true,
+      "value": 6.8,
+      "homeValue": 6.8,
+      "awayValue": 6.6
+    },
+    {
+      "key": "M103",
+      "description": "Clean Sheet Streak",
+      "status": "✅ OK",
+      "working": true,
+      "value": 2,
+      "homeValue": 2,
+      "awayValue": 3
+    },
+    {
+      "key": "M104",
+      "description": "Uzak Mesafe Şut Kurtarma (%)",
+      "status": "✅ OK",
+      "working": true,
+      "value": 100,
+      "homeValue": 100,
+      "awayValue": 100
+    },
+    {
+      "key": "M105",
+      "description": "Hata Sonucu Gol Sayısı",
+      "status": "⚠️ SIFIR",
+      "working": true,
+      "value": 0,
+      "reason": "Sıfır değer — veri kısıtlı olabilir veya gerçekten 0",
+      "homeValue": 0,
+      "awayValue": 0
+    },
+    {
+      "key": "M106",
+      "description": "Kaleci Nitelik Skoru",
+      "status": "⚠️ SIFIR",
+      "working": true,
+      "value": 0,
+      "reason": "Sıfır değer — veri kısıtlı olabilir veya gerçekten 0",
+      "homeValue": 0,
+      "awayValue": 0
+    },
+    {
+      "key": "M107",
+      "description": "Hava Hakimiyeti Ortalaması",
+      "status": "✅ OK",
+      "working": true,
+      "value": 0.83,
+      "homeValue": 0.8333333333333334,
+      "awayValue": 1.3333333333333333
+    },
+    {
+      "key": "M108",
+      "description": "Kaleci Son 5 Maç Trend",
+      "status": "⚠️ SIFIR",
+      "working": true,
+      "value": 0,
+      "reason": "Sıfır değer — veri kısıtlı olabilir veya gerçekten 0",
+      "homeValue": 0,
+      "awayValue": 0
+    },
+    {
+      "key": "M109",
+      "description": "Maç Başı Sarı Kart Ort.",
+      "status": "❌ NULL",
+      "working": false,
+      "value": null,
+      "reason": "Veri bulunamadı veya hesaplanamadı",
+      "homeValue": null,
+      "awayValue": "-"
+    },
+    {
+      "key": "M110",
+      "description": "Maç Başı Kırmızı Kart Ort.",
+      "status": "❌ NULL",
+      "working": false,
+      "value": null,
+      "reason": "Veri bulunamadı veya hesaplanamadı",
+      "homeValue": null,
+      "awayValue": "-"
+    },
+    {
+      "key": "M111",
+      "description": "Penaltı Verme Sıklığı",
+      "status": "❌ NULL",
+      "working": false,
+      "value": null,
+      "reason": "Veri bulunamadı veya hesaplanamadı",
+      "homeValue": null,
+      "awayValue": "-"
+    },
+    {
+      "key": "M112",
+      "description": "Ev Sahibi Galibiyet Oranı (%)",
+      "status": "❌ NULL",
+      "working": false,
+      "value": null,
+      "reason": "Veri bulunamadı veya hesaplanamadı",
+      "homeValue": null,
+      "awayValue": "-"
+    },
+    {
+      "key": "M113",
+      "description": "Maçlardaki Gol Ortalaması",
+      "status": "❌ NULL",
+      "working": false,
+      "value": null,
+      "reason": "Veri bulunamadı veya hesaplanamadı",
+      "homeValue": null,
+      "awayValue": "-"
+    },
+    {
+      "key": "M114",
+      "description": "Üst 2.5 Oranı (%)",
+      "status": "❌ NULL",
+      "working": false,
+      "value": null,
+      "reason": "Veri bulunamadı veya hesaplanamadı",
+      "homeValue": null,
+      "awayValue": "-"
+    },
+    {
+      "key": "M115",
+      "description": "Ev Sahibi Yaklaşım Skoru",
+      "status": "❌ NULL",
+      "working": false,
+      "value": null,
+      "reason": "Veri bulunamadı veya hesaplanamadı",
+      "homeValue": null,
+      "awayValue": "-"
+    },
+    {
+      "key": "M116",
+      "description": "Deplasman Yaklaşım Skoru",
+      "status": "❌ NULL",
+      "working": false,
+      "value": null,
+      "reason": "Veri bulunamadı veya hesaplanamadı",
+      "homeValue": null,
+      "awayValue": "-"
+    },
+    {
+      "key": "M117",
+      "description": "Sertlik İndeksi",
+      "status": "❌ NULL",
+      "working": false,
+      "value": null,
+      "reason": "Veri bulunamadı veya hesaplanamadı",
+      "homeValue": null,
+      "awayValue": "-"
+    },
+    {
+      "key": "M118",
+      "description": "Faul Toleransı",
+      "status": "❌ NULL",
+      "working": false,
+      "value": null,
+      "reason": "Veri bulunamadı veya hesaplanamadı",
+      "homeValue": null,
+      "awayValue": "-"
+    },
+    {
+      "key": "M119",
+      "description": "Ev Sahibi H2H Galibiyet",
+      "status": "⚠️ SIFIR",
+      "working": true,
+      "value": 0,
+      "reason": "Sıfır değer — veri kısıtlı olabilir veya gerçekten 0",
+      "homeValue": 0,
+      "awayValue": "-"
+    },
+    {
+      "key": "M120",
+      "description": "H2H Beraberlik Sayısı",
+      "status": "⚠️ SIFIR",
+      "working": true,
+      "value": 0,
+      "reason": "Sıfır değer — veri kısıtlı olabilir veya gerçekten 0",
+      "homeValue": 0,
+      "awayValue": "-"
+    },
+    {
+      "key": "M121",
+      "description": "Deplasman H2H Galibiyet",
+      "status": "⚠️ SIFIR",
+      "working": true,
+      "value": 0,
+      "reason": "Sıfır değer — veri kısıtlı olabilir veya gerçekten 0",
+      "homeValue": 0,
+      "awayValue": "-"
+    },
+    {
+      "key": "M122",
+      "description": "Son 5 H2H Ev Performansı (%)",
+      "status": "✅ OK",
+      "working": true,
+      "value": 50,
+      "homeValue": 50,
+      "awayValue": "-"
+    },
+    {
+      "key": "M123",
+      "description": "H2H Maç Başı Gol Ort.",
+      "status": "⚠️ SIFIR",
+      "working": true,
+      "value": 0,
+      "reason": "Sıfır değer — veri kısıtlı olabilir veya gerçekten 0",
+      "homeValue": 0,
+      "awayValue": "-"
+    },
+    {
+      "key": "M124",
+      "description": "H2H Üst 2.5 Oranı (%)",
+      "status": "✅ OK",
+      "working": true,
+      "value": 50,
+      "homeValue": 50,
+      "awayValue": "-"
+    },
+    {
+      "key": "M125",
+      "description": "H2H KG Var Oranı (%)",
+      "status": "✅ OK",
+      "working": true,
+      "value": 50,
+      "homeValue": 50,
+      "awayValue": "-"
+    },
+    {
+      "key": "M126",
+      "description": "Son H2H Skor Etkisi",
+      "status": "⚠️ SIFIR",
+      "working": true,
+      "value": 0,
+      "reason": "Sıfır değer — veri kısıtlı olabilir veya gerçekten 0",
+      "homeValue": 0,
+      "awayValue": "-"
+    },
+    {
+      "key": "M127",
+      "description": "Menajer H2H Galibiyet (%)",
+      "status": "✅ OK",
+      "working": true,
+      "value": 50,
+      "homeValue": 50,
+      "awayValue": "-"
+    },
+    {
+      "key": "M128",
+      "description": "H2H Gol Farkı Trendi",
+      "status": "⚠️ SIFIR",
+      "working": true,
+      "value": 0,
+      "reason": "Sıfır değer — veri kısıtlı olabilir veya gerçekten 0",
+      "homeValue": 0,
+      "awayValue": "-"
+    },
+    {
+      "key": "M129",
+      "description": "H2H Kart Ortalaması",
+      "status": "✅ OK",
+      "working": true,
+      "value": 3.5,
+      "homeValue": 3.5,
+      "awayValue": "-"
+    },
+    {
+      "key": "M130",
+      "description": "H2H Korner Ortalaması",
+      "status": "✅ OK",
+      "working": true,
+      "value": 9,
+      "homeValue": 9,
+      "awayValue": "-"
+    },
+    {
+      "key": "M131",
+      "description": "Bahis: Ev Sahibi Olasılık (%)",
+      "status": "✅ OK",
+      "working": true,
+      "value": 33.3,
+      "homeValue": 33.3,
+      "awayValue": "-"
+    },
+    {
+      "key": "M132",
+      "description": "Bahis: Beraberlik Olasılık (%)",
+      "status": "✅ OK",
+      "working": true,
+      "value": 33.3,
+      "homeValue": 33.3,
+      "awayValue": "-"
+    },
+    {
+      "key": "M133",
+      "description": "Bahis: Deplasman Olasılık (%)",
+      "status": "✅ OK",
+      "working": true,
+      "value": 33.3,
+      "homeValue": 33.3,
+      "awayValue": "-"
+    },
+    {
+      "key": "M134",
+      "description": "Bahis: Üst 2.5 Olasılık (%)",
+      "status": "✅ OK",
+      "working": true,
+      "value": 50,
+      "homeValue": 50,
+      "awayValue": "-"
+    },
+    {
+      "key": "M135",
+      "description": "Oy: Ev Sahibi Oyu (%)",
+      "status": "✅ OK",
+      "working": true,
+      "value": 81.06,
+      "homeValue": 81.06094605511174,
+      "awayValue": "-"
+    },
+    {
+      "key": "M136",
+      "description": "Oy: Beraberlik Oyu (%)",
+      "status": "✅ OK",
+      "working": true,
+      "value": 7.32,
+      "homeValue": 7.321305687700088,
+      "awayValue": "-"
+    },
+    {
+      "key": "M137",
+      "description": "Oy: Deplasman Oyu (%)",
+      "status": "✅ OK",
+      "working": true,
+      "value": 11.62,
+      "homeValue": 11.617748257188163,
+      "awayValue": "-"
+    },
+    {
+      "key": "M138",
+      "description": "Stadyum Kapasite Etkisi",
+      "status": "✅ OK",
+      "working": true,
+      "value": 0.53,
+      "homeValue": 0.5305625,
+      "awayValue": "-"
+    },
+    {
+      "key": "M139",
+      "description": "Ev Menajer Deneyim (%)",
+      "status": "✅ OK",
+      "working": true,
+      "value": 50,
+      "homeValue": 50,
+      "awayValue": "-"
+    },
+    {
+      "key": "M140",
+      "description": "Menajer Motivasyon Skoru (%)",
+      "status": "✅ OK",
+      "working": true,
+      "value": 50,
+      "homeValue": 50,
+      "awayValue": "-"
+    },
+    {
+      "key": "M141",
+      "description": "Sezon İlerleme Oranı",
+      "status": "✅ OK",
+      "working": true,
+      "value": 0.74,
+      "homeValue": 0.7368421052631579,
+      "awayValue": "-"
+    },
+    {
+      "key": "M142",
+      "description": "Puan Durumu Farkı (normalize)",
+      "status": "✅ OK",
+      "working": true,
+      "value": 0.25,
+      "homeValue": 0.25,
+      "awayValue": "-"
+    },
+    {
+      "key": "M143",
+      "description": "Puan Farkı (mutlak)",
+      "status": "⚠️ SIFIR",
+      "working": true,
+      "value": 0,
+      "reason": "Sıfır değer — veri kısıtlı olabilir veya gerçekten 0",
+      "homeValue": 0,
+      "awayValue": "-"
+    },
+    {
+      "key": "M144",
+      "description": "Lig Gücü İndeksi",
+      "status": "✅ OK",
+      "working": true,
+      "value": 50,
+      "homeValue": 50,
+      "awayValue": "-"
+    },
+    {
+      "key": "M145",
+      "description": "Transfer Değer Oranı",
+      "status": "✅ OK",
+      "working": true,
+      "value": 1,
+      "homeValue": 1,
+      "awayValue": "-"
+    },
+    {
+      "key": "M146",
+      "description": "Baskı Kurma İndeksi",
+      "status": "✅ OK",
+      "working": true,
+      "value": 27.42,
+      "homeValue": 27.421445404556167,
+      "awayValue": 29.201831044527673
+    },
+    {
+      "key": "M147",
+      "description": "Baskı Yeme İndeksi",
+      "status": "✅ OK",
+      "working": true,
+      "value": 27.58,
+      "homeValue": 27.582962962962966,
+      "awayValue": 17.43939393939394
+    },
+    {
+      "key": "M148",
+      "description": "Baskı Altında Gol Atma (%)",
+      "status": "⚠️ SIFIR",
+      "working": true,
+      "value": 0,
+      "reason": "Sıfır değer — veri kısıtlı olabilir veya gerçekten 0",
+      "homeValue": 0,
+      "awayValue": 0
+    },
+    {
+      "key": "M149",
+      "description": "Dominant İken Gol Atma (%)",
+      "status": "✅ OK",
+      "working": true,
+      "value": 50,
+      "homeValue": 50,
+      "awayValue": 33.33333333333333
+    },
+    {
+      "key": "M150",
+      "description": "Topla Oynama Ortalaması (%)",
+      "status": "✅ OK",
+      "working": true,
+      "value": 49.67,
+      "homeValue": 49.666666666666664,
+      "awayValue": 73
+    },
+    {
+      "key": "M151",
+      "description": "Topla Oynama/Gol Korelasyon",
+      "status": "✅ OK",
+      "working": true,
+      "value": 0.9,
+      "homeValue": 0.8990040968868916,
+      "awayValue": 0.987829161147262
+    },
+    {
+      "key": "M152",
+      "description": "Pas Tamamlama Oranı (%)",
+      "status": "⚠️ SIFIR",
+      "working": true,
+      "value": 0,
+      "reason": "Sıfır değer — veri kısıtlı olabilir veya gerçekten 0",
+      "homeValue": 0,
+      "awayValue": 0
+    },
+    {
+      "key": "M153",
+      "description": "Uzun Pas Başarısı (%)",
+      "status": "⚠️ SIFIR",
+      "working": true,
+      "value": 0,
+      "reason": "Sıfır değer — veri kısıtlı olabilir veya gerçekten 0",
+      "homeValue": 0,
+      "awayValue": 0
+    },
+    {
+      "key": "M154",
+      "description": "Cross Başarısı (%)",
+      "status": "⚠️ SIFIR",
+      "working": true,
+      "value": 0,
+      "reason": "Sıfır değer — veri kısıtlı olabilir veya gerçekten 0",
+      "homeValue": 0,
+      "awayValue": 0
+    },
+    {
+      "key": "M155",
+      "description": "Gole Katkı Sağlama İndeksi",
+      "status": "✅ OK",
+      "working": true,
+      "value": 5,
+      "homeValue": 5,
+      "awayValue": 2.6666666666666665
+    },
+    {
+      "key": "M156",
+      "description": "Genel Hücum Gücü Skoru",
+      "status": "✅ OK",
+      "working": true,
+      "value": 7.06,
+      "homeValue": 7.059921445404554,
+      "awayValue": 6.734640427535755
+    },
+    {
+      "key": "M157",
+      "description": "Genel Defans Gücü Skoru",
+      "status": "✅ OK",
+      "working": true,
+      "value": 50.76,
+      "homeValue": 50.76034367701035,
+      "awayValue": 54.614035087719294
+    },
+    {
+      "key": "M158",
+      "description": "Genel Form Skoru",
+      "status": "✅ OK",
+      "working": true,
+      "value": 62.08,
+      "homeValue": 62.08333333333332,
+      "awayValue": 68.46969696969698
+    },
+    {
+      "key": "M159",
+      "description": "Oyuncu Kalitesi Skoru",
+      "status": "⚠️ SIFIR",
+      "working": true,
+      "value": 0,
+      "reason": "Sıfır değer — veri kısıtlı olabilir veya gerçekten 0",
+      "homeValue": 0,
+      "awayValue": 0
+    },
+    {
+      "key": "M160",
+      "description": "Kaleci Gücü Skoru",
+      "status": "✅ OK",
+      "working": true,
+      "value": 54.88,
+      "homeValue": 54.87669418110493,
+      "awayValue": 47.94571428571428
+    },
+    {
+      "key": "M161",
+      "description": "Hakem Etkisi Skoru",
+      "status": "❌ NULL",
+      "working": false,
+      "value": null,
+      "reason": "Veri bulunamadı veya hesaplanamadı"
+    },
+    {
+      "key": "M162",
+      "description": "H2H Avantajı Skoru",
+      "status": "❌ NULL",
+      "working": false,
+      "value": null,
+      "reason": "Veri bulunamadı veya hesaplanamadı"
+    },
+    {
+      "key": "M163",
+      "description": "Bağlamsal Avantaj Skoru",
+      "status": "❌ NULL",
+      "working": false,
+      "value": null,
+      "reason": "Veri bulunamadı veya hesaplanamadı"
+    },
+    {
+      "key": "M164",
+      "description": "Momentum Skoru",
+      "status": "✅ OK",
+      "working": true,
+      "value": 46.3,
+      "homeValue": 46.29684463646679,
+      "awayValue": 42.17445711799645
+    },
+    {
+      "key": "M165",
+      "description": "Mutlaka Gol Atma İndeksi",
+      "status": "✅ OK",
+      "working": true,
+      "value": 72,
+      "homeValue": 71.99999999999999,
+      "awayValue": 59.999999999999986
+    },
+    {
+      "key": "M166",
+      "description": "Toplam Takım Güç Skoru",
+      "status": "✅ OK",
+      "working": true,
+      "value": 37.82,
+      "homeValue": 37.81896265566919,
+      "awayValue": 37.563215294816615
+    },
+    {
+      "key": "M167",
+      "description": "Poisson Lambda (Beklenen Gol)",
+      "status": "✅ OK",
+      "working": true,
+      "value": 1.31,
+      "homeValue": 1.3115679012345676,
+      "awayValue": 2.1433992094861667
+    },
+    {
+      "key": "M168",
+      "description": "Kazanma Olasılığı (%)",
+      "status": "✅ OK",
+      "working": true,
+      "value": 22.98,
+      "homeValue": 22.98,
+      "awayValue": 56.37
+    }
+  ],
+  "dataAvailability": {
+    "eventStats": true,
+    "incidents": true,
+    "lineups": true,
+    "shotmap": true,
+    "graph": true,
+    "h2h": true,
+    "odds": true,
+    "missingPlayers": false,
+    "streaks": true,
+    "form": false,
+    "votes": true,
+    "standings": true,
+    "refereeStats": false,
+    "homeManagerCareer": false,
+    "awayManagerCareer": false
+  }
+}

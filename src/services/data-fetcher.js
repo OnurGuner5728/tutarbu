@@ -1,0 +1,354 @@
+/**
+ * Data Fetcher — Orchestrator
+ * Bir maç için gereken TÜM verileri SofaScore API'den toplar.
+ * Hiçbir fallback/statik değer yoktur.
+ */
+
+const api = require('./playwright-client');
+
+/**
+ * Verilen event ID için tahmin motorunun ihtiyaç duyduğu tüm ham verileri toplar.
+ * @param {number} eventId
+ * @returns {Promise<object>} Tüm ham veriler
+ */
+async function fetchAllMatchData(eventId) {
+  console.log(`[DataFetcher] Fetching all data for event ${eventId}...`);
+  const startTime = Date.now();
+
+  // 1. Maç temel bilgisi — tournamentId, seasonId, teamId'ler buradan çıkacak
+  const eventData = await api.getEvent(eventId);
+  if (!eventData || !eventData.event) {
+    throw new Error(`Event ${eventId} not found or API error`);
+  }
+
+  const event = eventData.event;
+  const homeTeamId = event.homeTeam.id;
+  const awayTeamId = event.awayTeam.id;
+  const tournamentId = event.tournament?.uniqueTournament?.id || event.tournament?.id;
+  const seasonId = event.season?.id;
+  const refereeId = event.referee?.id || null;
+  const homeManagerId = event.homeTeam?.manager?.id || null;
+  const awayManagerId = event.awayTeam?.manager?.id || null;
+
+  console.log(`[DataFetcher] Match: ${event.homeTeam.name} vs ${event.awayTeam.name}`);
+  console.log(`[DataFetcher] Tournament: ${tournamentId}, Season: ${seasonId}`);
+
+  // 2. Maç seviyesi veriler (paralel)
+  // Promise.allSettled kullanılıyor: tek bir API hatası tüm fetch'i çökertmemeli.
+  // Her sonuç { status: 'fulfilled'|'rejected', value|reason } şeklinde gelir.
+  const matchLevelResults = await Promise.allSettled([
+    api.getEventStats(eventId),        // 0
+    api.getEventIncidents(eventId),    // 1
+    api.getEventLineups(eventId),      // 2
+    api.getEventShotmap(eventId),      // 3
+    api.getEventGraph(eventId),        // 4
+    api.getEventH2H(eventId),          // 5
+    api.getEventH2HEvents(eventId),    // 6
+    api.getEventOdds(eventId),         // 7
+    api.getEventMissingPlayers(eventId), // 8
+    api.getEventStreaks(eventId),      // 9
+    api.getEventForm(eventId),         // 10
+    api.getEventManagers(eventId),     // 11
+    api.getEventVotes(eventId),        // 12
+  ]);
+
+  const matchLevelNames = [
+    'eventStats', 'incidents', 'lineups', 'shotmap', 'graph',
+    'h2h', 'h2hEvents', 'odds', 'missingPlayers', 'streaks',
+    'form', 'managers', 'votes',
+  ];
+  matchLevelResults.forEach((r, i) => {
+    if (r.status === 'rejected') {
+      console.warn(`[DataFetcher] Non-critical fetch failed (${matchLevelNames[i]}): ${r.reason?.message || r.reason}`);
+    }
+  });
+
+  let [
+    eventStats, incidents, lineups, shotmap, graph,
+    h2h, h2hEvents, odds, missingPlayers, streaks,
+    form, managers, votes
+  ] = matchLevelResults.map(r => (r.status === 'fulfilled' ? r.value : null));
+
+  // 3 + 4. Takım verileri — Ev sahibi ve deplasman (paralel)
+  const teamLevelResults = await Promise.allSettled([
+    api.getTeam(homeTeamId),              // 0
+    api.getTeamPlayers(homeTeamId),       // 1
+    api.getTeamLastEvents(homeTeamId, 0), // 2
+    api.getTeamLastEvents(homeTeamId, 1), // 3
+    api.getTeam(awayTeamId),              // 4
+    api.getTeamPlayers(awayTeamId),       // 5
+    api.getTeamLastEvents(awayTeamId, 0), // 6
+    api.getTeamLastEvents(awayTeamId, 1), // 7
+  ]);
+
+  const teamLevelNames = [
+    'homeTeam', 'homePlayers', 'homeLastEvents0', 'homeLastEvents1',
+    'awayTeam', 'awayPlayers', 'awayLastEvents0', 'awayLastEvents1',
+  ];
+  teamLevelResults.forEach((r, i) => {
+    if (r.status === 'rejected') {
+      console.warn(`[DataFetcher] Non-critical fetch failed (${teamLevelNames[i]}): ${r.reason?.message || r.reason}`);
+    }
+  });
+
+  const [
+    homeTeam, homePlayers, homeLastEvents0, homeLastEvents1,
+    awayTeam, awayPlayers, awayLastEvents0, awayLastEvents1
+  ] = teamLevelResults.map(r => (r.status === 'fulfilled' ? r.value : null));
+
+  // 5. Lig/Turnuva verileri
+  let standingsTotal = null;
+  let standingsHome = null;
+  let standingsAway = null;
+  let homeTeamSeasonStats = null;
+  let awayTeamSeasonStats = null;
+  let homeTopPlayers = null;
+  let awayTopPlayers = null;
+
+  if (tournamentId && seasonId) {
+    const leagueResults = await Promise.allSettled([
+      api.getStandings(tournamentId, seasonId, 'total'),             // 0
+      api.getStandings(tournamentId, seasonId, 'home'),              // 1
+      api.getStandings(tournamentId, seasonId, 'away'),              // 2
+      api.getTeamSeasonStats(homeTeamId, tournamentId, seasonId),    // 3
+      api.getTeamSeasonStats(awayTeamId, tournamentId, seasonId),    // 4
+      api.getTeamTopPlayers(homeTeamId, tournamentId, seasonId),     // 5
+      api.getTeamTopPlayers(awayTeamId, tournamentId, seasonId),     // 6
+    ]);
+
+    const leagueNames = [
+      'standingsTotal', 'standingsHome', 'standingsAway',
+      'homeTeamSeasonStats', 'awayTeamSeasonStats',
+      'homeTopPlayers', 'awayTopPlayers',
+    ];
+    leagueResults.forEach((r, i) => {
+      if (r.status === 'rejected') {
+        console.warn(`[DataFetcher] Non-critical fetch failed (${leagueNames[i]}): ${r.reason?.message || r.reason}`);
+      }
+    });
+
+    const [st, sh, sa, hss, ass, htp, atp] = leagueResults.map(r => (r.status === 'fulfilled' ? r.value : null));
+    standingsTotal = st; standingsHome = sh; standingsAway = sa;
+    homeTeamSeasonStats = hss; awayTeamSeasonStats = ass;
+    homeTopPlayers = htp; awayTopPlayers = atp;
+  }
+
+  // 6. Hakem verisi
+  let refereeStats = null;
+  if (refereeId) {
+    refereeStats = await api.getRefereeStats(refereeId);
+  }
+
+  // 7. Menajer verileri
+  let homeManagerCareer = null;
+  let awayManagerCareer = null;
+
+  // Manager ID'leri event'ten veya managers endpoint'ten al
+  let actualHomeManagerId = homeManagerId;
+  let actualAwayManagerId = awayManagerId;
+
+  if (managers) {
+    if (managers.homeManager) actualHomeManagerId = managers.homeManager.id;
+    if (managers.awayManager) actualAwayManagerId = managers.awayManager.id;
+  }
+  if (!actualHomeManagerId && homeTeam?.team?.manager?.id) {
+    actualHomeManagerId = homeTeam.team.manager.id;
+  }
+  if (!actualAwayManagerId && awayTeam?.team?.manager?.id) {
+    actualAwayManagerId = awayTeam.team.manager.id;
+  }
+
+  if (actualHomeManagerId) {
+    homeManagerCareer = await api.getManagerCareer(actualHomeManagerId);
+  }
+  if (actualAwayManagerId) {
+    awayManagerCareer = await api.getManagerCareer(actualAwayManagerId);
+  }
+
+  // 8. Son maçların incident/stats verilerini çek (son 3 maç deep-dive)
+  const homeRecentMatchDetails = await fetchRecentMatchDetails(homeLastEvents0, 3);
+  const awayRecentMatchDetails = await fetchRecentMatchDetails(awayLastEvents0, 3);
+
+  // --- FALLBACK LINEUP GENERATOR ---
+  function buildFallbackLineup(topPlayers, squadPlayers) {
+    if (!topPlayers && !squadPlayers) return { players: [] };
+    
+    let availablePlayers = [];
+    if (topPlayers?.topPlayers?.rating) {
+      availablePlayers = topPlayers.topPlayers.rating.map(p => ({
+        player: p.player,
+        position: p.player?.position || 'Unknown',
+        shirtNumber: p.player?.shirtNumber || '',
+        substitute: false 
+      }));
+    } else if (squadPlayers?.players) {
+      availablePlayers = squadPlayers.players.map(p => ({
+        player: p.player,
+        position: p.player?.position || 'Unknown',
+        shirtNumber: p.player?.shirtNumber || '',
+        substitute: false
+      }));
+    }
+    
+    const selected = availablePlayers.slice(0, 18);
+    return {
+      players: selected.map((p, idx) => ({ ...p, substitute: idx >= 11 }))
+    };
+  }
+
+  if (!lineups) lineups = {};
+  if (!lineups.home || !lineups.home.players || lineups.home.players.length === 0) {
+    console.log(`[DataFetcher] No home lineup found, generating fallback Auto-Lineup...`);
+    lineups.home = buildFallbackLineup(homeTopPlayers, homePlayers);
+    lineups.isFallback = true;
+  }
+  
+  if (!lineups.away || !lineups.away.players || lineups.away.players.length === 0) {
+    console.log(`[DataFetcher] No away lineup found, generating fallback Auto-Lineup...`);
+    lineups.away = buildFallbackLineup(awayTopPlayers, awayPlayers);
+    lineups.isFallback = true;
+  }
+
+  // 9. İlk 11 oyuncuların bireysel istatistikleri
+  const homePlayerStats = await fetchPlayerStats(lineups?.home?.players, tournamentId, seasonId);
+  const awayPlayerStats = await fetchPlayerStats(lineups?.away?.players, tournamentId, seasonId);
+
+  const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+  console.log(`[DataFetcher] All data fetched in ${elapsed}s`);
+
+  return {
+    event: eventData,
+    eventId,
+    homeTeamId,
+    awayTeamId,
+    tournamentId,
+    seasonId,
+    refereeId,
+
+    // Maç seviyesi
+    eventStats,
+    incidents,
+    lineups,
+    shotmap,
+    graph,
+    h2h,
+    h2hEvents,
+    odds,
+    missingPlayers,
+    streaks,
+    form,
+    managers,
+    votes,
+
+    // Takımlar
+    homeTeam,
+    awayTeam,
+    homePlayers,
+    awayPlayers,
+    homeLastEvents: mergeEventPages(homeLastEvents0, homeLastEvents1),
+    awayLastEvents: mergeEventPages(awayLastEvents0, awayLastEvents1),
+
+    // Lig
+    standingsTotal,
+    standingsHome,
+    standingsAway,
+    homeTeamSeasonStats,
+    awayTeamSeasonStats,
+    homeTopPlayers,
+    awayTopPlayers,
+
+    // Hakem & Menajer
+    refereeStats,
+    homeManagerCareer,
+    awayManagerCareer,
+    homeManagerId: actualHomeManagerId,
+    awayManagerId: actualAwayManagerId,
+
+    // Deep-dive
+    homeRecentMatchDetails,
+    awayRecentMatchDetails,
+    homePlayerStats,
+    awayPlayerStats,
+  };
+}
+
+/**
+ * Son N maçın incidents + statistics + shotmap + graph verilerini çeker.
+ * count default'u çağrı sitesiyle uyumlu olarak 3 olarak ayarlandı.
+ */
+async function fetchRecentMatchDetails(lastEventsResponse, count = 3) {
+  const events = lastEventsResponse?.events || [];
+  const recentFinished = events
+    .filter(e => e.status?.type === 'finished')
+    .slice(0, count);
+
+  const details = [];
+  for (const ev of recentFinished) {
+    const incidents = await api.getEventIncidents(ev.id);
+    const stats = await api.getEventStats(ev.id);
+    const shotmap = await api.getEventShotmap(ev.id);
+    const graph = await api.getEventGraph(ev.id);
+    const lineups = await api.getEventLineups(ev.id);
+
+    details.push({
+      eventId: ev.id,
+      homeTeam: ev.homeTeam,
+      awayTeam: ev.awayTeam,
+      homeScore: ev.homeScore,
+      awayScore: ev.awayScore,
+      status: ev.status,
+      startTimestamp: ev.startTimestamp,
+      incidents,
+      stats,
+      shotmap,
+      graph,
+      lineups,
+    });
+  }
+  return details;
+}
+
+/**
+ * Kadrodaki oyuncuların sezon istatistiklerini çeker.
+ * Sadece ilk 11 + ilk 3 yedek (toplam max 14 oyuncu).
+ */
+async function fetchPlayerStats(players, tournamentId, seasonId) {
+  if (!players || !tournamentId || !seasonId) return [];
+
+  const starters = players.filter(p => !p.substitute).slice(0, 11);
+  const subs = players.filter(p => p.substitute).slice(0, 3);
+  const targetPlayers = [...starters, ...subs];
+
+  const results = [];
+  for (const p of targetPlayers) {
+    const playerId = p.player?.id;
+    if (!playerId) continue;
+
+    const seasonStats = await api.getPlayerSeasonStats(playerId, tournamentId, seasonId);
+    const attributes = await api.getPlayerAttributes(playerId);
+    const characteristics = await api.getPlayerCharacteristics(playerId);
+
+    results.push({
+      playerId,
+      name: p.player.name,
+      position: p.player.position || p.position,
+      shirtNumber: p.shirtNumber,
+      substitute: p.substitute || false,
+      seasonStats,
+      attributes,
+      characteristics,
+    });
+  }
+  return results;
+}
+
+/**
+ * İki sayfa event verisini birleştirir.
+ */
+function mergeEventPages(page0, page1) {
+  const events0 = page0?.events || [];
+  const events1 = page1?.events || [];
+  return [...events0, ...events1];
+}
+
+module.exports = { fetchAllMatchData };

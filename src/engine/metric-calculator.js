@@ -1,0 +1,131 @@
+/**
+ * Metric Calculator — Orchestrator
+ * Tüm 168 metriği tek bir çağrıda hesaplar.
+ */
+
+const { calculateTeamAttackMetrics } = require('../metrics/team-attack');
+const { calculateTeamDefenseMetrics } = require('../metrics/team-defense');
+const { calculateTeamFormMetrics } = require('../metrics/team-form');
+const { calculatePlayerMetrics } = require('../metrics/player-performance');
+const { calculateGoalkeeperMetrics } = require('../metrics/goalkeeper');
+const { calculateRefereeMetrics } = require('../metrics/referee-impact');
+const { calculateH2HMetrics } = require('../metrics/h2h-analysis');
+const { calculateContextualMetrics } = require('../metrics/contextual');
+const { calculateMomentumMetrics } = require('../metrics/momentum');
+const { calculateAdvancedMetrics } = require('../metrics/advanced-derived');
+
+/**
+ * Tüm 168 metriği hesaplar.
+ * @param {object} data - fetchAllMatchData çıktısı
+ * @returns {object} Tüm metrikler + tahmin çıktısı
+ */
+function calculateAllMetrics(data) {
+  console.log('[MetricCalculator] Calculating 168 metrics...');
+  const startTime = Date.now();
+
+  // Bölüm A: Hücum (M001-M025) — Her iki takım
+  const homeAttack = calculateTeamAttackMetrics(data, 'home');
+  const awayAttack = calculateTeamAttackMetrics(data, 'away');
+
+  // Bölüm B: Defans (M026-M045) — Her iki takım
+  const homeDefense = calculateTeamDefenseMetrics(data, 'home');
+  const awayDefense = calculateTeamDefenseMetrics(data, 'away');
+
+  // Bölüm C: Form (M046-M065) — Her iki takım
+  const homeForm = calculateTeamFormMetrics(data, 'home');
+  const awayForm = calculateTeamFormMetrics(data, 'away');
+
+  // Bölüm D: Oyuncu (M066-M095) — Her iki takım
+  const homePlayer = calculatePlayerMetrics(data, 'home');
+  const awayPlayer = calculatePlayerMetrics(data, 'away');
+
+  // Bölüm E: Kaleci (M096-M108) — Her iki takım
+  const homeGK = calculateGoalkeeperMetrics(data, 'home');
+  const awayGK = calculateGoalkeeperMetrics(data, 'away');
+
+  // Bölüm F: Hakem (M109-M118) — Paylaşılan
+  const referee = calculateRefereeMetrics(data);
+
+  // Bölüm G: H2H (M119-M130) — Paylaşılan
+  const h2h = calculateH2HMetrics(data);
+
+  // Bölüm H: Bağlamsal (M131-M145) — Paylaşılan
+  const contextual = calculateContextualMetrics(data);
+
+  // Bölüm I: Momentum (M146-M155) — Her iki takım
+  const homeMomentum = calculateMomentumMetrics(data, 'home');
+  const awayMomentum = calculateMomentumMetrics(data, 'away');
+
+  // Bölüm J: Türetilmiş + Tahmin (M156-M168)
+  const advanced = calculateAdvancedMetrics({
+    homeAttack, awayAttack, homeDefense, awayDefense,
+    homeForm, awayForm, homePlayer, awayPlayer,
+    homeGK, awayGK, referee, h2h, contextual,
+    homeMomentum, awayMomentum,
+  });
+
+  const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
+  console.log(`[MetricCalculator] All metrics calculated in ${elapsed}s`);
+
+  // Metrik sayısını doğrula
+  const metricCount = countMetrics({
+    homeAttack, awayAttack, homeDefense, awayDefense,
+    homeForm, awayForm, homePlayer, awayPlayer,
+    homeGK, awayGK, referee, h2h, contextual,
+    homeMomentum, awayMomentum, advanced,
+  });
+
+  return {
+    home: {
+      attack: homeAttack,
+      defense: homeDefense,
+      form: homeForm,
+      player: homePlayer,
+      goalkeeper: homeGK,
+      momentum: homeMomentum,
+      compositeScores: advanced.home,
+    },
+    away: {
+      attack: awayAttack,
+      defense: awayDefense,
+      form: awayForm,
+      player: awayPlayer,
+      goalkeeper: awayGK,
+      momentum: awayMomentum,
+      compositeScores: advanced.away,
+    },
+    shared: {
+      referee,
+      h2h,
+      contextual,
+      sharedComposite: advanced.shared,
+    },
+    prediction: advanced.prediction,
+    meta: {
+      calculationTimeMs: Date.now() - startTime,
+      totalMetricsCalculated: metricCount,
+      eventId: data.eventId,
+      homeTeam: data.event?.event?.homeTeam?.name,
+      awayTeam: data.event?.event?.awayTeam?.name,
+      timestamp: new Date().toISOString(),
+    }
+  };
+}
+
+function countMetrics(groups) {
+  let count = 0;
+  for (const [key, group] of Object.entries(groups)) {
+    if (typeof group !== 'object' || !group) continue;
+    for (const [k, v] of Object.entries(group)) {
+      if (k.startsWith('M') && k.length === 4 && !isNaN(k.slice(1))) count++;
+      if (k === 'home' || k === 'away') {
+        for (const [kk] of Object.entries(v || {})) {
+          if (kk.startsWith('M') && kk.length === 4) count++;
+        }
+      }
+    }
+  }
+  return count;
+}
+
+module.exports = { calculateAllMetrics };
