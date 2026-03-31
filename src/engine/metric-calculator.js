@@ -57,11 +57,17 @@ function calculateAllMetrics(data) {
   const awayMomentum = calculateMomentumMetrics(data, 'away');
 
   // Bölüm J: Türetilmiş + Tahmin (M156-M168)
+  // Dinamik lig ortalaması — standings verisinden hesaplanır
+  const leagueAvgGoals = computeLeagueAvgGoals(data.standingsTotal);
+  const homeFormation = data.lineups?.home?.formation || null;
+  const awayFormation = data.lineups?.away?.formation || null;
   const advanced = calculateAdvancedMetrics({
     homeAttack, awayAttack, homeDefense, awayDefense,
     homeForm, awayForm, homePlayer, awayPlayer,
     homeGK, awayGK, referee, h2h, contextual,
     homeMomentum, awayMomentum,
+    leagueAvgGoals,
+    homeFormation, awayFormation,
   });
 
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
@@ -126,6 +132,14 @@ function countMetrics(groups) {
     }
   }
   return count;
+}
+
+function computeLeagueAvgGoals(standingsTotal) {
+  const rows = standingsTotal?.standings?.[0]?.rows || [];
+  if (rows.length < 4) return 1.35; // Yeterli veri yok, Avrupa ortalamasına dön
+  const totalGoals = rows.reduce((s, r) => s + (r.scoresFor || 0), 0);
+  const totalGames = rows.reduce((s, r) => s + (r.played || 0), 0);
+  return totalGames > 0 ? totalGoals / totalGames : 1.35;
 }
 
 module.exports = { calculateAllMetrics };

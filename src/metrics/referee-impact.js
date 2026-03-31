@@ -74,8 +74,31 @@ function calculateRefereeMetrics(data) {
   const avgFouls = matchesCount > 0 && totalFouls > 0 ? totalFouls / matchesCount : 25;
   const M118 = avgFouls / 25; // 25 = lig ortalaması yaklaşık (API'den hesaplanacak)
 
+  // ── M118b: Hakem Ev Sahibi Yanlılık İndeksi ──
+  // İdeal hakem: 50 (tam tarafsız)
+  // >50: ev sahibi lehine eğilim  <50: deplasman lehine eğilim
+  // Hesaplama: ev sahibi kazanma oranı vs lig ortalaması (%52) karşılaştırması
+  // Not: homeWins M112 bloğunda zaten tanımlı, burada awayWins/draws ekleniyor
+  const awayWins = stats.awayWins || stats.awayTeamWins || 0;
+  const draws = stats.draws || 0;
+  const totalGamesForBias = homeWins + awayWins + draws;
+
+  let M118b = 50; // Nötr başlangıç
+  if (totalGamesForBias >= 10) {
+    const homeWinRate = homeWins / totalGamesForBias; // Hakeme göre ev kazanma oranı
+    const leagueHomeWinAvg = 0.46; // Avrupa liglerinde ortalama ev sahibi kazanma oranı
+    // 50 + (hakemde ev kazanma oranı - lig ortalaması) × 100
+    M118b = 50 + (homeWinRate - leagueHomeWinAvg) * 100;
+    M118b = Math.max(0, Math.min(100, M118b));
+  } else if (totalGamesForBias > 0) {
+    // Az veri: lig ortalamasına çek
+    const homeWinRate = homeWins / totalGamesForBias;
+    M118b = 50 + (homeWinRate - 0.46) * 50; // Daha az ağırlık (az veri)
+    M118b = Math.max(20, Math.min(80, M118b));
+  }
+
   return {
-    M109, M110, M111, M112, M113, M114, M115, M116, M117, M118,
+    M109, M110, M111, M112, M113, M114, M115, M116, M117, M118, M118b,
     _meta: {
       refereeId,
       refereeName: event?.referee?.name || 'Unknown',
@@ -87,6 +110,7 @@ function calculateRefereeMetrics(data) {
 function createEmptyRefereeMetrics() {
   const m = {};
   for (let i = 109; i <= 118; i++) m[`M${String(i).padStart(3, '0')}`] = null;
+  m.M118b = null;
   m._meta = { error: 'No referee data' };
   return m;
 }

@@ -6,7 +6,9 @@
 function calculateAdvancedMetrics(allMetrics) {
   const { homeAttack, awayAttack, homeDefense, awayDefense, homeForm, awayForm,
     homePlayer, awayPlayer, homeGK, awayGK, referee, h2h, contextual,
-    homeMomentum, awayMomentum } = allMetrics;
+    homeMomentum, awayMomentum, leagueAvgGoals: _leagueAvgGoals,
+    homeFormation, awayFormation } = allMetrics;
+  const leagueAvgGoals = _leagueAvgGoals || 1.35; // Fallback: 1.35
 
   // ── M156: Genel Hücum Gücü Skoru ──
   const M156_home = weightedAvg([
@@ -168,7 +170,6 @@ function calculateAdvancedMetrics(allMetrics) {
     M164_away * weights.momentum, 0, 100);
 
   // ── M167: Poisson Lambda Hesaplama ──
-  const leagueAvgGoals = 1.35; // Lig ortalaması — standings verisiyle dinamik hesaplanabilir
   const homeAdvantage = 1.15; // Ev sahibi avantaj çarpanı
 
   // M026 (goals conceded/match): null → use league avg; 0 → legitimate (perfect defense), keep 0.
@@ -230,6 +231,29 @@ function calculateAdvancedMetrics(allMetrics) {
     if (sp.home > 0 && sp.away > 0) bttsProb += sp.prob;
   }
 
+  // ── M169: Formasyon Uyumsuzluğu Avantajı ──
+  // Pozitif değer ev sahibi lehine taktik avantaj gösterir.
+  function parseForm(f) {
+    if (!f) return null;
+    const parts = (f + '').split('-').map(Number).filter(n => !isNaN(n));
+    if (parts.length < 3) return null;
+    return { def: parts[0], mid: parts.slice(1, -1).reduce((a, b) => a + b, 0), fwd: parts[parts.length - 1] };
+  }
+  const homeF = parseForm(homeFormation);
+  const awayF = parseForm(awayFormation);
+  let M169 = 50;
+
+  if (homeF && awayF) {
+    const awayUses3Back = awayF.def === 3 || awayF.def === 5;
+    const midDiff = homeF.mid - awayF.mid;
+    const attackPresence = homeF.fwd - awayF.def;
+    M169 = 50
+      + (awayUses3Back ? 3 : 0)
+      + midDiff * 2
+      + attackPresence * 1.5;
+    M169 = Math.max(20, Math.min(80, M169));
+  }
+
   return {
     home: {
       M156: M156_home, M157: M157_home, M158: M158_home, M159: M159_home,
@@ -241,7 +265,7 @@ function calculateAdvancedMetrics(allMetrics) {
       M160: M160_away, M164: M164_away, M165: M165_away, M166: M166_away,
       M167: M167_away,
     },
-    shared: { M161, M162, M163 },
+    shared: { M161, M162, M163, M169 },
     prediction: {
       homeWinProbability: round2(homeWinProb),
       drawProbability: round2(drawProb),

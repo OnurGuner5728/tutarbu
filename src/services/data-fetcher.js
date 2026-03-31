@@ -172,27 +172,73 @@ async function fetchAllMatchData(eventId) {
   // --- FALLBACK LINEUP GENERATOR ---
   function buildFallbackLineup(topPlayers, squadPlayers) {
     if (!topPlayers && !squadPlayers) return { players: [] };
-    
-    let availablePlayers = [];
+
+    let pool = [];
     if (topPlayers?.topPlayers?.rating) {
-      availablePlayers = topPlayers.topPlayers.rating.map(p => ({
+      pool = topPlayers.topPlayers.rating.map(p => ({
         player: p.player,
-        position: p.player?.position || 'Unknown',
+        position: p.player?.position || 'M',
         shirtNumber: p.player?.shirtNumber || '',
-        substitute: false 
+        substitute: false,
       }));
     } else if (squadPlayers?.players) {
-      availablePlayers = squadPlayers.players.map(p => ({
+      pool = squadPlayers.players.map(p => ({
         player: p.player,
-        position: p.player?.position || 'Unknown',
+        position: p.player?.position || 'M',
         shirtNumber: p.player?.shirtNumber || '',
-        substitute: false
+        substitute: false,
       }));
     }
-    
-    const selected = availablePlayers.slice(0, 18);
+
+    // Pozisyon bazlı seçim — kaleci garantisi
+    const byPos = { G: [], D: [], M: [], F: [] };
+    for (const p of pool) {
+      const pos = p.position;
+      if (byPos[pos]) byPos[pos].push(p);
+    }
+
+    const starting = [];
+    const usedIdx = new Set();
+
+    function pickN(posArr, n) {
+      let picked = 0;
+      for (const p of posArr) {
+        if (picked >= n) break;
+        if (!usedIdx.has(p.player?.id)) {
+          starting.push({ ...p, substitute: false });
+          usedIdx.add(p.player?.id);
+          picked++;
+        }
+      }
+      // Yeterli oyuncu yoksa genel havuzdan doldur
+      if (picked < n) {
+        for (const p of pool) {
+          if (picked >= n) break;
+          if (!usedIdx.has(p.player?.id)) {
+            starting.push({ ...p, substitute: false });
+            usedIdx.add(p.player?.id);
+            picked++;
+          }
+        }
+      }
+    }
+
+    // 4-3-3 varsayılan formasyon
+    pickN(byPos.G, 1); // 1 kaleci
+    pickN(byPos.D, 4); // 4 defans
+    pickN(byPos.M, 3); // 3 orta saha
+    pickN(byPos.F, 3); // 3 forvet
+
+    // Yedekler: kalan oyunculardan
+    const subs = pool
+      .filter(p => !usedIdx.has(p.player?.id))
+      .slice(0, 7)
+      .map(p => ({ ...p, substitute: true }));
+
     return {
-      players: selected.map((p, idx) => ({ ...p, substitute: idx >= 11 }))
+      players: [...starting, ...subs],
+      formation: '4-3-3',
+      isFallback: true,
     };
   }
 
@@ -310,13 +356,13 @@ async function fetchRecentMatchDetails(lastEventsResponse, count = 3) {
 
 /**
  * Kadrodaki oyuncuların sezon istatistiklerini çeker.
- * Sadece ilk 11 + ilk 3 yedek (toplam max 14 oyuncu).
+ * İlk 11 + tüm yedekler — M067 (Yedek Rating) ve M088 (Bench/Starter değer oranı) için tam veri gereklidir.
  */
 async function fetchPlayerStats(players, tournamentId, seasonId) {
   if (!players || !tournamentId || !seasonId) return [];
 
   const starters = players.filter(p => !p.substitute).slice(0, 11);
-  const subs = players.filter(p => p.substitute).slice(0, 3);
+  const subs = players.filter(p => p.substitute); // Tüm yedekler — 5 değişiklik kuralı gereği hepsi çekilmeli
   const targetPlayers = [...starters, ...subs];
 
   const results = [];

@@ -15,6 +15,7 @@ function calculateContextualMetrics(data) {
 
   // ── M131-M134: Bahis Oranı İma Edilen Olasılıklar ──
   let M131 = 33.3, M132 = 33.3, M133 = 33.3, M134 = 50;
+  let M134b = 50, M134c = 50, ahLine = null;
 
   const markets = odds?.markets || [];
   for (const market of markets) {
@@ -33,6 +34,36 @@ function calculateContextualMetrics(data) {
         const decimal = parseFloat(choice.decimalValue) || 0;
         if (decimal > 0 && (choice.name === 'Over 2.5' || choice.name === 'Over')) {
           M134 = (1 / decimal) * 100;
+        }
+      }
+    }
+  }
+
+  // ── M134b: Asian Handicap İma Edilen Olasılık (Ev Sahibi) ──
+  // AH hat 0 ise dengeli maç; negatif hat → ev sahibi favori
+  for (const market of markets) {
+    const mName = (market.marketName || '').toLowerCase();
+    const mId = market.marketId;
+
+    // Asian Handicap tespiti
+    if (mId === 2 || mName.includes('asian handicap') || mName.includes('asian')) {
+      for (const choice of (market.choices || [])) {
+        const decimal = parseFloat(choice.decimalValue) || 0;
+        if (decimal > 0 && (choice.name === '1' || choice.name?.includes('Home'))) {
+          M134b = (1 / decimal) * 100;
+          // Handicap hattını çıkarmaya çalış
+          const handicapMatch = (choice.name + (choice.handicap || '')).match(/[-+]?\d*\.?\d+/);
+          if (handicapMatch) ahLine = parseFloat(handicapMatch[0]);
+        }
+      }
+    }
+
+    // Draw No Bet (DNB) tespiti
+    if (mId === 3 || mName.includes('draw no bet') || mName.includes('dnb')) {
+      for (const choice of (market.choices || [])) {
+        const decimal = parseFloat(choice.decimalValue) || 0;
+        if (decimal > 0 && (choice.name === '1' || choice.name?.includes('Home'))) {
+          M134c = (1 / decimal) * 100;
         }
       }
     }
@@ -113,7 +144,7 @@ function calculateContextualMetrics(data) {
   const M145 = homeMarketValue / maxValue; // Ev sahibinin görece gücü
 
   return {
-    M131, M132, M133, M134, M135, M136, M137, M138, M139, M140,
+    M131, M132, M133, M134, M134b, M134c, M135, M136, M137, M138, M139, M140,
     M141, M142, M143, M144, M145,
     _meta: {
       oddsAvailable: markets.length > 0,

@@ -103,11 +103,17 @@ function buildLineup(data, side) {
     .filter(p => !startingIds.has(p.id))
     .slice(0, 9); // Max 9 yedek
 
+  // Kadro dışı: available ama ne ilk 11'de ne yedekte
+  // Bu oyuncuların "görünmez eksikliği" disiplin/form sorunu sinyali olabilir
   const notInSquad = allPlayers.filter(p =>
     !startingIds.has(p.id) &&
     !substitutes.some(s => s.id === p.id) &&
     p.status === 'available'
-  );
+  ).map(p => ({
+    ...p,
+    notInSquadReason: 'tactical', // Varsayılan: teknik karar
+    notInSquadWarning: p.marketValue > 5_000_000, // 5M€ üstü → dikkat çekici
+  }));
 
   const injured = allPlayers.filter(p => p.status === 'injured');
   const suspended = allPlayers.filter(p => p.status === 'suspended');
@@ -123,6 +129,7 @@ function buildLineup(data, side) {
     doubtful: doubtful.map(p => ({ ...p, role: 'doubtful' })),
     totalPlayers: allPlayers.length,
     missingCount: injured.length + suspended.length,
+    notInSquadWarningCount: notInSquad.filter(p => p.notInSquadWarning).length,
   };
 }
 

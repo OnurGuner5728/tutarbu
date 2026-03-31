@@ -26,12 +26,18 @@ function calculatePlayerMetrics(data, side) {
   const M066 = starterRatings.length > 0
     ? starterRatings.reduce((a, b) => a + b, 0) / starterRatings.length : 0;
 
-  // ── M067: Yedek Ortalama Rating ──
-  const subRatings = subs
-    .map(p => p.seasonStats?.statistics?.rating)
-    .filter(r => r != null && r > 0);
-  const M067 = subRatings.length > 0
-    ? subRatings.reduce((a, b) => a + b, 0) / subRatings.length : 0;
+  // ── M067: Yedek Ortalama Rating (Katılım Olasılığı Ağırlıklı) ──
+  // Her yedeğin rating'i 0.6 katılım olasılığıyla ağırlıklandırılır.
+  // 0.6: modern futbolda ortalama yedek sahaya girme olasılığı (5 değişiklik hakkıyla ~60%)
+  const SUB_PARTICIPATION_PROB = 0.6;
+  const subWeightedRatings = subs
+    .map(p => {
+      const rating = p.seasonStats?.statistics?.rating;
+      return (rating != null && rating > 0) ? rating * SUB_PARTICIPATION_PROB : null;
+    })
+    .filter(r => r != null);
+  const M067 = subWeightedRatings.length > 0
+    ? subWeightedRatings.reduce((a, b) => a + b, 0) / subWeightedRatings.length : 0;
 
   // ── M068: Rating Farkı ──
   const allRatings = [...starterRatings, ...subRatings];
@@ -117,36 +123,59 @@ function calculatePlayerMetrics(data, side) {
   }
   const M076 = totalAerial > 0 ? (totalAerialWon / totalAerial) * 100 : 50;
 
-  // ── M077-M078: Sakatlık ve Ceza Etkisi Skoru ──
-  // API returns flat { players: [...] } with team.id on each entry — filter by teamId.
+  // ── M077-M078: Sakatlık ve Ceza Etkisi Skoru (Pozisyon Kritikliği Ağırlıklı) ──
+  // Pozisyon kritikliği: Kaleci > Forvet > Defans > Orta Saha
+  // Alternatif azlığı: Aynı pozisyonda kaç sağlam oyuncu var → az = yüksek etki
   const teamMissing = (missingPlayers?.players || []).filter(mp => mp.team?.id === teamId);
 
+  const POSITION_CRITICALITY = { G: 2.0, D: 1.2, M: 1.0, F: 1.3 };
   let injuredImpact = 0, suspendedImpact = 0;
   const avgTeamRating = M066 || 6.5;
+  const allPlayers = teamPlayers?.players || [];
 
   for (const mp of teamMissing) {
     const playerId = mp.player?.id;
-    // missing-players endpoint'inde player nesnesi içinde istatistik olmayabilir,
-    // o yüzden playerStats or topPlayers içinden bulmaya çalışıyoruz.
     const playerInStats = playerStats.find(ps => ps.playerId === playerId);
+    const missingPosition = mp.player?.position || playerInStats?.position || 'M';
     const playerRating = playerInStats?.seasonStats?.statistics?.rating || avgTeamRating;
+
+    // Pozisyon kritiklik çarpanı
+    const posCrit = POSITION_CRITICALITY[missingPosition] || 1.0;
+
+    // Aynı pozisyonda kaç sağlam alternatif var (kadrodaki)
+    const alternatives = allPlayers.filter(p =>
+      p.player?.position === missingPosition
+    ).length - 1; // kendisi hariç
+    // 0 alternatif → factor 1.0, her ek alternatif etkiyi %20 düşürür, min 0.3
+    const replacementFactor = Math.max(0.3, 1 - Math.max(0, alternatives - 1) * 0.2);
+
+    const baseImpact = (playerRating / avgTeamRating) * posCrit * replacementFactor;
 
     const isInjured = mp.type === 'injured' || mp.reason?.description?.includes('Injury');
     const isSuspended = mp.type === 'suspended' || mp.reason?.description?.includes('Suspended');
 
     if (isInjured) {
-      injuredImpact += playerRating / avgTeamRating;
+      injuredImpact += baseImpact;
     } else if (isSuspended) {
-      suspendedImpact += playerRating / avgTeamRating;
+      suspendedImpact += baseImpact;
     }
   }
   const M077 = injuredImpact;
   const M078 = suspendedImpact;
 
   // ── M079: Kadro Derinliği İndeksi ──
-  const allPlayers = teamPlayers?.players || [];
   const totalPlayerCount = allPlayers.length;
   const M079 = (totalPlayerCount / 25) * (M066 / 7.0);
+
+  // ── M079b: Bench Güç Skoru ──
+  // Yedek oyuncuların kalitesi ile sayısının birleşik skoru (0-100)
+  // benchRatingScore: yedeklerin ortalama ağırlıklı rating'i (M067 bazlı)
+  // benchDepthScore: kaç yedeğin gerçek anlamda kullanılabilir olduğu (min 5 = tam derinlik)
+  const availableSubCount = subs.filter(p => p.seasonStats?.statistics?.rating != null).length;
+  const benchRatingScore = M067 > 0 ? Math.min(100, (M067 / 7.5) * 100) : 0;
+  const benchDepthScore = Math.min(100, (availableSubCount / 5) * 100);
+  // Ağırlıklar: Rating kalitesi %60, Derinlik (oyuncu sayısı) %40
+  const M079b = benchRatingScore * 0.6 + benchDepthScore * 0.4;
 
   // ── M080: Dakika Dağılımı (Yorgunluk) ──
   const minutes = starters
@@ -191,14 +220,24 @@ function calculatePlayerMetrics(data, side) {
   const M086 = starters.length > 0 ? totalNegative / starters.length : 0;
 
   // ── M087-M088: Piyasa Değeri ──
-  let starterValue = 0, subValue = 0;
+  // Eşleştirme: playerStats'taki playerId ile teamPlayers'taki player.id karşılaştırılır
+  const starterPlayerIds = new Set(starters.map(p => p.playerId).filter(Boolean));
+  const subPlayerIds = new Set(subs.map(p => p.playerId).filter(Boolean));
+
+  let starterValue = 0, subValue = 0, otherValue = 0;
   for (const p of allPlayers) {
+    const pid = p.player?.id;
     const val = p.player?.proposedMarketValue || 0;
-    const isStarter = starters.some(s => s.playerId === p.player?.id);
-    if (isStarter) starterValue += val;
-    else subValue += val;
+    if (pid && starterPlayerIds.has(pid)) {
+      starterValue += val;
+    } else if (pid && subPlayerIds.has(pid)) {
+      subValue += val;
+    } else {
+      otherValue += val; // Kadrodaki diğer oyuncular (stats alınamamış)
+    }
   }
   const M087 = starterValue;
+  // M088: Yedek/Starter değer oranı — 1.0 = eşit güç, >1.0 = yedekler daha değerli
   const M088 = starterValue > 0 ? subValue / starterValue : 0;
 
   // ── M089: Oyuncunun Rakibe Karşı Geçmişi ──
@@ -225,24 +264,41 @@ function calculatePlayerMetrics(data, side) {
   const M090 = stdDev(goalPerMatch);
   const M091 = stdDev(assistPerMatch);
 
-  // ── M092: Son 5 Maç Rating Trendi ──
-  let totalTrend = 0;
-  let matchesWithRatings = 0;
+  // ── M092: Son Maçlar Bireysel Rating Trendi ──
+  // Her mevcut kadro oyuncusunun son maçtaki ratingini sezon ortalamasıyla karşılaştırır.
+  // Sadece takım ortalaması değil, MEVCUT KADRODA OLAN oyuncular için hesaplanır.
+  const currentStarterIds = new Set(starters.map(p => p.playerId).filter(Boolean));
+  const playerTrends = new Map(); // playerId → [trendDelta, ...]
 
   for (const match of recentDetails) {
     const sideLineup = isHome ? match.lineups?.home : match.lineups?.away;
-    if (sideLineup?.players) {
-      const ratings = sideLineup.players
-        .map(p => p.statistics?.rating)
-        .filter(r => r != null && r > 0);
-      if (ratings.length > 0) {
-        const avg = ratings.reduce((a, b) => a + b, 0) / ratings.length;
-        totalTrend += (avg - avgTeamRating);
-        matchesWithRatings++;
-      }
+    if (!sideLineup?.players) continue;
+
+    for (const lp of sideLineup.players) {
+      const pid = lp.player?.id;
+      if (!pid || !currentStarterIds.has(pid)) continue; // Sadece mevcut ilk 11
+      const matchRating = lp.statistics?.rating;
+      if (matchRating == null || matchRating <= 0) continue;
+
+      // Bu oyuncunun sezon ortalaması
+      const starterData = starters.find(s => s.playerId === pid);
+      const seasonRating = starterData?.seasonStats?.statistics?.rating || avgTeamRating;
+      const delta = matchRating - seasonRating;
+
+      if (!playerTrends.has(pid)) playerTrends.set(pid, []);
+      playerTrends.get(pid).push(delta);
     }
   }
-  const M092 = matchesWithRatings > 0 ? totalTrend / matchesWithRatings : 0;
+
+  // Her oyuncu için ortalama delta al, sonra tüm oyuncuların ortalaması
+  let totalPlayerTrend = 0;
+  let playersWithTrend = 0;
+  for (const [, deltas] of playerTrends) {
+    if (deltas.length === 0) continue;
+    totalPlayerTrend += deltas.reduce((a, b) => a + b, 0) / deltas.length;
+    playersWithTrend++;
+  }
+  const M092 = playersWithTrend > 0 ? totalPlayerTrend / playersWithTrend : 0;
 
   // ── M093: Kendinden Güçlüye Gol Atma Oranı ──
   let goalsVsStronger = 0, totalGoalsForCalc = 0;
@@ -296,7 +352,7 @@ function calculatePlayerMetrics(data, side) {
 
   return {
     M066, M067, M068, M069, M070, M071, M072, M073, M074, M075,
-    M076, M077, M078, M079, M080, M081, M082, M083, M084, M085,
+    M076, M077, M078, M079, M079b, M080, M081, M082, M083, M084, M085,
     M086, M087, M088, M089, M090, M091, M092, M093, M094, M095,
     _meta: { starterCount: starters.length, subCount: subs.length, missingCount: teamMissing.length }
   };
@@ -322,6 +378,7 @@ function findTeamPosition(standings, teamId) {
 function createEmptyPlayerMetrics() {
   const m = {};
   for (let i = 66; i <= 95; i++) m[`M${String(i).padStart(3, '0')}`] = null;
+  m.M079b = null;
   m._meta = { error: 'No player data' };
   return m;
 }

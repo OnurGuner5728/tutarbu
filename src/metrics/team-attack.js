@@ -276,10 +276,57 @@ function calculateTeamAttackMetrics(data, side) {
 
   const M025 = totalFinalThird > 0 ? Math.min((totalAccFinalThird / totalFinalThird) * 100, 100) : 0;
 
+  // ── M025b: Set Piece (Korner + Serbest Vuruş) Gol Etkinliği ──
+  // Son N maçtaki korner + serbest vuruştan gelen gollerin toplam gollere oranı
+  let setPieceGoals = 0;
+  let totalGoalsForSP = 0;
+
+  for (const match of recentDetails) {
+    const incidents = match.incidents?.incidents || [];
+    for (const inc of incidents) {
+      if (inc.incidentType !== 'goal') continue;
+      const isMatchHome = match.homeTeam?.id === teamId;
+      if (inc.isHome !== isMatchHome) continue;
+      totalGoalsForSP++;
+      // Set piece gol: direkt serbest vuruş, kornerden, penaltı hariç
+      const isSetPiece = inc.goalType === 'header' || // Kornerden kafa
+        inc.description?.toLowerCase().includes('corner') ||
+        inc.description?.toLowerCase().includes('free kick') ||
+        (inc.goalType === 'free-kick');
+      if (isSetPiece) setPieceGoals++;
+    }
+  }
+  const M025b = totalGoalsForSP > 0 ? (setPieceGoals / totalGoalsForSP) * 100 : 0;
+
+  // ── M025c: Korner Başına Tehlike Oranı ──
+  // Son maçlardaki korner istatistiklerinden hesaplanır
+  let totalCornersForM025c = 0;
+  let matchCountForCorners = 0;
+  for (const match of recentDetails) {
+    const stats = match.stats?.statistics || [];
+    for (const period of stats) {
+      const groups = period.groups || [];
+      for (const group of groups) {
+        for (const item of (group.statisticsItems || [])) {
+          if (item.name?.toLowerCase().includes('corner') || item.key === 'cornerKicks') {
+            const isMatchHome = match.homeTeam?.id === teamId;
+            const val = isMatchHome
+              ? parseInt(item.home, 10) || 0
+              : parseInt(item.away, 10) || 0;
+            totalCornersForM025c += val;
+            matchCountForCorners++;
+            break;
+          }
+        }
+      }
+    }
+  }
+  const M025c = matchCountForCorners > 0 ? totalCornersForM025c / recentDetails.length : 0;
+
   return {
     M001, M002, M003, M004, M005, M006, M007, M008, M009, M010,
     M011, M012, M013, M014, M015, M016, M017, M018, M019, M020,
-    M021, M022, M023, M024, M025,
+    M021, M022, M023, M024, M025, M025b, M025c,
     _meta: {
       totalMatchesAnalyzed: totalMatches,
       recentMatchesDeepDive: recentMatchCount,
@@ -415,6 +462,8 @@ function createEmptyAttackMetrics() {
   for (let i = 1; i <= 25; i++) {
     metrics[`M${String(i).padStart(3, '0')}`] = null;
   }
+  metrics.M025b = 0;
+  metrics.M025c = 0;
   metrics._meta = { totalMatchesAnalyzed: 0, error: 'No finished matches found' };
   return metrics;
 }
