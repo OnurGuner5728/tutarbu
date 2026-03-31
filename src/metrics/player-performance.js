@@ -40,6 +40,7 @@ function calculatePlayerMetrics(data, side) {
     ? subWeightedRatings.reduce((a, b) => a + b, 0) / subWeightedRatings.length : 0;
 
   // ── M068: Rating Farkı ──
+  const subRatings = subs.map(p => p.seasonStats?.statistics?.rating).filter(r => r != null && r > 0);
   const allRatings = [...starterRatings, ...subRatings];
   const M068 = allRatings.length > 1
     ? Math.max(...allRatings) - Math.min(...allRatings) : 0;
