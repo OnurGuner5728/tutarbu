@@ -121,23 +121,30 @@ function calculateRefereeMetrics(data) {
   // ── M118b: Hakem Ev Sahibi Yanlılık İndeksi ──
   // İdeal hakem: 50 (tam tarafsız)
   // >50: ev sahibi lehine eğilim  <50: deplasman lehine eğilim
-  // Hesaplama: ev sahibi kazanma oranı vs lig ortalaması (%52) karşılaştırması
+  // Hesaplama: ev sahibi kazanma oranı vs lig ortalaması karşılaştırması
   // Not: homeWins M112 bloğunda zaten tanımlı, burada awayWins/draws ekleniyor
   const awayWins = stats.awayWins || stats.awayTeamWins || 0;
   const draws = stats.draws || 0;
   const totalGamesForBias = homeWins + awayWins + draws;
 
+  // Lig ev sahibi kazanma ortalamasını standingsHome'dan dinamik hesapla
+  const homeRows = data.standingsHome?.standings?.[0]?.rows || [];
+  const totalHomeWins = homeRows.reduce((s, r) => s + (r.wins || 0), 0);
+  const totalHomePlayed = homeRows.reduce((s, r) => s + (r.played || 0), 0);
+  const leagueHomeWinAvg = totalHomePlayed >= 10
+    ? totalHomeWins / totalHomePlayed
+    : 0.46; // Fallback: standingsHome verisi yetersizse Avrupa ortalaması
+
   let M118b = 50; // Nötr başlangıç
   if (totalGamesForBias >= 10) {
     const homeWinRate = homeWins / totalGamesForBias; // Hakeme göre ev kazanma oranı
-    const leagueHomeWinAvg = 0.46; // Avrupa liglerinde ortalama ev sahibi kazanma oranı
     // 50 + (hakemde ev kazanma oranı - lig ortalaması) × 100
     M118b = 50 + (homeWinRate - leagueHomeWinAvg) * 100;
     M118b = Math.max(0, Math.min(100, M118b));
   } else if (totalGamesForBias > 0) {
     // Az veri: lig ortalamasına çek
     const homeWinRate = homeWins / totalGamesForBias;
-    M118b = 50 + (homeWinRate - 0.46) * 50; // Daha az ağırlık (az veri)
+    M118b = 50 + (homeWinRate - leagueHomeWinAvg) * 50; // Daha az ağırlık (az veri)
     M118b = Math.max(20, Math.min(80, M118b));
   }
 

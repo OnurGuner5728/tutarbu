@@ -58,7 +58,7 @@ function calculateTeamFormMetrics(data, side) {
   const M048 = last20.length > 0 ? (formPoints(last20) / (last20.length * 3)) * 100 : 0;
 
   // ── M049-M052: Seriler (Team Streaks'ten) ──
-  let M049 = 0, M050 = 0, M051 = 0, M052 = 0;
+  let M049 = 0, M050raw = 0, M051 = 0, M052 = 0;
 
   // Streaks endpoint'ten
   const generalStreaks = streaks?.general || [];
@@ -71,13 +71,13 @@ function calculateTeamFormMetrics(data, side) {
     if (!matchesTeam && s.team) continue;
 
     if (s.name === 'Wins' || s.name === 'wins') M049 = s.streak || s.value || 0;
-    if (s.name === 'No losses' || s.name === 'Unbeaten') M050 = s.streak || s.value || 0;
+    if (s.name === 'No losses' || s.name === 'Unbeaten') M050raw = s.streak || s.value || 0;
     if (s.name === 'Scoring' || s.name === 'Goals scored') M051 = s.streak || s.value || 0;
     if (s.name === 'No goals conceded' || s.name === 'Clean sheets') M052 = s.streak || s.value || 0;
   }
 
   // Eğer streaks API'den gelmezse, events'tan hesapla
-  if (M049 === 0 && M050 === 0) {
+  if (M049 === 0 && M050raw === 0) {
     let winStreak = 0, unbeatenStreak = 0, scoringStreak = 0, cleanStreak = 0;
     let winDone = false, unbeatenDone = false, scoringDone = false, cleanDone = false;
 
@@ -105,19 +105,23 @@ function calculateTeamFormMetrics(data, side) {
       }
     }
     if (M049 === 0) M049 = winStreak;
-    if (M050 === 0) M050 = unbeatenStreak;
+    if (M050raw === 0) M050raw = unbeatenStreak;
     if (M051 === 0) M051 = scoringStreak;
     if (M052 === 0) M052 = cleanStreak;
   }
 
   // ── M050: avgRating entegrasyonu (getEventForm API) ──
-  // Streak sayısı 0-100'e normalize (cap: 10 maç = %100), avgRating 6-9 → 0-100 normalize
-  // Birleşim: streak %60 + avgRating %40 (avgRating yoksa yalnızca streak)
+  // Raw streak (M050raw) 0-100'e normalize (cap: 10 maç = %100),
+  // avgRating 6-9 → 0-100 normalize; birleşim: streak %60 + avgRating %40
+  // avgRating yoksa yalnızca raw streak kullanılır.
   const avgRating = formData?.avgRating;
+  let M050;
   if (avgRating != null) {
-    const M050streak = Math.min(M050, 10) * 10; // 0-100
+    const M050streak = Math.min(M050raw, 10) * 10; // 0-100
     const M050rating = Math.min(Math.max((avgRating - 6) / (9 - 6), 0), 1) * 100; // 0-100
     M050 = M050streak * 0.6 + M050rating * 0.4;
+  } else {
+    M050 = M050raw; // Sadece streak, avgRating yoksa
   }
 
   // ── M053-M054: Gol Trend Yönü ──

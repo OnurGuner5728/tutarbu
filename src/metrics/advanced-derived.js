@@ -34,6 +34,7 @@ function calculateAdvancedMetrics(allMetrics) {
     [homeDefense.M042 != null ? 100 - homeDefense.M042 : null, 8],
     [homeDefense.M044 != null ? 100 - homeDefense.M044 / 90 * 100 : null, 7],
     [homeDefense.M037, 5],
+    [homePlayer.M083, 8], // M083: Savunma nitelikleri (0-100, oyuncu attr. defending ort.)
   ]);
   const M157_away = weightedAvg([
     [100 - (awayDefense.M026 || 0) * 30, 15],
@@ -43,6 +44,7 @@ function calculateAdvancedMetrics(allMetrics) {
     [awayDefense.M042 != null ? 100 - awayDefense.M042 : null, 8],
     [awayDefense.M044 != null ? 100 - awayDefense.M044 / 90 * 100 : null, 7],
     [awayDefense.M037, 5],
+    [awayPlayer.M083, 8], // M083: Savunma nitelikleri (0-100, oyuncu attr. defending ort.)
   ]);
 
   // ── M158: Genel Form Skoru ──
@@ -177,11 +179,26 @@ function calculateAdvancedMetrics(allMetrics) {
   const awayDefenseRate = awayDefense.M026 != null ? awayDefense.M026 : leagueAvgGoals;
   const homeDefenseRate = homeDefense.M026 != null ? homeDefense.M026 : leagueAvgGoals;
 
-  const lambda_home = (homeAttack.M001 || leagueAvgGoals) *
+  // M001=0 gerçek mi yoksa veri eksikliği mi?
+  // Kural: M001 null/undefined ise → veri yok → fallback.
+  //        M001 > 0 ise → gerçek veri, kullan.
+  //        M001 = 0 AND ≥5 maç varsa → gerçekten 0 gol atan takım, kullan.
+  //        M001 = 0 AND <5 maç varsa → yetersiz veri → fallback.
+  const homeMatchCount = homeAttack._matchCount ?? 0;
+  const homeGoalsPerMatch = (homeAttack.M001 != null && (homeAttack.M001 > 0 || homeMatchCount >= 5))
+    ? homeAttack.M001
+    : leagueAvgGoals;
+
+  const awayMatchCount = awayAttack._matchCount ?? 0;
+  const awayGoalsPerMatch = (awayAttack.M001 != null && (awayAttack.M001 > 0 || awayMatchCount >= 5))
+    ? awayAttack.M001
+    : leagueAvgGoals;
+
+  const lambda_home = homeGoalsPerMatch *
     (awayDefenseRate / leagueAvgGoals) *
     ((M158_home || 50) / 50) * homeAdvantage;
 
-  const lambda_away = (awayAttack.M001 || leagueAvgGoals) *
+  const lambda_away = awayGoalsPerMatch *
     (homeDefenseRate / leagueAvgGoals) *
     ((M158_away || 50) / 50) * (1 / homeAdvantage);
 
@@ -231,11 +248,34 @@ function calculateAdvancedMetrics(allMetrics) {
     if (sp.home > 0 && sp.away > 0) bttsProb += sp.prob;
   }
 
+  // ── Confidence Score / Data Quality ──
+  const matchDataScore = Math.min(homeMatchCount, awayMatchCount) >= 5
+    ? 40
+    : Math.min(homeMatchCount, awayMatchCount) * 8;
+  const metricCompleteness = [homeAttack.M001, homeAttack.M026, homeForm.M046, homePlayer.M066]
+    .filter(v => v != null).length * 10; // max 40
+  const confidenceScore = Math.min(100, matchDataScore + metricCompleteness + 20); // 20 base
+  const lowDataWarning = Math.min(homeMatchCount, awayMatchCount) < 5;
+  const dataFreshnessNote = `${Math.min(homeMatchCount, awayMatchCount)} maç verisi kullanıldı`;
+
   // ── M169: Formasyon Uyumsuzluğu Avantajı ──
   // Pozitif değer ev sahibi lehine taktik avantaj gösterir.
   function parseForm(f) {
     if (!f) return null;
-    const parts = (f + '').split('-').map(Number).filter(n => !isNaN(n));
+    let normalized = String(f).trim();
+    // Dash-less: "442" → "4-4-2", "4321" → "4-3-2-1"
+    if (!normalized.includes('-') && !normalized.includes(' ') && /^\d+$/.test(normalized)) {
+      normalized = normalized.split('').join('-');
+    }
+    // Space-separated: "4 4 2" → "4-4-2"
+    if (normalized.includes(' ') && !normalized.includes('-')) {
+      normalized = normalized.replace(/\s+/g, '-');
+    }
+    // Dot-separated: "4.4.2" → "4-4-2"
+    if (normalized.includes('.') && !normalized.includes('-')) {
+      normalized = normalized.replace(/\./g, '-');
+    }
+    const parts = normalized.split('-').map(Number).filter(n => !isNaN(n) && n >= 0);
     if (parts.length < 3) return null;
     return { def: parts[0], mid: parts.slice(1, -1).reduce((a, b) => a + b, 0), fwd: parts[parts.length - 1] };
   }
@@ -282,6 +322,9 @@ function calculateAdvancedMetrics(allMetrics) {
         score: `${s.home}-${s.away}`,
         probability: round2(s.prob / totalProb * 100),
       })),
+      confidenceScore: Math.round(confidenceScore),
+      lowDataWarning,
+      dataFreshnessNote,
     }
   };
 }
