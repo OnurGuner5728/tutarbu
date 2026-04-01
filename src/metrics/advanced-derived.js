@@ -60,20 +60,20 @@ function calculateAdvancedMetrics(allMetrics) {
   // ── M159: Oyuncu Kalitesi Skoru ──
   // Null-safe: arithmetic on null bypasses weightedAvg's skip logic, so guard explicitly.
   const M159_home = weightedAvg([
-    [homePlayer.M066 != null ? homePlayer.M066 * 14 : null, 20], [homePlayer.M069, 10],
+    [homePlayer.M066 != null ? (homePlayer.M066 / 10) * 100 : null, 20], [homePlayer.M069, 10],
     [homePlayer.M070 != null ? homePlayer.M070 * 20 : null, 10],
-    [homePlayer.M071 != null ? homePlayer.M071 * 14 : null, 10],
+    [homePlayer.M071 != null ? (homePlayer.M071 / 10) * 100 : null, 10],
     [homePlayer.M082, 10], [homePlayer.M084, 10],
-    [homePlayer.M077 != null ? 100 - homePlayer.M077 * 30 : null, 15],
-    [homePlayer.M078 != null ? 100 - homePlayer.M078 * 30 : null, 15],
+    [homePlayer.M077 != null ? Math.max(0, 100 - (homePlayer.M077 / 5.0) * 100) : null, 15],
+    [homePlayer.M078 != null ? Math.max(0, 100 - (homePlayer.M078 / 5.0) * 100) : null, 15],
   ]);
   const M159_away = weightedAvg([
-    [awayPlayer.M066 != null ? awayPlayer.M066 * 14 : null, 20], [awayPlayer.M069, 10],
+    [awayPlayer.M066 != null ? (awayPlayer.M066 / 10) * 100 : null, 20], [awayPlayer.M069, 10],
     [awayPlayer.M070 != null ? awayPlayer.M070 * 20 : null, 10],
-    [awayPlayer.M071 != null ? awayPlayer.M071 * 14 : null, 10],
+    [awayPlayer.M071 != null ? (awayPlayer.M071 / 10) * 100 : null, 10],
     [awayPlayer.M082, 10], [awayPlayer.M084, 10],
-    [awayPlayer.M077 != null ? 100 - awayPlayer.M077 * 30 : null, 15],
-    [awayPlayer.M078 != null ? 100 - awayPlayer.M078 * 30 : null, 15],
+    [awayPlayer.M077 != null ? Math.max(0, 100 - (awayPlayer.M077 / 5.0) * 100) : null, 15],
+    [awayPlayer.M078 != null ? Math.max(0, 100 - (awayPlayer.M078 / 5.0) * 100) : null, 15],
   ]);
 
   // ── M160: Kaleci Gücü Skoru ──

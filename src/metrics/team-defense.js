@@ -75,8 +75,8 @@ function calculateTeamDefenseMetrics(data, side) {
       if (minute <= 45) firstHalfConceded++;
       else secondHalfConceded++;
 
-      if (minute <= 15) conceded015++;
-      if (minute >= 76) conceded7690++;
+      if (minute >= 1 && minute <= 15) conceded015++;
+      if (minute >= 76 && minute <= 90) conceded7690++;
     }
   }
 
@@ -182,23 +182,42 @@ function calculateTeamDefenseMetrics(data, side) {
   const M041 = totalConcededInc > 0 ? (goalsUnderPressure / totalConcededInc) * 100 : 0;
 
   // ── M042: Geri Düşünce Gol Yeme (önde gidip yenilme) ──
-  let timesAhead = 0, lostFromAhead = 0;
+  // ── M043: Öne Geçince Maç Kapatma ──
+  // State machine yaklaşımı: wasAhead boolean yerine her gol sonrası
+  // durum geçişi izlenerek takımın kaç kez öne geçtiği doğru sayılır.
+  // Örn: 1-0 → 1-1 → 2-1 senaryosunda timesWentAhead = 2 olmalı.
+  let timesAhead = 0, lostFromAhead = 0, wonFromAhead = 0;
   for (const match of recentDetails) {
-    const incidents = match.incidents?.incidents || [];
+    const rawIncidents = match.incidents?.incidents || [];
     const isMatchHome = match.homeTeam?.id === teamId;
-    let teamGoals = 0, oppGoals = 0;
-    let wasAhead = false;
 
-    for (const inc of incidents) {
+    // Olayları zamana göre sırala
+    const sortedIncidents = rawIncidents.slice().sort((a, b) => (a.time || 0) - (b.time || 0));
+
+    let teamGoals = 0, oppGoals = 0;
+    let wasLeading = false;  // Önceki adımda önde miydi?
+    let everWentAhead = false;
+
+    for (const inc of sortedIncidents) {
       if (inc.incidentType !== 'goal') continue;
+
+      const prevLeading = teamGoals > oppGoals;
+
       if (inc.isHome === isMatchHome) teamGoals++;
       else oppGoals++;
 
-      if (teamGoals > oppGoals) wasAhead = true;
+      const nowLeading = teamGoals > oppGoals;
+
+      // Öne geçiş: önceden önde değildi, şimdi önde
+      if (!prevLeading && nowLeading) {
+        timesAhead++;
+        everWentAhead = true;
+      }
+
+      wasLeading = nowLeading;
     }
 
-    if (wasAhead) {
-      timesAhead++;
+    if (everWentAhead) {
       const finalTeam = isMatchHome
         ? (match.homeScore?.current || 0)
         : (match.awayScore?.current || 0);
@@ -206,31 +225,10 @@ function calculateTeamDefenseMetrics(data, side) {
         ? (match.awayScore?.current || 0)
         : (match.homeScore?.current || 0);
       if (finalOpp >= finalTeam) lostFromAhead++;
-    }
-  }
-  const M042 = timesAhead > 0 ? (lostFromAhead / timesAhead) * 100 : 0;
-
-  // ── M043: Öne Geçince Maç Kapatma ──
-  let wonFromAhead = 0;
-  for (const match of recentDetails) {
-    const incidents = match.incidents?.incidents || [];
-    const isMatchHome = match.homeTeam?.id === teamId;
-    let teamGoals = 0, oppGoals = 0;
-    let wasAhead = false;
-
-    for (const inc of incidents) {
-      if (inc.incidentType !== 'goal') continue;
-      if (inc.isHome === isMatchHome) teamGoals++;
-      else oppGoals++;
-      if (teamGoals > oppGoals) wasAhead = true;
-    }
-
-    if (wasAhead) {
-      const finalTeam = isMatchHome ? (match.homeScore?.current || 0) : (match.awayScore?.current || 0);
-      const finalOpp = isMatchHome ? (match.awayScore?.current || 0) : (match.homeScore?.current || 0);
       if (finalTeam > finalOpp) wonFromAhead++;
     }
   }
+  const M042 = timesAhead > 0 ? (lostFromAhead / timesAhead) * 100 : 0;
   const M043 = timesAhead > 0 ? (wonFromAhead / timesAhead) * 100 : 0;
 
   // ── M044: Gol Yedikten Sonra Tepki Süresi ──
