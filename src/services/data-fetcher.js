@@ -166,8 +166,11 @@ async function fetchAllMatchData(eventId) {
   }
 
   // 8. Son maçların incident/stats verilerini çek (son 5 maç deep-dive)
-  const homeRecentMatchDetails = await fetchRecentMatchDetails(homeLastEvents0, 5);
-  const awayRecentMatchDetails = await fetchRecentMatchDetails(awayLastEvents0, 5);
+  // Her iki sayfa birleştirilip sıralanarak gerçek son 5 maç alınır (cross-competition).
+  const homeMergedEvents = mergeAndSortEvents(homeLastEvents0, homeLastEvents1);
+  const awayMergedEvents = mergeAndSortEvents(awayLastEvents0, awayLastEvents1);
+  const homeRecentMatchDetails = await fetchRecentMatchDetails(homeMergedEvents, 5);
+  const awayRecentMatchDetails = await fetchRecentMatchDetails(awayMergedEvents, 5);
 
   // --- FALLBACK LINEUP GENERATOR ---
   function buildFallbackLineup(topPlayers, squadPlayers) {
@@ -320,10 +323,13 @@ async function fetchAllMatchData(eventId) {
 
 /**
  * Son N maçın incidents + statistics + shotmap + graph verilerini çeker.
- * count default'u çağrı sitesiyle uyumlu olarak 5 olarak ayarlandı.
+ * Tüm turnuvalardan (cross-competition) gerçek son N maç seçilir.
+ * @param {Array} eventsArray - mergeAndSortEvents() ile üretilmiş, startTimestamp'e göre
+ *                              azalan sırada düzenlenmiş düz event dizisi.
+ * @param {number} count - Kaç maçın deep-dive verisi çekileceği (varsayılan 5)
  */
-async function fetchRecentMatchDetails(lastEventsResponse, count = 5) {
-  const events = lastEventsResponse?.events || [];
+async function fetchRecentMatchDetails(eventsArray, count = 5) {
+  const events = Array.isArray(eventsArray) ? eventsArray : (eventsArray?.events || []);
   const recentFinished = events
     .filter(e => e.status?.type === 'finished')
     .slice(0, count);
@@ -389,12 +395,23 @@ async function fetchPlayerStats(players, tournamentId, seasonId) {
 }
 
 /**
- * İki sayfa event verisini birleştirir.
+ * İki sayfa event verisini birleştirir ve startTimestamp'e göre azalan sırada döner.
+ * Tüm turnuvalardan (lig, kupa, Avrupa) gerçek kronolojik sıra korunur.
  */
 function mergeEventPages(page0, page1) {
   const events0 = page0?.events || [];
   const events1 = page1?.events || [];
-  return [...events0, ...events1];
+  return [...events0, ...events1].sort((a, b) => (b.startTimestamp || 0) - (a.startTimestamp || 0));
+}
+
+/**
+ * İki sayfa event verisini birleştirip startTimestamp'e göre azalan sırada
+ * düzenlenmiş düz bir dizi döner. fetchRecentMatchDetails için kullanılır.
+ */
+function mergeAndSortEvents(page0, page1) {
+  const events0 = page0?.events || [];
+  const events1 = page1?.events || [];
+  return [...events0, ...events1].sort((a, b) => (b.startTimestamp || 0) - (a.startTimestamp || 0));
 }
 
 module.exports = { fetchAllMatchData };

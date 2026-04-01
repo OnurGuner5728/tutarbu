@@ -127,7 +127,8 @@ function calculateMomentumMetrics(data, side) {
       goalsArr.push(scored);
     }
   }
-  const M151 = pearsonCorrelation(possessionArr, goalsArr);
+  const M151raw = pearsonCorrelation(possessionArr, goalsArr); // -1..+1
+  const M151 = ((M151raw + 1) / 2) * 100; // -1..+1 → 0..100
 
   // ── M152: Pas Tamamlama Oranı ──
   let totalAccPasses = 0, totalPasses = 0;

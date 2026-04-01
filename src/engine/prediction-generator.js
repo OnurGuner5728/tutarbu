@@ -137,11 +137,42 @@ function generatePrediction(metricsResult, data) {
       ...e,
       startTimestamp: e.startTimestamp ? new Date(e.startTimestamp * 1000).toISOString() : '',
     })),
-    h2hSummary: (data.h2h?.teamDuels || data.h2hEvents?.teamDuels) ? {
-      team1Wins: (data.h2h?.teamDuels || data.h2hEvents?.teamDuels).homeWins || 0,
-      draws: (data.h2h?.teamDuels || data.h2hEvents?.teamDuels).draws || 0,
-      team2Wins: (data.h2h?.teamDuels || data.h2hEvents?.teamDuels).awayWins || 0,
-    } : null,
+    h2hSummary: (() => {
+      // 1. Önce SofaScore teamDuel / teamDuels alanını dene (singular ve plural her ikisi)
+      const teamDuel = data.h2h?.teamDuel || data.h2h?.teamDuels ||
+                       data.h2hEvents?.teamDuel || data.h2hEvents?.teamDuels ||
+                       data.h2h?.h2h || null;
+      if (teamDuel && (teamDuel.homeWins != null || teamDuel.team1Wins != null)) {
+        return {
+          team1Wins: teamDuel.homeWins ?? teamDuel.team1Wins ?? 0,
+          draws: teamDuel.draws ?? 0,
+          team2Wins: teamDuel.awayWins ?? teamDuel.team2Wins ?? 0,
+        };
+      }
+
+      // 2. Fallback: H2H maç listesini manuel say
+      const h2hGames = data.h2hEvents?.events || data.h2h?.events || [];
+      if (h2hGames.length === 0) return null;
+
+      const homeTeamId = data.event?.event?.homeTeam?.id;
+      let team1Wins = 0, draws = 0, team2Wins = 0;
+      for (const game of h2hGames) {
+        const homeScore = game.homeScore?.current ?? game.homeScore?.display ?? 0;
+        const awayScore = game.awayScore?.current ?? game.awayScore?.display ?? 0;
+        const gameHomeTeamId = game.homeTeam?.id;
+        if (homeScore === awayScore) {
+          draws++;
+        } else if (
+          (gameHomeTeamId === homeTeamId && homeScore > awayScore) ||
+          (gameHomeTeamId !== homeTeamId && awayScore > homeScore)
+        ) {
+          team1Wins++;
+        } else {
+          team2Wins++;
+        }
+      }
+      return { team1Wins, draws, team2Wins };
+    })(),
     recentForm: {
       home: (data.homeLastEvents || []).slice(0, 6).map(e => ({
         ...e,

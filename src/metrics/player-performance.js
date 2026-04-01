@@ -191,8 +191,11 @@ function calculatePlayerMetrics(data, side) {
   const M078 = suspendedImpact;
 
   // ── M079: Kadro Derinliği İndeksi ──
+  // Raw: (totalPlayerCount / 25) * (M066 / 7.0) → 0-1.5 aralığı
+  // Normalize: raw / 1.5 * 100 → 0-100 aralığı
   const totalPlayerCount = allPlayers.length;
-  const M079 = (totalPlayerCount / 25) * (M066 / 7.0);
+  const M079raw = (totalPlayerCount / 25) * (M066 / 7.0);
+  const M079 = Math.min(100, (M079raw / 1.5) * 100);
 
   // ── M079b: Bench Güç Skoru ──
   // Yedek oyuncuların kalitesi ile sayısının birleşik skoru (0-100)
@@ -263,7 +266,9 @@ function calculatePlayerMetrics(data, side) {
       otherValue += val; // Kadrodaki diğer oyuncular (stats alınamamış)
     }
   }
-  const M087 = starterValue;
+  // M087: Ham £ piyasa değerini log-scale ile 0-100'e normalize et
+  // log10(starterValue_M€ + 1) * 50 → 1M€≈15, 10M€≈35, 100M€≈65, 1000M€≈100
+  const M087 = Math.min(100, Math.log10(Math.max(1, starterValue / 1_000_000) + 1) * 50);
   // M088: Yedek/Starter değer oranı — 1.0 = eşit güç, >1.0 = yedekler daha değerli
   const M088 = starterValue > 0 ? subValue / starterValue : 0;
 
