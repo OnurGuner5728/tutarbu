@@ -128,9 +128,20 @@ function calculateContextualMetrics(data) {
   const M143 = Math.abs(homePoints - awayPoints);
 
   // ── M144: Lig Gücü İndeksi (normalize) ──
-  // Top 5 lig ID'leri: Premier League=17, LaLiga=8, Bundesliga=35, SerieA=23, Ligue1=34
+  // Birincil: standings üzerinden dinamik hesap (avgGoals + takım sayısı)
+  // Fallback: bilinen lig ID'leri için hardcoded map (standings yetersizse)
   const ligGücüMap = { 17: 100, 8: 95, 35: 88, 23: 90, 34: 82, 52: 65, 7: 100, 679: 85 };
-  const M144 = ligGücüMap[data.tournamentId] || 50;
+  const standingsRows = data.standingsTotal?.standings?.[0]?.rows || [];
+  let M144;
+  if (standingsRows.length >= 4) {
+    const totalGoals = standingsRows.reduce((s, r) => s + (r.scoresFor || 0), 0);
+    const totalGames = Math.max(standingsRows.reduce((s, r) => s + (r.played || 0), 0), 1);
+    const avgGoals = totalGoals / totalGames;
+    const teamCount = standingsRows.length;
+    M144 = Math.min(100, Math.round(50 + avgGoals * 10 + (teamCount >= 18 ? 10 : 0)));
+  } else {
+    M144 = ligGücüMap[data.tournamentId] || 50;
+  }
 
   // ── M145: Transfer Net Harcama Etkisi ──
   let homeMarketValue = 0, awayMarketValue = 0;

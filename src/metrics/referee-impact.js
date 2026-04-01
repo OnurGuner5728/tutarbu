@@ -12,7 +12,12 @@ function calculateRefereeMetrics(data) {
 
   // Hakem sezon istatistiklerini pars et (en güncel sezon)
   const seasons = refereeStats?.statistics?.seasons || refereeStats?.seasons || [];
-  let currentSeason = seasons[0]; // En güncel sezon
+  const sortedSeasons = [...seasons].sort((a, b) => {
+    const yearA = a.season?.year ?? a.year ?? 0;
+    const yearB = b.season?.year ?? b.year ?? 0;
+    return yearB - yearA; // Azalan — en yeni önce
+  });
+  let currentSeason = sortedSeasons[0]; // En güncel sezon
 
   // Eğer sezon detayı yoksa, farklı yapılarda aranır
   if (!currentSeason && refereeStats) {
@@ -43,35 +48,74 @@ function calculateRefereeMetrics(data) {
   const totalReds = stats.redCards || stats.totalRedCards || 0;
   const M110 = matchesCount > 0 ? totalReds / matchesCount : 0;
 
-  // ── M111: Penaltı Verme Sıklığı ──
+  // ── M111: Kırmızı Kart Oranı (redCards / matchesOfficiated) ──
   const totalPenalties = stats.penalties || stats.penaltiesAwarded || 0;
-  let M111 = matchesCount > 0 ? totalPenalties / matchesCount : 0;
-  if (M111 === 0 && matchesCount > 0) M111 = 0.24; // Lig ortalaması tahmini
+  let M111;
+  if (matchesCount > 0 && totalReds > 0) {
+    M111 = totalReds / matchesCount; // Gerçek veri: kırmızı kart / maç
+  } else if (matchesCount > 0 && totalPenalties > 0) {
+    M111 = totalPenalties / matchesCount; // Penaltı verisi varsa kullan
+  } else {
+    M111 = 0.24; // Fallback: lig ortalaması tahmini (gerçek veri yok)
+  }
 
-  // ── M112: Ev Sahibi Galibiyet Oranı ──
+  // ── M112: Faul / Maç Ortalaması (fouls / matchesOfficiated) ──
   const homeWins = stats.homeWins || stats.homeTeamWins || 0;
-  const M112 = matchesCount > 0 && homeWins > 0 ? (homeWins / matchesCount) * 100 : 45.5;
+  const totalFoulsForM112 = stats.fouls || stats.totalFouls || 0;
+  let M112;
+  if (matchesCount > 0 && totalFoulsForM112 > 0) {
+    M112 = totalFoulsForM112 / matchesCount; // Gerçek veri: faul / maç
+  } else if (matchesCount > 0 && homeWins > 0) {
+    M112 = (homeWins / matchesCount) * 100; // Ev sahibi galibiyet oranı (yedek)
+  } else {
+    M112 = 45.5; // Fallback: lig ortalaması tahmini (gerçek veri yok)
+  }
 
-  // ── M113: Maçlardaki Gol Ortalaması ──
+  // ── M113: Sarı Kart / Maç Ortalaması (yellowCards / matchesOfficiated) ──
   const totalGoals = stats.goals || stats.totalGoals || 0;
-  let M113 = matchesCount > 0 ? totalGoals / matchesCount : 0;
-  if (M113 === 0 && matchesCount > 0) M113 = 2.65; // Lig ortalaması tahmini
+  let M113;
+  if (matchesCount > 0 && totalYellows > 0) {
+    M113 = totalYellows / matchesCount; // Gerçek veri: sarı kart / maç
+  } else if (matchesCount > 0 && totalGoals > 0) {
+    M113 = totalGoals / matchesCount; // Gol verisi varsa kullan
+  } else {
+    M113 = 2.65; // Fallback: lig ortalaması tahmini (gerçek veri yok)
+  }
 
-  // ── M114: Üst 2.5 Oranı ──
+  // ── M114: Dakika / Faul Oranı (minutes / fouls) ──
   const over25 = stats.over25 || stats.overTwoFiveGoals || 0;
-  const M114 = matchesCount > 0 && over25 > 0 ? (over25 / matchesCount) * 100 : 52.0;
+  const totalMinutes = stats.minutes || stats.totalMinutes || 0;
+  let M114;
+  if (matchesCount > 0 && totalFoulsForM112 > 0 && totalMinutes > 0) {
+    M114 = totalMinutes / totalFoulsForM112; // Gerçek veri: dakika / faul
+  } else if (matchesCount > 0 && over25 > 0) {
+    M114 = (over25 / matchesCount) * 100; // Üst 2.5 oranı (yedek)
+  } else {
+    M114 = 52.0; // Fallback: lig ortalaması tahmini (gerçek veri yok)
+  }
 
-  // ── M115-M116: Bu takımı yönetme geçmişi ──
-  // Detaylı veri gerektirdiği için mevcut refereeStats'tan yaklaşık
-  const M115 = M112; // Ev sahibine yönelik ortalama
-  const M116 = 100 - M112; // Deplasmana yönelik yaklaşım
+  // ── M115-M116: Hakem Home/Away Bias (ev sahibi / deplasman faul oranı) ──
+  // homeFouls/awayFouls ayrıştırılmış veri varsa kullan, yoksa nötr 50.
+  // M112 kopyası KULLANILMAZ.
+  const homeFouls = stats.homeFouls || stats.homeTeamFouls || 0;
+  const awayFouls = stats.awayFouls || stats.awayTeamFouls || 0;
+  let M115, M116;
+  if (matchesCount > 0 && homeFouls > 0) {
+    M115 = (homeFouls / matchesCount) * 100; // Ev sahibi faul oranı (0-100 ölçek)
+  } else {
+    M115 = 50; // Veri yok → nötr
+  }
+  if (matchesCount > 0 && awayFouls > 0) {
+    M116 = (awayFouls / matchesCount) * 100; // Deplasman faul oranı (0-100 ölçek)
+  } else {
+    M116 = 50; // Veri yok → nötr
+  }
 
   // ── M117: Sertlik İndeksi ──
   const M117 = matchesCount > 0 ? (totalYellows + totalReds * 3) / matchesCount : 0;
 
   // ── M118: Faul Toleransı ──
-  const totalFouls = stats.fouls || stats.totalFouls || 0;
-  const avgFouls = matchesCount > 0 && totalFouls > 0 ? totalFouls / matchesCount : 25;
+  const avgFouls = matchesCount > 0 && totalFoulsForM112 > 0 ? totalFoulsForM112 / matchesCount : 25;
   const M118 = avgFouls / 25; // 25 = lig ortalaması yaklaşık (API'den hesaplanacak)
 
   // ── M118b: Hakem Ev Sahibi Yanlılık İndeksi ──

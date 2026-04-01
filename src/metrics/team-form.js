@@ -42,8 +42,18 @@ function calculateTeamFormMetrics(data, side) {
     return points;
   }
 
+  // ── formData parse (getEventForm API) ──
+  const formString = formData?.value || '';
+  const formScore = formString.split('').reduce((s, c) => s + (c === 'W' ? 3 : c === 'D' ? 1 : 0), 0);
+  const maxScore = formString.length * 3;
+  const formPct = maxScore > 0 ? (formScore / maxScore) * 100 : 50;
+
   // ── M046-M048: Form Puanları ──
-  const M046 = last5.length > 0 ? (formPoints(last5) / (last5.length * 3)) * 100 : 0;
+  // M046: Son 5 maç event tabanlı hesap (%70) + API form string'i (%30) ağırlıklı birleşim
+  const M046raw = last5.length > 0 ? (formPoints(last5) / (last5.length * 3)) * 100 : 0;
+  const M046 = maxScore > 0
+    ? M046raw * 0.7 + formPct * 0.3
+    : M046raw;
   const M047 = last10.length > 0 ? (formPoints(last10) / (last10.length * 3)) * 100 : 0;
   const M048 = last20.length > 0 ? (formPoints(last20) / (last20.length * 3)) * 100 : 0;
 
@@ -98,6 +108,16 @@ function calculateTeamFormMetrics(data, side) {
     if (M050 === 0) M050 = unbeatenStreak;
     if (M051 === 0) M051 = scoringStreak;
     if (M052 === 0) M052 = cleanStreak;
+  }
+
+  // ── M050: avgRating entegrasyonu (getEventForm API) ──
+  // Streak sayısı 0-100'e normalize (cap: 10 maç = %100), avgRating 6-9 → 0-100 normalize
+  // Birleşim: streak %60 + avgRating %40 (avgRating yoksa yalnızca streak)
+  const avgRating = formData?.avgRating;
+  if (avgRating != null) {
+    const M050streak = Math.min(M050, 10) * 10; // 0-100
+    const M050rating = Math.min(Math.max((avgRating - 6) / (9 - 6), 0), 1) * 100; // 0-100
+    M050 = M050streak * 0.6 + M050rating * 0.4;
   }
 
   // ── M053-M054: Gol Trend Yönü ──

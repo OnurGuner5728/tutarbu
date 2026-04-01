@@ -117,8 +117,20 @@ function calculateGoalkeeperMetrics(data, side) {
   const highClaims = gkStats.highClaims || gkStats.totalHighClaim || 0;
   const M107 = appearances > 0 ? (punches + highClaims) / appearances : 0;
 
-  // ── M108: Kaleci Son 5 Maç Trend ──
-  const M108 = 0; // Maç-maç kaleci rating verisi gerektirir
+  // ── M108: Kaleci Son 5 Maç Rating Ortalaması ──
+  const gkRatings = [];
+  for (const match of recentDetails) {
+    const isMatchHome = match.homeTeam?.id === teamId;
+    const lineupSide = isMatchHome ? match.lineups?.home : match.lineups?.away;
+    const players = lineupSide?.players || [];
+    const matchGk = players.find(p => p.position === 'G' || p.positionName === 'Goalkeeper');
+    const rating = matchGk?.statistics?.rating;
+    if (rating != null && !isNaN(rating)) gkRatings.push(Number(rating));
+  }
+  const avgGkRating = gkRatings.length > 0
+    ? gkRatings.reduce((sum, r) => sum + r, 0) / gkRatings.length
+    : null;
+  const M108 = avgGkRating != null ? Math.min(Math.max(avgGkRating * 10, 0), 100) : 50;
 
   return {
     M096, M097, M098, M099, M100, M101, M102, M103, M104, M105,

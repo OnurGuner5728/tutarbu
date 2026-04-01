@@ -92,11 +92,37 @@ function calculatePlayerMetrics(data, side) {
   const M072 = teamXG > 0 ? topScorerXG / teamXG : 0;
 
   // ── M073: Kilit Oyuncu Bağımlılık İndeksi ──
+  // Temel hesap: kadro içinde en yüksek gol+asist katkısına sahip oyuncunun payı
   const playerContribs = starters.map(p => {
     return (p.seasonStats?.statistics?.goals || 0) + (p.seasonStats?.statistics?.assists || 0);
   });
   const maxContrib = Math.max(...playerContribs, 0);
-  const M073 = totalContrib > 0 ? (maxContrib / totalContrib) * 100 : 0;
+  const baseM073 = totalContrib > 0 ? (maxContrib / totalContrib) * 100 : 0;
+
+  // topPlayers entegrasyonu: API'nin yıldız olarak işaretlediği oyunculardan star bonus hesapla
+  // starScore: rating > 8.0 veya goals > 10 olan oyuncuların normalize edilmiş etki puanı
+  let starBonus = 0;
+  const topPlayersList = Array.isArray(topPlayers) ? topPlayers : [];
+  if (topPlayersList.length > 0) {
+    let starScoreSum = 0;
+    for (const tp of topPlayersList) {
+      const rating = tp.statistics?.rating || 0;
+      const goals = tp.statistics?.goals || 0;
+      const assists = tp.statistics?.assists || 0;
+      // Yıldız kriter: rating > 8.0 → yüksek etki, goals > 10 → ek bonus
+      const ratingScore = rating > 8.0 ? (rating - 8.0) * 25 : 0;  // 8.1→2.5, 9.0→25, 10→50
+      const goalScore = goals > 10 ? Math.min(50, (goals - 10) * 2.5) : 0;
+      const assistScore = Math.min(20, assists * 2);
+      starScoreSum += ratingScore + goalScore + assistScore;
+    }
+    // topPlayers sayısına bölerek ortalama al, 0-100 arasına sıkıştır
+    starBonus = Math.min(100, starScoreSum / topPlayersList.length);
+  }
+
+  // topPlayers varsa: %30 star bonus + %70 mevcut hesap; yoksa mevcut hesap değişmez
+  const M073 = topPlayersList.length > 0
+    ? starBonus * 0.30 + baseM073 * 0.70
+    : baseM073;
 
   // ── M074: Dribling Başarı Oranı ──
   let totalSuccDrib = 0, totalDrib = 0;
@@ -152,8 +178,8 @@ function calculatePlayerMetrics(data, side) {
 
     const baseImpact = (playerRating / avgTeamRating) * posCrit * replacementFactor;
 
-    const isInjured = mp.type === 'injured' || mp.reason?.description?.includes('Injury');
-    const isSuspended = mp.type === 'suspended' || mp.reason?.description?.includes('Suspended');
+    const isInjured = mp.type === 'injured' || mp.reason?.description?.toLowerCase().includes('injury');
+    const isSuspended = mp.type === 'suspended' || mp.reason?.description?.toLowerCase().includes('suspended');
 
     if (isInjured) {
       injuredImpact += baseImpact;
@@ -241,9 +267,49 @@ function calculatePlayerMetrics(data, side) {
   // M088: Yedek/Starter değer oranı — 1.0 = eşit güç, >1.0 = yedekler daha değerli
   const M088 = starterValue > 0 ? subValue / starterValue : 0;
 
-  // ── M089: Oyuncunun Rakibe Karşı Geçmişi ──
-  // H2H maçlarındaki ortalama rating — basitleştirilmiş
-  const M089 = M066; // Mevcut sezon rating'i kullanılır
+  // ── M089: Oyuncunun Rakibe Karşı Geçmişi (H2H Lineup Presence) ──
+  // Mevcut starter kadrosundan kaç oyuncunun H2H maçlarında sahaya çıktığını ölçer.
+  // playerH2HPresence = H2H maçlarında görünen starter'lar / toplam starter sayısı
+  // M089 = playerH2HPresence * 100 → 0-100 scale
+  // Fallback: h2hEvents yoksa veya lineup verisi yoksa M066 kullanılır (sezon rating bazlı)
+  let M089;
+  const h2hEvents = data.h2hEvents || [];
+  const starterPlayerIdSet = new Set(starters.map(p => p.playerId).filter(Boolean));
+
+  if (h2hEvents.length === 0 || starterPlayerIdSet.size === 0) {
+    // Fallback: H2H verisi yok
+    M089 = M066;
+  } else {
+    const seenInH2H = new Set();
+
+    for (const h2hMatch of h2hEvents) {
+      // Bu H2H maçında geçerli takımın hangi tarafta olduğunu belirle
+      const matchHomeId = h2hMatch.homeTeam?.id;
+      const matchAwayId = h2hMatch.awayTeam?.id;
+
+      let sideLineup = null;
+      if (matchHomeId === teamId) {
+        sideLineup = h2hMatch.lineups?.home;
+      } else if (matchAwayId === teamId) {
+        sideLineup = h2hMatch.lineups?.away;
+      } else {
+        // Takım bu maçta yok (veri tutarsızlığı), geç
+        continue;
+      }
+
+      if (!sideLineup?.players) continue;
+
+      for (const lp of sideLineup.players) {
+        const pid = lp.player?.id;
+        if (pid && starterPlayerIdSet.has(pid)) {
+          seenInH2H.add(pid);
+        }
+      }
+    }
+
+    const playerH2HPresence = seenInH2H.size / starterPlayerIdSet.size;
+    M089 = playerH2HPresence * 100;
+  }
 
   // ── M090-M091: Tutarlılık (StdDev) ──
   const goalPerMatch = [];

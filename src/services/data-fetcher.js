@@ -165,9 +165,9 @@ async function fetchAllMatchData(eventId) {
     awayManagerCareer = await api.getManagerCareer(actualAwayManagerId);
   }
 
-  // 8. Son maçların incident/stats verilerini çek (son 3 maç deep-dive)
-  const homeRecentMatchDetails = await fetchRecentMatchDetails(homeLastEvents0, 3);
-  const awayRecentMatchDetails = await fetchRecentMatchDetails(awayLastEvents0, 3);
+  // 8. Son maçların incident/stats verilerini çek (son 5 maç deep-dive)
+  const homeRecentMatchDetails = await fetchRecentMatchDetails(homeLastEvents0, 5);
+  const awayRecentMatchDetails = await fetchRecentMatchDetails(awayLastEvents0, 5);
 
   // --- FALLBACK LINEUP GENERATOR ---
   function buildFallbackLineup(topPlayers, squadPlayers) {
@@ -320,9 +320,9 @@ async function fetchAllMatchData(eventId) {
 
 /**
  * Son N maçın incidents + statistics + shotmap + graph verilerini çeker.
- * count default'u çağrı sitesiyle uyumlu olarak 3 olarak ayarlandı.
+ * count default'u çağrı sitesiyle uyumlu olarak 5 olarak ayarlandı.
  */
-async function fetchRecentMatchDetails(lastEventsResponse, count = 3) {
+async function fetchRecentMatchDetails(lastEventsResponse, count = 5) {
   const events = lastEventsResponse?.events || [];
   const recentFinished = events
     .filter(e => e.status?.type === 'finished')

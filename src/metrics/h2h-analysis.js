@@ -113,11 +113,60 @@ function calculateH2HMetrics(data) {
   }
   const M128 = last5H2H.length > 0 ? goalDiffTrend / last5H2H.length : 0;
 
-  // ── M129: H2H Kart Ortalaması (yaklaşık) ──
-  const M129 = M123 > 3.0 ? 5.5 : 4.2; // Gerçek kart verisi yoksa gol korrelasyonu
+  // ── M129: H2H Kart Ortalaması (gerçek incident verilerinden) ──
+  // ── M130: H2H Korner Ortalaması (gerçek incident verilerinden) ──
+  let totalH2HCards = 0;
+  let totalH2HCorners = 0;
+  let matchesWithIncidents = 0;
 
-  // ── M130: H2H Korner Ortalaması (yaklaşık) ──
-  const M130 = M123 > 2.5 ? 11.5 : 9.5;
+  for (const ev of events) {
+    let matchCards = 0;
+    let matchCorners = 0;
+    let foundData = false;
+
+    // Önce incidents dizisini kontrol et
+    if (Array.isArray(ev.incidents) && ev.incidents.length > 0) {
+      for (const inc of ev.incidents) {
+        if (inc.incidentType === 'card') {
+          matchCards++;
+          foundData = true;
+        } else if (
+          inc.incidentType === 'corner' ||
+          (typeof inc.description === 'string' && inc.description.toLowerCase().includes('corner'))
+        ) {
+          matchCorners++;
+          foundData = true;
+        }
+      }
+    }
+
+    // incidents yoksa ya da boşsa statistics dizisini dene
+    if (!foundData && Array.isArray(ev.statistics) && ev.statistics.length > 0) {
+      for (const stat of ev.statistics) {
+        const name = (stat.name || stat.type || stat.statisticsType || '').toLowerCase();
+        if (name.includes('yellow card') || name.includes('red card') || name === 'cards') {
+          const home = Number(stat.homeValue ?? stat.home ?? 0);
+          const away = Number(stat.awayValue ?? stat.away ?? 0);
+          matchCards += home + away;
+          foundData = true;
+        } else if (name.includes('corner')) {
+          const home = Number(stat.homeValue ?? stat.home ?? 0);
+          const away = Number(stat.awayValue ?? stat.away ?? 0);
+          matchCorners += home + away;
+          foundData = true;
+        }
+      }
+    }
+
+    if (foundData) {
+      totalH2HCards += matchCards;
+      totalH2HCorners += matchCorners;
+      matchesWithIncidents++;
+    }
+  }
+
+  const M129 = matchesWithIncidents > 0 ? totalH2HCards / matchesWithIncidents : 4.5;
+  const M130 = matchesWithIncidents > 0 ? totalH2HCorners / matchesWithIncidents : 10;
 
   return {
     M119, M120, M121, M122, M123, M124, M125, M126, M127, M128,

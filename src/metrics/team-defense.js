@@ -134,7 +134,7 @@ function calculateTeamDefenseMetrics(data, side) {
       totalOpponentShots += oppStats.totalShots || 0;
       totalDuels += (teamStats?.totalDuels || 0) > 0
         ? (teamStats.totalDuels || 0)
-        : (teamStats?.duelsWon || 0) + (oppStats?.duelsWon || 0);
+        : (teamStats?.duelsWon || 0) + (teamStats?.duelsLost || 0);
     }
   }
 

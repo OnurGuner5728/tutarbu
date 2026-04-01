@@ -109,10 +109,20 @@ function calculateTeamAttackMetrics(data, side) {
     }
   }
 
+  // teamSeasonStats fallback helpers — recentDetails sparse olduğunda kullanılır
+  const seasonStat = (name) =>
+    teamSeasonStats?.statistics?.find(s => s.name === name)?.value ?? null;
+
   const M011 = totalShots > 0 ? Math.min((totalGoalsFromIncidents / totalShots) * 100, 100) : 0;
   const M012 = shotsOnTarget > 0 ? Math.min((totalGoalsFromIncidents / shotsOnTarget) * 100, 100) : 0;
-  const M013 = matchesWithStats > 0 ? totalShots / matchesWithStats : 0;
-  const M014 = matchesWithStats > 0 ? shotsOnTarget / matchesWithStats : 0;
+  // M013: Maç başı toplam şut — recentDetails yoksa sezon "Shots per Game" kullan
+  const M013 = matchesWithStats > 0
+    ? totalShots / matchesWithStats
+    : (seasonStat('Shots per Game') ?? 0);
+  // M014: Maç başı isabetli şut — recentDetails yoksa sezon "Shots on Target per Game" kullan
+  const M014 = matchesWithStats > 0
+    ? shotsOnTarget / matchesWithStats
+    : (seasonStat('Shots on Target per Game') ?? 0);
 
   // ── M015-M016: xG Metrikleri ──
   let totalXG = 0;
@@ -150,7 +160,16 @@ function calculateTeamAttackMetrics(data, side) {
     }
   }
 
-  const M017 = matchesWithStats > 0 ? totalBigChances / matchesWithStats : 0;
+  // M017: Maç başı büyük şans — recentDetails yoksa sezon "Big Chances" değerini
+  // totalMatches'e bölerek ortalama olarak kullan
+  const M017 = matchesWithStats > 0
+    ? totalBigChances / matchesWithStats
+    : (() => {
+        const seasonBigChances = seasonStat('Big Chances');
+        return seasonBigChances != null && totalMatches > 0
+          ? seasonBigChances / totalMatches
+          : 0;
+      })();
   const M018 = totalBigChances > 0 ? Math.min((totalBigChancesScored / totalBigChances) * 100, 100) : 0;
 
   // ── M019-M020: Penaltı Metrikleri ──
@@ -175,15 +194,6 @@ function calculateTeamAttackMetrics(data, side) {
       }
     }
 
-    // shotmap'ten de kontrol et
-    const shotmapData = match.shotmap?.shotmap || [];
-    for (const shot of shotmapData) {
-      if (shot.isHome === isMatchHome && shot.situation === 'penalty') {
-        if (shot.shotType === 'goal') {
-          // Zaten incidents'ta sayıldı
-        }
-      }
-    }
   }
 
   const M019 = recentMatchCount > 0 ? penaltiesWon / recentMatchCount : 0;
@@ -219,7 +229,7 @@ function calculateTeamAttackMetrics(data, side) {
   }
 
   const M021 = pressureMatches > 0
-    ? Math.min(Math.max(totalPositivePressure / pressureMatches / 100, 0), 1) : 0.5;
+    ? Math.min(Math.max(totalPositivePressure / pressureMatches, 0), 100) : 50;
 
   // ── M022-M023: Korner Metrikleri ──
   let totalCorners = 0;
@@ -240,7 +250,10 @@ function calculateTeamAttackMetrics(data, side) {
     }
   }
 
-  const M022 = matchesWithStats > 0 ? totalCorners / matchesWithStats : 0;
+  // M022: Maç başı korner — recentDetails yoksa sezon "Corners per Game" kullan
+  const M022 = matchesWithStats > 0
+    ? totalCorners / matchesWithStats
+    : (seasonStat('Corners per Game') ?? 0);
   // Fallback: Eğer shotmap'te bulamazsak seasonStats'ten bakmayı deneyebiliriz (varsa)
   const M023 = totalCorners > 0 ? (cornerGoalsCount / totalCorners) * 100 : 0;
 
@@ -378,6 +391,46 @@ function extractTeamStats(statsResponse, isHome) {
     yellowCards: 0, redCards: 0, offsides: 0
   };
 
+  // Key-based lookup map (locale-independent — SofaScore sabit İngilizce key döner).
+  // item.key mevcutsa önce buradan resolve edilir; bulunamazsa aşağıdaki switch fallback devreye girer.
+  // Fraction/total gerektiren case'ler üçüncü parametre (st = stats objesi) ile birlikte handle edilir.
+  const KEY_MAP = {
+    'totalShots':                (r, v)     => { r.totalShots = v; },
+    'onTargetScoringAttempts':   (r, v)     => { r.shotsOnTarget = v; },
+    'cornerKicks':               (r, v)     => { r.cornerKicks = v; },
+    'bigChances':                (r, v)     => { r.bigChances = v; },
+    'bigChancesScored':          (r, v)     => { r.bigChancesScored = v; },
+    'bigChancesMissed':          (r, v)     => { r.bigChancesMissed = v; },
+    'fouls':                     (r, v)     => { r.fouls = v; },
+    'ballPossession':            (r, v)     => { r.possession = v; },
+    'expectedGoals':             (r, v)     => { r.expectedGoals = v; },
+    'blockedShots':              (r, v)     => { r.blockedShots = v; },
+    'shotsOffTarget':            (r, v)     => { r.shotsOffTarget = v; },
+    'hitWoodwork':               (r, v)     => { r.hitWoodwork = v; },
+    'shotsInsideBox':            (r, v)     => { r.shotsInsideBox = v; },
+    'shotsOutsideBox':           (r, v)     => { r.shotsOutsideBox = v; },
+    'totalPasses':               (r, v)     => { r.totalPasses = v; },
+    'totalLongBalls':            (r, v)     => { r.totalLongBalls = v; },
+    'totalCrosses':              (r, v)     => { r.totalCrosses = v; },
+    'totalDuels':                (r, v)     => { r.totalDuels = v; },
+    'totalAerialDuels':          (r, v)     => { r.totalAerialDuels = v; },
+    'interceptions':             (r, v)     => { r.interceptions = v; },
+    'tackles':                   (r, v)     => { r.tackles = v; },
+    'clearances':                (r, v)     => { r.clearances = v; },
+    'saves':                     (r, v)     => { r.saves = v; },
+    'goalKeeperSaves':           (r, v)     => { r.saves = v; },
+    'yellowCards':               (r, v)     => { r.yellowCards = v; },
+    'redCards':                  (r, v)     => { r.redCards = v; },
+    'offsides':                  (r, v)     => { r.offsides = v; },
+    // Fraction case'ler: current + total birlikte yazılır
+    'accuratePasses':            (r, v, st) => { r.accuratePasses = v; if (st.total) r.totalPasses = st.total; },
+    'accurateLongBalls':         (r, v, st) => { r.accurateLongBalls = v; if (st.total) r.totalLongBalls = st.total; },
+    'accurateCrosses':           (r, v, st) => { r.accurateCrosses = v; if (st.total) r.totalCrosses = st.total; },
+    'accuratePassesFinalThird':  (r, v, st) => { r.accuratePassesFinalThird = v; if (st.total) r.totalPassesFinalThird = st.total; },
+    'duelsWon':                  (r, v, st) => { r.duelsWon = v; if (st.total) r.totalDuels = st.total; },
+    'aerialDuelsWon':            (r, v, st) => { r.aerialDuelsWon = v; if (st.total) r.totalAerialDuels = st.total; },
+  };
+
   for (const period of statsResponse.statistics) {
     if (period.period !== 'ALL') continue;
     for (const group of (period.groups || [])) {
@@ -385,6 +438,13 @@ function extractTeamStats(statsResponse, isHome) {
         const stats = parseStatValue(item, isHome);
         const val = stats.current;
 
+        // Key-based lookup önce dene (locale-independent)
+        if (item.key && KEY_MAP[item.key]) {
+          KEY_MAP[item.key](result, val, stats);
+          continue;
+        }
+
+        // Fallback: name-based switch (İngilizce lokalizasyon veya key yoksa çalışır)
         switch (item.name) {
           case 'Total shots': result.totalShots = val; break;
           case 'Shots on target': result.shotsOnTarget = val; break;
@@ -421,7 +481,6 @@ function extractTeamStats(statsResponse, isHome) {
           case 'Accurate passes in final third':
             result.accuratePassesFinalThird = stats.current;
             if (stats.total) result.totalPassesFinalThird = stats.total;
-            else if (result.totalPassesFinalThird === 0) result.totalPassesFinalThird = stats.current * 1.3; // Tahmin
             break;
           case 'Duels':
           case 'Duels won':
