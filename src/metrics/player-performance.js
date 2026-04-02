@@ -3,6 +3,92 @@
  * Oyuncu kalitesi, kadro etkisi, sakatlık etkisi, güçlü/güçsüze gol atma.
  */
 
+/**
+ * Builds a map of { [playerId]: avgMinutesPerMatch } from recent match incidents.
+ *
+ * For each match in recentDetails:
+ *   - substitution incidents with incidentType === 'substitution':
+ *       playerOut.id  → played `inc.time` minutes (subbed off)
+ *       playerIn.id   → played `(90 - inc.time)` minutes (subbed on)
+ *   - players with no substitution incident are assumed to have played 90 minutes.
+ *
+ * Only players present in playerStats are included in the returned map.
+ *
+ * Falls back gracefully: if recentDetails is empty or has no substitution data,
+ * every player in playerStats gets an implicit 90-minute average (no change to
+ * existing behaviour because weight = 90/90 = 1.0).
+ *
+ * @param {Array}  recentDetails - Array of recent match detail objects.
+ * @param {Array}  playerStats   - Array of player stat objects (must have .playerId).
+ * @returns {{ [playerId: number]: number }} avgMinutesPerMatch per player.
+ */
+function getPlayerMinutesMap(recentDetails, playerStats) {
+  const knownIds = new Set((playerStats || []).map(p => p.playerId).filter(Boolean));
+  if (knownIds.size === 0 || !Array.isArray(recentDetails) || recentDetails.length === 0) {
+    // No data — return 90 for every player so weights are neutral (1.0)
+    const fallback = {};
+    for (const id of knownIds) fallback[id] = 90;
+    return fallback;
+  }
+
+  // Accumulate minutes per player across all recent matches
+  // matchMinutes[playerId] = [minutesInMatch1, minutesInMatch2, ...]
+  const matchMinutes = {};
+
+  for (const match of recentDetails) {
+    const incidents = match.incidents?.incidents;
+    if (!Array.isArray(incidents)) continue;
+
+    // Collect substitution events for this match
+    const subbedOutAt = {};   // playerId → minute subbed off
+    const subbedInAt  = {};   // playerId → minute subbed on
+
+    for (const inc of incidents) {
+      if (inc.incidentType !== 'substitution') continue;
+      const outId = inc.playerOut?.id;
+      const inId  = inc.playerIn?.id;
+      const minute = typeof inc.time === 'number' ? inc.time : null;
+      if (minute == null) continue;
+
+      if (outId) subbedOutAt[outId] = minute;
+      if (inId)  subbedInAt[inId]   = minute;
+    }
+
+    // For each known player, determine minutes played in this match
+    for (const pid of knownIds) {
+      let minutes;
+      if (subbedOutAt[pid] != null) {
+        // Player was substituted off — played until the substitution minute
+        minutes = subbedOutAt[pid];
+      } else if (subbedInAt[pid] != null) {
+        // Player came on as a substitute — played the remainder
+        minutes = Math.max(0, 90 - subbedInAt[pid]);
+      } else if (Object.keys(subbedOutAt).length > 0 || Object.keys(subbedInAt).length > 0) {
+        // There were substitutions in this match but this player was not involved → full 90
+        minutes = 90;
+      } else {
+        // No substitution data at all for this match → assume 90
+        minutes = 90;
+      }
+
+      if (!matchMinutes[pid]) matchMinutes[pid] = [];
+      matchMinutes[pid].push(minutes);
+    }
+  }
+
+  // Convert to averages; fall back to 90 for players with no recorded entries
+  const avgMap = {};
+  for (const pid of knownIds) {
+    const entries = matchMinutes[pid];
+    if (entries && entries.length > 0) {
+      avgMap[pid] = entries.reduce((a, b) => a + b, 0) / entries.length;
+    } else {
+      avgMap[pid] = 90; // No match data → neutral weight
+    }
+  }
+  return avgMap;
+}
+
 function calculatePlayerMetrics(data, side) {
   const isHome = side === 'home';
   const teamId = isHome ? data.homeTeamId : data.awayTeamId;
@@ -19,21 +105,33 @@ function calculatePlayerMetrics(data, side) {
   const starters = playerStats.filter(p => !p.substitute);
   const subs = playerStats.filter(p => p.substitute);
 
-  // ── M066: İlk 11 Ortalama Rating ──
-  const starterRatings = starters
-    .map(p => p.seasonStats?.statistics?.rating)
-    .filter(r => r != null && r > 0);
-  const M066 = starterRatings.length > 0
-    ? starterRatings.reduce((a, b) => a + b, 0) / starterRatings.length : 0;
+  // Substitution-aware minutes map — weights each player by actual minutes played
+  const minutesMap = getPlayerMinutesMap(recentDetails, playerStats);
 
-  // ── M067: Yedek Ortalama Rating (Katılım Olasılığı Ağırlıklı) ──
-  // Her yedeğin rating'i 0.6 katılım olasılığıyla ağırlıklandırılır.
-  // 0.6: modern futbolda ortalama yedek sahaya girme olasılığı (5 değişiklik hakkıyla ~60%)
+  // ── M066: İlk 11 Ortalama Rating (dakika ağırlıklı) ──
+  const starterRatingEntries = starters
+    .map(p => {
+      const rating = p.seasonStats?.statistics?.rating;
+      if (rating == null || rating <= 0) return null;
+      const weight = (minutesMap[p.playerId] ?? 90) / 90;
+      return { rating, weight };
+    })
+    .filter(r => r != null);
+  const starterTotalWeight = starterRatingEntries.reduce((a, b) => a + b.weight, 0);
+  const M066 = starterTotalWeight > 0
+    ? starterRatingEntries.reduce((a, b) => a + b.rating * b.weight, 0) / starterTotalWeight : 0;
+  // Keep plain array for M068/other downstream uses
+  const starterRatings = starterRatingEntries.map(e => e.rating);
+
+  // ── M067: Yedek Ortalama Rating (katılım + dakika ağırlıklı) ──
+  // SUB_PARTICIPATION_PROB: modern futbolda ortalama yedek sahaya girme olasılığı (~60%)
   const SUB_PARTICIPATION_PROB = 0.6;
   const subWeightedRatings = subs
     .map(p => {
       const rating = p.seasonStats?.statistics?.rating;
-      return (rating != null && rating > 0) ? rating * SUB_PARTICIPATION_PROB : null;
+      if (rating == null || rating <= 0) return null;
+      const minuteWeight = (minutesMap[p.playerId] ?? 90) / 90;
+      return rating * SUB_PARTICIPATION_PROB * minuteWeight;
     })
     .filter(r => r != null);
   const M067 = subWeightedRatings.length > 0

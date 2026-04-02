@@ -36,26 +36,24 @@ async function fetchAllMatchData(eventId) {
   // 2. Maç seviyesi veriler (paralel)
   // Promise.allSettled kullanılıyor: tek bir API hatası tüm fetch'i çökertmemeli.
   // Her sonuç { status: 'fulfilled'|'rejected', value|reason } şeklinde gelir.
+  // Not: getEventStats, getEventIncidents, getEventShotmap ve getEventGraph
+  // mevcut (henüz oynanmamış) maç için anlamsız veri döner ve hiçbir metrik
+  // hesaplayıcı tarafından tüketilmez — bu nedenle bu çağrılar kaldırıldı.
   const matchLevelResults = await Promise.allSettled([
-    api.getEventStats(eventId),        // 0
-    api.getEventIncidents(eventId),    // 1
-    api.getEventLineups(eventId),      // 2
-    api.getEventShotmap(eventId),      // 3
-    api.getEventGraph(eventId),        // 4
-    api.getEventH2H(eventId),          // 5
-    api.getEventH2HEvents(eventId),    // 6
-    api.getEventOdds(eventId),         // 7
-    api.getEventMissingPlayers(eventId), // 8
-    api.getEventStreaks(eventId),      // 9
-    api.getEventForm(eventId),         // 10
-    api.getEventManagers(eventId),     // 11
-    api.getEventVotes(eventId),        // 12
+    api.getEventLineups(eventId),        // 0
+    api.getEventH2H(eventId),            // 1
+    api.getEventH2HEvents(eventId),      // 2
+    api.getEventOdds(eventId),           // 3
+    api.getEventMissingPlayers(eventId), // 4
+    api.getEventStreaks(eventId),        // 5
+    api.getEventForm(eventId),           // 6
+    api.getEventManagers(eventId),       // 7
+    api.getEventVotes(eventId),          // 8
   ]);
 
   const matchLevelNames = [
-    'eventStats', 'incidents', 'lineups', 'shotmap', 'graph',
-    'h2h', 'h2hEvents', 'odds', 'missingPlayers', 'streaks',
-    'form', 'managers', 'votes',
+    'lineups', 'h2h', 'h2hEvents', 'odds', 'missingPlayers',
+    'streaks', 'form', 'managers', 'votes',
   ];
   matchLevelResults.forEach((r, i) => {
     if (r.status === 'rejected') {
@@ -64,9 +62,8 @@ async function fetchAllMatchData(eventId) {
   });
 
   let [
-    eventStats, incidents, lineups, shotmap, graph,
-    h2h, h2hEvents, odds, missingPlayers, streaks,
-    form, managers, votes
+    lineups, h2h, h2hEvents, odds, missingPlayers,
+    streaks, form, managers, votes
   ] = matchLevelResults.map(r => (r.status === 'fulfilled' ? r.value : null));
 
   // 3 + 4. Takım verileri — Ev sahibi ve deplasman (paralel)
@@ -275,11 +272,7 @@ async function fetchAllMatchData(eventId) {
     refereeId,
 
     // Maç seviyesi
-    eventStats,
-    incidents,
     lineups,
-    shotmap,
-    graph,
     h2h,
     h2hEvents,
     odds,
