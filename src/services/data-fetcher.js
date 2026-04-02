@@ -262,16 +262,29 @@ async function fetchAllMatchData(eventId) {
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
   console.log(`[DataFetcher] All data fetched in ${elapsed}s`);
 
-  // Attach API call log for debug page
+  // Attach API call log for debug page (includes full response data)
   const _apiLog = [
-    { endpoint: 'getEvent', eventId, success: !!eventData },
-    ...matchLevelNames.map((name, i) => ({
-      endpoint: name,
+    {
+      endpoint: 'getEvent',
+      url: `/event/${eventId}`,
       eventId,
-      success: matchLevelResults[i].status === 'fulfilled',
-      responseSize: matchLevelResults[i].status === 'fulfilled'
-        ? JSON.stringify(matchLevelResults[i].value).length : 0,
-    })),
+      success: !!eventData,
+      responseSize: eventData ? JSON.stringify(eventData).length : 0,
+      data: eventData,
+    },
+    ...matchLevelNames.map((name, i) => {
+      const fulfilled = matchLevelResults[i].status === 'fulfilled';
+      const val = fulfilled ? matchLevelResults[i].value : null;
+      return {
+        endpoint: name,
+        url: `/event/${eventId}/${name.replace(/([A-Z])/g, '-$1').toLowerCase().replace(/^-/, '')}`,
+        eventId,
+        success: fulfilled,
+        error: fulfilled ? null : (matchLevelResults[i].reason?.message || 'failed'),
+        responseSize: val ? JSON.stringify(val).length : 0,
+        data: val,
+      };
+    }),
   ];
 
   return {

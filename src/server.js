@@ -138,15 +138,15 @@ app.post('/api/workshop/:eventId', async (req, res) => {
   }
   const numericEventId = parseInt(eventId, 10);
 
-  // Input validation: modifiedLineup varsa home/away diziler olmalı
-  if (modifiedLineup !== undefined && modifiedLineup !== null) {
+  // Input validation: modifiedLineup varsa home/away null veya array olmalı
+  if (modifiedLineup != null) {
     if (typeof modifiedLineup !== 'object' || Array.isArray(modifiedLineup)) {
       return res.status(400).json({ error: 'Invalid modifiedLineup: must be an object.' });
     }
-    if (modifiedLineup.home !== undefined && !Array.isArray(modifiedLineup.home)) {
+    if (modifiedLineup.home != null && !Array.isArray(modifiedLineup.home)) {
       return res.status(400).json({ error: 'Invalid modifiedLineup.home: must be an array.' });
     }
-    if (modifiedLineup.away !== undefined && !Array.isArray(modifiedLineup.away)) {
+    if (modifiedLineup.away != null && !Array.isArray(modifiedLineup.away)) {
       return res.status(400).json({ error: 'Invalid modifiedLineup.away: must be an array.' });
     }
   }
