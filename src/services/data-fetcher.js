@@ -257,18 +257,31 @@ async function fetchAllMatchData(eventId) {
   }
 
   // 9. İlk 11 oyuncuların bireysel istatistikleri
-  const homePlayerStats = await fetchPlayerStats(lineups?.home?.players, tournamentId, seasonId);
-  const awayPlayerStats = await fetchPlayerStats(lineups?.away?.players, tournamentId, seasonId);
+  const { stats: homePlayerStats, log: homePlayerLog } = await fetchPlayerStats(lineups?.home?.players, tournamentId, seasonId);
+  const { stats: awayPlayerStats, log: awayPlayerLog } = await fetchPlayerStats(lineups?.away?.players, tournamentId, seasonId);
 
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
   console.log(`[DataFetcher] All data fetched in ${elapsed}s`);
+
+  // Actual API URLs for each matchLevel endpoint
+  const matchLevelUrls = {
+    lineups: `/event/${eventId}/lineups`,
+    h2h: `/event/${eventId}/h2h`,
+    h2hEvents: `/event/${eventId}/h2h/events`,
+    teamH2H: `/team/${homeTeamId}/head2head/${awayTeamId}`,
+    odds: `/event/${eventId}/odds/1/all`,
+    missingPlayers: `/event/${eventId}/missing-players`,
+    streaks: `/event/${eventId}/team-streaks`,
+    form: `/event/${eventId}/pregame-form`,
+    managers: `/event/${eventId}/managers`,
+    votes: `/event/${eventId}/votes`,
+  };
 
   // Attach API call log for debug page (includes full response data)
   const _apiLog = [
     {
       endpoint: 'getEvent',
       url: `/event/${eventId}`,
-      eventId,
       success: !!eventData,
       responseSize: eventData ? JSON.stringify(eventData).length : 0,
       data: eventData,
@@ -278,14 +291,30 @@ async function fetchAllMatchData(eventId) {
       const val = fulfilled ? matchLevelResults[i].value : null;
       return {
         endpoint: name,
-        url: `/event/${eventId}/${name.replace(/([A-Z])/g, '-$1').toLowerCase().replace(/^-/, '')}`,
-        eventId,
+        url: matchLevelUrls[name] || `/${name}`,
         success: fulfilled,
         error: fulfilled ? null : (matchLevelResults[i].reason?.message || 'failed'),
         responseSize: val ? JSON.stringify(val).length : 0,
         data: val,
       };
     }),
+    // Player stats summary entries (grouped by team, not per-player)
+    {
+      endpoint: 'homePlayerStats',
+      url: `fetchPlayerStats × ${homePlayerLog.length} oyuncu (ev sahibi)`,
+      success: homePlayerStats.length > 0,
+      responseSize: JSON.stringify(homePlayerStats).length,
+      data: homePlayerStats,
+      _detail: homePlayerLog,
+    },
+    {
+      endpoint: 'awayPlayerStats',
+      url: `fetchPlayerStats × ${awayPlayerLog.length} oyuncu (deplasman)`,
+      success: awayPlayerStats.length > 0,
+      responseSize: JSON.stringify(awayPlayerStats).length,
+      data: awayPlayerStats,
+      _detail: awayPlayerLog,
+    },
   ];
 
   return {
@@ -388,22 +417,28 @@ async function fetchRecentMatchDetails(eventsArray, count = 5) {
  * İlk 11 + tüm yedekler — M067 (Yedek Rating) ve M088 (Bench/Starter değer oranı) için tam veri gereklidir.
  */
 async function fetchPlayerStats(players, tournamentId, seasonId) {
-  if (!players || !tournamentId || !seasonId) return [];
+  if (!players || !tournamentId || !seasonId) return { stats: [], log: [] };
 
   const starters = players.filter(p => !p.substitute).slice(0, 11);
-  const subs = players.filter(p => p.substitute); // Tüm yedekler — 5 değişiklik kuralı gereği hepsi çekilmeli
+  const subs = players.filter(p => p.substitute);
   const targetPlayers = [...starters, ...subs];
 
-  const results = [];
+  const stats = [];
+  const log = [];
+
   for (const p of targetPlayers) {
     const playerId = p.player?.id;
     if (!playerId) continue;
 
-    const seasonStats = await api.getPlayerSeasonStats(playerId, tournamentId, seasonId);
-    const attributes = await api.getPlayerAttributes(playerId);
-    const characteristics = await api.getPlayerCharacteristics(playerId);
+    const t0 = Date.now();
+    const [seasonStats, attributes, characteristics] = await Promise.all([
+      api.getPlayerSeasonStats(playerId, tournamentId, seasonId).catch(() => null),
+      api.getPlayerAttributes(playerId).catch(() => null),
+      api.getPlayerCharacteristics(playerId).catch(() => null),
+    ]);
+    const duration = Date.now() - t0;
 
-    results.push({
+    stats.push({
       playerId,
       name: p.player.name,
       position: p.player.position || p.position,
@@ -413,8 +448,19 @@ async function fetchPlayerStats(players, tournamentId, seasonId) {
       attributes,
       characteristics,
     });
+
+    log.push({
+      playerId,
+      name: p.player.name,
+      substitute: p.substitute || false,
+      durationMs: duration,
+      hasSeasonStats: !!seasonStats,
+      hasAttributes: !!attributes,
+      hasCharacteristics: !!characteristics,
+      rating: seasonStats?.statistics?.rating ?? null,
+    });
   }
-  return results;
+  return { stats, log };
 }
 
 /**
