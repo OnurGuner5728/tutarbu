@@ -262,6 +262,18 @@ async function fetchAllMatchData(eventId) {
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
   console.log(`[DataFetcher] All data fetched in ${elapsed}s`);
 
+  // Attach API call log for debug page
+  const _apiLog = [
+    { endpoint: 'getEvent', eventId, success: !!eventData },
+    ...matchLevelNames.map((name, i) => ({
+      endpoint: name,
+      eventId,
+      success: matchLevelResults[i].status === 'fulfilled',
+      responseSize: matchLevelResults[i].status === 'fulfilled'
+        ? JSON.stringify(matchLevelResults[i].value).length : 0,
+    })),
+  ];
+
   return {
     event: eventData,
     eventId,
@@ -311,6 +323,9 @@ async function fetchAllMatchData(eventId) {
     awayRecentMatchDetails,
     homePlayerStats,
     awayPlayerStats,
+
+    // Debug
+    _apiLog,
   };
 }
 

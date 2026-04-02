@@ -179,6 +179,26 @@ app.post('/api/workshop/:eventId', async (req, res) => {
   }
 });
 
+// Match Debug Endpoint
+app.get('/api/match-debug/:eventId', async (req, res) => {
+  const { eventId } = req.params;
+  if (!/^\d+$/.test(eventId)) {
+    return res.status(400).json({ error: 'Invalid eventId: must be a positive integer.' });
+  }
+  try {
+    const data = await fetchAllMatchData(parseInt(eventId, 10));
+    res.json({
+      eventId,
+      homeTeam: data.event?.event?.homeTeam?.name,
+      awayTeam: data.event?.event?.awayTeam?.name,
+      apiLog: data._apiLog || [],
+      timestamp: new Date().toISOString(),
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Health Check
 app.get('/api/health', (req, res) => {
   res.json({

@@ -2,8 +2,9 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Trophy, Users, Zap, Calendar,
   AlertTriangle, ChevronDown, ChevronUp, Globe,
-  TrendingUp, Target, Shield, Activity, History
+  TrendingUp, Target, Shield, Activity, History, Bug
 } from 'lucide-react';
+import DebugPage from './DebugPage';
 
 export default function App() {
   const [matches, setMatches] = useState([]);
@@ -19,6 +20,7 @@ export default function App() {
   const [modifiedLineup, setModifiedLineup] = useState({ home: null, away: null });
   const [originalLineupIds, setOriginalLineupIds] = useState({ home: new Set(), away: new Set() });
   const [swapMode, setSwapMode] = useState(null);
+  const [debugEventId, setDebugEventId] = useState(null);
   const tabPaneRef = useRef(null);
   const autoRefreshRef = useRef(null);
 
@@ -231,7 +233,7 @@ export default function App() {
         ) : prediction ? (
           <div className="prediction-grid">
             <div className="analysis-column">
-              <nav className="tabs">
+              <nav className="tabs" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                 {[
                   { key: 'summary', label: 'Analysis', icon: <TrendingUp size={14} /> },
                   { key: 'goals', label: 'Goals Market', icon: <Target size={14} /> },
@@ -247,10 +249,38 @@ export default function App() {
                     {t.label}
                   </button>
                 ))}
+                <button
+                  title="API Debug"
+                  style={{
+                    marginLeft: 'auto',
+                    background: 'rgba(160,196,255,0.08)',
+                    border: '1px solid rgba(160,196,255,0.2)',
+                    borderRadius: '6px',
+                    color: '#a0c4ff',
+                    padding: '4px 10px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    fontSize: '0.72rem',
+                    letterSpacing: '0.5px',
+                  }}
+                  onClick={() => setDebugEventId(selectedMatch?.id ?? null)}
+                >
+                  <Bug size={12} /> Debug
+                </button>
               </nav>
 
               <div className="tab-pane" ref={tabPaneRef}>
+                {/* ──── API DEBUG PAGE ──── */}
+                {debugEventId && (
+                  <DebugPage
+                    eventId={debugEventId}
+                    onBack={() => setDebugEventId(null)}
+                  />
+                )}
                 {/* ──── ANALYSIS SUMMARY ──── */}
+                {!debugEventId && (<>
                 {activeTab === 'summary' && (
                   <>
                     <div className="score-hero">
@@ -779,6 +809,7 @@ export default function App() {
                     </div>
                   </div>
                 )}
+                </>)}
               </div>
             </div>
 
