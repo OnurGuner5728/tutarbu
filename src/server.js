@@ -179,6 +179,27 @@ app.post('/api/workshop/:eventId', async (req, res) => {
   }
 });
 
+// Team Events — "Load more" pagination for Form & H2H sections
+app.get('/api/team-events/:teamId/:page', async (req, res) => {
+  const { teamId, page } = req.params;
+  if (!/^\d+$/.test(teamId) || !/^\d+$/.test(page)) {
+    return res.status(400).json({ error: 'Invalid teamId or page.' });
+  }
+  try {
+    const api = require('./services/playwright-client');
+    const result = await api.getTeamLastEvents(parseInt(teamId, 10), parseInt(page, 10));
+    const events = (result?.events || [])
+      .filter(e => e.status?.type === 'finished')
+      .map(e => ({
+        ...e,
+        startTimestamp: e.startTimestamp ? new Date(e.startTimestamp * 1000).toISOString() : '',
+      }));
+    res.json({ events, page: parseInt(page, 10), teamId: parseInt(teamId, 10) });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Match Debug Endpoint
 app.get('/api/match-debug/:eventId', async (req, res) => {
   const { eventId } = req.params;

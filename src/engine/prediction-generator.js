@@ -18,6 +18,8 @@ function generatePrediction(metricsResult, data) {
     match: {
       homeTeam: event?.homeTeam?.name || 'Home',
       awayTeam: event?.awayTeam?.name || 'Away',
+      homeTeamId: data.homeTeamId,
+      awayTeamId: data.awayTeamId,
       tournament: event?.tournament?.name || '',
       round: event?.roundInfo?.round || '',
       stadium: event?.venue?.stadium?.name || '',
@@ -133,10 +135,26 @@ function generatePrediction(metricsResult, data) {
     },
 
     // Form & H2H History
-    h2hMatches: (data.h2h?.events || data.h2hEvents?.events || []).slice(0, 5).map(e => ({
-      ...e,
-      startTimestamp: e.startTimestamp ? new Date(e.startTimestamp * 1000).toISOString() : '',
-    })),
+    h2hMatches: (() => {
+      // API'den gelen H2H maçları
+      let _evs = data.h2hEvents?.events || data.h2h?.events || [];
+      // Fallback: H2H API boşsa, her iki takımın son maçları arasında ortak olanları bul
+      if (_evs.length === 0) {
+        const hid = data.homeTeamId;
+        const aid = data.awayTeamId;
+        const seen = new Set();
+        _evs = [...(data.homeLastEvents || []), ...(data.awayLastEvents || [])].filter(ev => {
+          if (!ev || seen.has(ev.id)) return false;
+          seen.add(ev.id);
+          return (ev.homeTeam?.id === hid || ev.awayTeam?.id === hid) &&
+                 (ev.homeTeam?.id === aid || ev.awayTeam?.id === aid);
+        });
+      }
+      return _evs.map(e => ({
+        ...e,
+        startTimestamp: e.startTimestamp ? new Date(e.startTimestamp * 1000).toISOString() : '',
+      }));
+    })(),
     h2hSummary: (() => {
       // 1. Önce SofaScore teamDuel / teamDuels alanını dene (singular ve plural her ikisi)
       const teamDuel = data.h2h?.teamDuel || data.h2h?.teamDuels ||
@@ -174,14 +192,18 @@ function generatePrediction(metricsResult, data) {
       return { team1Wins, draws, team2Wins };
     })(),
     recentForm: {
-      home: (data.homeLastEvents || []).slice(0, 6).map(e => ({
-        ...e,
-        startTimestamp: e.startTimestamp ? new Date(e.startTimestamp * 1000).toISOString() : '',
-      })),
-      away: (data.awayLastEvents || []).slice(0, 6).map(e => ({
-        ...e,
-        startTimestamp: e.startTimestamp ? new Date(e.startTimestamp * 1000).toISOString() : '',
-      })),
+      home: (data.homeLastEvents || [])
+        .filter(e => e.status?.type === 'finished')
+        .map(e => ({
+          ...e,
+          startTimestamp: e.startTimestamp ? new Date(e.startTimestamp * 1000).toISOString() : '',
+        })),
+      away: (data.awayLastEvents || [])
+        .filter(e => e.status?.type === 'finished')
+        .map(e => ({
+          ...e,
+          startTimestamp: e.startTimestamp ? new Date(e.startTimestamp * 1000).toISOString() : '',
+        })),
     },
 
     // Meta

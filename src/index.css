@@ -1244,6 +1244,20 @@ body {
 }
 .history-row:hover { background: rgba(255,255,255,0.04); }
 
+.show-more-btn {
+  width: 100%;
+  padding: 8px 0;
+  margin-top: 4px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+.show-more-btn:hover { background: rgba(255,255,255,0.09); color: var(--text-primary); }
+
 .history-date { color: var(--text-secondary); font-size: 0.75rem; width: 65px; margin-right: 8px;}
 .history-teams { flex: 1; display: flex; justify-content: center; gap: 12px; align-items: center;}
 .history-team { flex: 1; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px; }

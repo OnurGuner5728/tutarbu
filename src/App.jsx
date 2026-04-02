@@ -21,6 +21,15 @@ export default function App() {
   const [originalLineupIds, setOriginalLineupIds] = useState({ home: new Set(), away: new Set() });
   const [swapMode, setSwapMode] = useState(null);
   const [debugEventId, setDebugEventId] = useState(null);
+  // Form & H2H pagination
+  const [h2hAll, setH2hAll] = useState([]);
+  const [homeFormAll, setHomeFormAll] = useState([]);
+  const [awayFormAll, setAwayFormAll] = useState([]);
+  const [h2hShown, setH2hShown] = useState(5);
+  const [homeFormShown, setHomeFormShown] = useState(5);
+  const [awayFormShown, setAwayFormShown] = useState(5);
+  const [homeFormPage, setHomeFormPage] = useState(1);
+  const [awayFormPage, setAwayFormPage] = useState(1);
   const tabPaneRef = useRef(null);
   const autoRefreshRef = useRef(null);
 
@@ -37,6 +46,19 @@ export default function App() {
     }
     return () => { if (autoRefreshRef.current) clearInterval(autoRefreshRef.current); };
   }, [selectedMatch?.id, selectedMatch?.isLive]);
+
+  // Reset form/H2H pagination state when prediction changes
+  useEffect(() => {
+    if (!prediction) return;
+    setH2hAll(prediction.h2hMatches || []);
+    setHomeFormAll(prediction.recentForm?.home || []);
+    setAwayFormAll(prediction.recentForm?.away || []);
+    setH2hShown(5);
+    setHomeFormShown(5);
+    setAwayFormShown(5);
+    setHomeFormPage(1);
+    setAwayFormPage(1);
+  }, [prediction]);
 
   const fetchMatches = async (dateStr = selectedDate) => {
     setError(null);
@@ -109,6 +131,39 @@ export default function App() {
     } finally {
       setLoading(false);
       setWorkshopLoading(false);
+    }
+  };
+
+  // Load more events for form/H2H sections
+  const loadMoreEvents = async (side) => {
+    const isHome = side === 'home';
+    const isH2h = side === 'h2h';
+    const teamId = isH2h ? null : (isHome ? prediction?.match?.homeTeamId : prediction?.match?.awayTeamId);
+    const currentPage = isHome ? homeFormPage : awayFormPage;
+    const nextPage = currentPage + 1;
+
+    if (isH2h) {
+      // H2H: just show more from already-loaded data (no extra API call needed)
+      setH2hShown(s => s + 5);
+      return;
+    }
+
+    if (!teamId) return;
+    try {
+      const res = await fetch(`/api/team-events/${teamId}/${nextPage}`);
+      if (!res.ok) return;
+      const { events } = await res.json();
+      if (isHome) {
+        setHomeFormAll(prev => [...prev, ...events]);
+        setHomeFormPage(nextPage);
+        setHomeFormShown(s => s + 5);
+      } else {
+        setAwayFormAll(prev => [...prev, ...events]);
+        setAwayFormPage(nextPage);
+        setAwayFormShown(s => s + 5);
+      }
+    } catch (e) {
+      console.error('loadMoreEvents failed', e);
     }
   };
 
@@ -537,7 +592,7 @@ export default function App() {
                       )}
                       
                       <div className="match-history-list">
-                        {prediction.h2hMatches?.length > 0 ? prediction.h2hMatches.map((m, i) => (
+                        {h2hAll.length > 0 ? h2hAll.slice(0, h2hShown).map((m, i) => (
                           <div key={i} className="history-row">
                             <div className="history-date">{m.startTimestamp ? m.startTimestamp.split('T')[0] : ''}</div>
                             <div className="history-teams">
@@ -551,6 +606,11 @@ export default function App() {
                             Son dönemde aralarında resmi maç bulunmuyor.
                           </div>
                         )}
+                        {h2hAll.length > h2hShown && (
+                          <button className="show-more-btn" onClick={() => setH2hShown(s => s + 5)}>
+                            Daha fazla göster ({Math.min(5, h2hAll.length - h2hShown)} maç daha)
+                          </button>
+                        )}
                       </div>
                     </div>
 
@@ -559,9 +619,9 @@ export default function App() {
                       
                       {/* HOME FORM */}
                       <div className="form-column">
-                        <h4>{prediction.match?.homeTeam} - Son 6 Maç</h4>
+                        <h4>{prediction.match?.homeTeam} - Son Maçlar</h4>
                         <div className="form-badge-row">
-                          {prediction.recentForm?.home?.map((m, i) => {
+                          {homeFormAll.slice(0, homeFormShown).map((m, i) => {
                             let res = 'D';
                             const isHome = m.homeTeam?.name === prediction.match?.homeTeam || m.homeTeam === prediction.match?.homeTeam;
                             if (m.homeScore?.current > m.awayScore?.current) res = isHome ? 'W' : 'L';
@@ -570,7 +630,7 @@ export default function App() {
                           })}
                         </div>
                         <div className="match-history-list">
-                          {prediction.recentForm?.home?.map((m, i) => (
+                          {homeFormAll.slice(0, homeFormShown).map((m, i) => (
                             <div key={i} className="history-row">
                               <div className="history-date">{m.startTimestamp ? m.startTimestamp.split('T')[0] : ''}</div>
                               <div className="history-teams">
@@ -580,14 +640,23 @@ export default function App() {
                               </div>
                             </div>
                           ))}
+                          <button className="show-more-btn" onClick={() => {
+                            if (homeFormShown < homeFormAll.length) {
+                              setHomeFormShown(s => s + 5);
+                            } else {
+                              loadMoreEvents('home');
+                            }
+                          }}>
+                            Daha fazla göster
+                          </button>
                         </div>
                       </div>
 
                       {/* AWAY FORM */}
                       <div className="form-column">
-                        <h4>{prediction.match?.awayTeam} - Son 6 Maç</h4>
+                        <h4>{prediction.match?.awayTeam} - Son Maçlar</h4>
                         <div className="form-badge-row">
-                          {prediction.recentForm?.away?.map((m, i) => {
+                          {awayFormAll.slice(0, awayFormShown).map((m, i) => {
                             let res = 'D';
                             const isHome = m.homeTeam?.name === prediction.match?.awayTeam || m.homeTeam === prediction.match?.awayTeam;
                             if (m.homeScore?.current > m.awayScore?.current) res = isHome ? 'W' : 'L';
@@ -596,7 +665,7 @@ export default function App() {
                           })}
                         </div>
                         <div className="match-history-list">
-                          {prediction.recentForm?.away?.map((m, i) => (
+                          {awayFormAll.slice(0, awayFormShown).map((m, i) => (
                             <div key={i} className="history-row">
                               <div className="history-date">{m.startTimestamp ? m.startTimestamp.split('T')[0] : ''}</div>
                               <div className="history-teams">
@@ -606,6 +675,15 @@ export default function App() {
                               </div>
                             </div>
                           ))}
+                          <button className="show-more-btn" onClick={() => {
+                            if (awayFormShown < awayFormAll.length) {
+                              setAwayFormShown(s => s + 5);
+                            } else {
+                              loadMoreEvents('away');
+                            }
+                          }}>
+                            Daha fazla göster
+                          </button>
                         </div>
                       </div>
 
