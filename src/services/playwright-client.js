@@ -268,6 +268,7 @@ const api = {
   // Team endpoints
   getTeam: (teamId) => fetchAPI(`/team/${teamId}`, 'teamPlayers'),
   getTeamPlayers: (teamId) => fetchAPI(`/team/${teamId}/players`, 'teamPlayers'),
+  getTeamH2H: (homeTeamId, awayTeamId) => fetchAPI(`/team/${homeTeamId}/head2head/${awayTeamId}`, 'h2h'),
   getTeamLastEvents: (teamId, page = 0) => fetchAPI(`/team/${teamId}/events/last/${page}`, 'teamLastEvents'),
   getTeamNextEvents: (teamId, page = 0) => fetchAPI(`/team/${teamId}/events/next/${page}`, 'teamLastEvents'),
   getTeamSeasonStats: (teamId, tId, sId) => fetchAPI(`/team/${teamId}/unique-tournament/${tId}/season/${sId}/statistics/overall`, 'standings'),

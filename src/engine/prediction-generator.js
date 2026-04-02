@@ -136,9 +136,23 @@ function generatePrediction(metricsResult, data) {
 
     // Form & H2H History
     h2hMatches: (() => {
-      // API'den gelen H2H maçları
-      let _evs = data.h2hEvents?.events || data.h2h?.events || [];
-      // Fallback: H2H API boşsa, her iki takımın son maçları arasında ortak olanları bul
+      // 1. Dedicated H2H events endpoint (event-level)
+      let _evs = data.h2hEvents?.events || [];
+      // 2. Team-level H2H history (/team/:id/head2head/:id) — various possible keys
+      if (_evs.length === 0) {
+        _evs = data.teamH2H?.events ||
+               data.teamH2H?.previousEvents ||
+               data.teamH2H?.teamDuel?.events ||
+               [];
+      }
+      // 3. Event-level h2h object (may nest events under various keys)
+      if (_evs.length === 0) {
+        _evs = data.h2h?.events ||
+               data.h2h?.previousEvents ||
+               data.h2h?.lastH2H ||
+               [];
+      }
+      // 4. Last-resort: scan both teams' recent matches for mutual games
       if (_evs.length === 0) {
         const hid = data.homeTeamId;
         const aid = data.awayTeamId;
@@ -150,10 +164,13 @@ function generatePrediction(metricsResult, data) {
                  (ev.homeTeam?.id === aid || ev.awayTeam?.id === aid);
         });
       }
-      return _evs.map(e => ({
-        ...e,
-        startTimestamp: e.startTimestamp ? new Date(e.startTimestamp * 1000).toISOString() : '',
-      }));
+      return _evs
+        .filter(e => e.status?.type === 'finished' || e.homeScore?.current != null)
+        .sort((a, b) => (b.startTimestamp || 0) - (a.startTimestamp || 0))
+        .map(e => ({
+          ...e,
+          startTimestamp: e.startTimestamp ? new Date(e.startTimestamp * 1000).toISOString() : '',
+        }));
     })(),
     h2hSummary: (() => {
       // 1. Önce SofaScore teamDuel / teamDuels alanını dene (singular ve plural her ikisi)

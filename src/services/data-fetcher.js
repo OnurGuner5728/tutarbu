@@ -40,19 +40,20 @@ async function fetchAllMatchData(eventId) {
   // mevcut (henüz oynanmamış) maç için anlamsız veri döner ve hiçbir metrik
   // hesaplayıcı tarafından tüketilmez — bu nedenle bu çağrılar kaldırıldı.
   const matchLevelResults = await Promise.allSettled([
-    api.getEventLineups(eventId),        // 0
-    api.getEventH2H(eventId),            // 1
-    api.getEventH2HEvents(eventId),      // 2
-    api.getEventOdds(eventId),           // 3
-    api.getEventMissingPlayers(eventId), // 4
-    api.getEventStreaks(eventId),        // 5
-    api.getEventForm(eventId),           // 6
-    api.getEventManagers(eventId),       // 7
-    api.getEventVotes(eventId),          // 8
+    api.getEventLineups(eventId),               // 0
+    api.getEventH2H(eventId),                   // 1
+    api.getEventH2HEvents(eventId),             // 2
+    api.getTeamH2H(homeTeamId, awayTeamId),     // 3  ← team-level H2H history
+    api.getEventOdds(eventId),                  // 4
+    api.getEventMissingPlayers(eventId),        // 5
+    api.getEventStreaks(eventId),               // 6
+    api.getEventForm(eventId),                  // 7
+    api.getEventManagers(eventId),              // 8
+    api.getEventVotes(eventId),                 // 9
   ]);
 
   const matchLevelNames = [
-    'lineups', 'h2h', 'h2hEvents', 'odds', 'missingPlayers',
+    'lineups', 'h2h', 'h2hEvents', 'teamH2H', 'odds', 'missingPlayers',
     'streaks', 'form', 'managers', 'votes',
   ];
   matchLevelResults.forEach((r, i) => {
@@ -62,7 +63,7 @@ async function fetchAllMatchData(eventId) {
   });
 
   let [
-    lineups, h2h, h2hEvents, odds, missingPlayers,
+    lineups, h2h, h2hEvents, teamH2H, odds, missingPlayers,
     streaks, form, managers, votes
   ] = matchLevelResults.map(r => (r.status === 'fulfilled' ? r.value : null));
 
@@ -300,6 +301,7 @@ async function fetchAllMatchData(eventId) {
     lineups,
     h2h,
     h2hEvents,
+    teamH2H,
     odds,
     missingPlayers,
     streaks,

@@ -17,10 +17,15 @@ function calculateH2HMetrics(data) {
   const M120 = teamDuel.draws || 0;
   const M121 = teamDuel.awayWins || teamDuel.team2Wins || 0;
 
-  // H2H Events analizi
+  // H2H Events analizi — çoklu kaynak ile fallback zinciri
   let events = h2hEvents?.events || [];
-  
-  // FALLBACK: Eğer SofaScore API h2h-events döndürmezse, her iki takımın son 20 maçını tarayıp birbirleriyle olanları bulalım.
+  if (events.length === 0) {
+    events = data.teamH2H?.events || data.teamH2H?.previousEvents || data.teamH2H?.teamDuel?.events || [];
+  }
+  if (events.length === 0) {
+    events = h2h?.events || h2h?.previousEvents || h2h?.lastH2H || [];
+  }
+  // FALLBACK: Her iki takımın son maçlarını tara
   if (events.length === 0) {
     const homeLast = Array.isArray(data.homeLastEvents) ? data.homeLastEvents : [];
     const awayLast = Array.isArray(data.awayLastEvents) ? data.awayLastEvents : [];

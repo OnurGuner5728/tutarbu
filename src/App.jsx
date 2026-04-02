@@ -725,7 +725,11 @@ export default function App() {
                               ? prediction.match?.homeTeam
                               : prediction.match?.awayTeam
                           }
-                          players={prediction.lineups[workshopSide]?.players ?? []}
+                          players={
+                            modifiedLineup[workshopSide] !== null
+                              ? modifiedLineup[workshopSide]
+                              : prediction.lineups[workshopSide]?.players ?? []
+                          }
                           icon={<Users size={14} />}
                           side={workshopSide}
                           swapMode={swapMode}
@@ -744,11 +748,11 @@ export default function App() {
                               p => p?.player?.id === playerIn?.player?.id
                             );
                             if (outIdx !== -1 && inIdx !== -1) {
-                              const newPlayers = [...currentPlayers];
-                              [newPlayers[outIdx], newPlayers[inIdx]] = [
-                                newPlayers[inIdx],
-                                newPlayers[outIdx],
-                              ];
+                              const newPlayers = currentPlayers.map((p, i) => {
+                                if (i === outIdx) return { ...p, substitute: true };
+                                if (i === inIdx) return { ...p, substitute: false };
+                                return p;
+                              });
                               setModifiedLineup(prev => ({ ...prev, [side]: newPlayers }));
                             }
                             setSwapMode(null);
