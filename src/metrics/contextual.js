@@ -14,8 +14,8 @@ function calculateContextualMetrics(data) {
   const awayPlayers = data.awayPlayers;
 
   // ── M131-M134: Bahis Oranı İma Edilen Olasılıklar ──
-  let M131 = 33.3, M132 = 33.3, M133 = 33.3, M134 = 50;
-  let M134b = 50, M134c = 50, ahLine = null;
+  let M131 = null, M132 = null, M133 = null, M134 = null;
+  let M134b = null, M134c = null, ahLine = null;
 
   const markets = odds?.markets || [];
   for (const market of markets) {
@@ -70,26 +70,28 @@ function calculateContextualMetrics(data) {
   }
 
   // ── M135-M137: Kullanıcı Oyları ──
-  let M135 = 33.3, M136 = 33.3, M137 = 33.3;
+  let M135 = null, M136 = null, M137 = null;
   if (votes) {
     const voteData = votes.vote || votes;
-    const vote1 = voteData.vote1 || voteData.home || 0;
-    const voteX = voteData.voteX || voteData.draw || 0;
-    const vote2 = voteData.vote2 || voteData.away || 0;
-    const totalVotes = vote1 + voteX + vote2;
-    if (totalVotes > 0) {
-      M135 = (vote1 / totalVotes) * 100;
-      M136 = (voteX / totalVotes) * 100;
-      M137 = (vote2 / totalVotes) * 100;
+    const vote1Raw = voteData.vote1 ?? voteData.home ?? null;
+    const voteXRaw = voteData.voteX ?? voteData.draw ?? null;
+    const vote2Raw = voteData.vote2 ?? voteData.away ?? null;
+    if (vote1Raw != null && voteXRaw != null && vote2Raw != null) {
+      const totalVotes = vote1Raw + voteXRaw + vote2Raw;
+      if (totalVotes > 0) {
+        M135 = (vote1Raw / totalVotes) * 100;
+        M136 = (voteXRaw / totalVotes) * 100;
+        M137 = (vote2Raw / totalVotes) * 100;
+      }
     }
   }
 
   // ── M138: Stadyum Kapasitesi Etkisi ──
   const capacity = event?.venue?.stadium?.capacity || 0;
-  const M138 = capacity > 0 ? Math.min(capacity / 80000, 1) : 0.3; // 80K = normalize ref
+  const M138 = capacity > 0 ? Math.min(capacity / 80000, 1) : null; // 80K = normalize ref
 
   // ── M139-M140: Menajer Deneyimi ──
-  let M139 = 50, M140 = 50;
+  let M139 = null, M140 = null;
   const homeCareer = data.homeManagerCareer;
   const awayCareer = data.awayManagerCareer;
 
@@ -106,41 +108,39 @@ function calculateContextualMetrics(data) {
       }
     }
     M139 = Math.min((totalMgrMatches / 500) * 100, 100); // 500 maç = max deneyim
-    M140 = currentTeamMatches > 0 ? (currentTeamWins / currentTeamMatches) * 100 : 50;
+    M140 = currentTeamMatches > 0 ? (currentTeamWins / currentTeamMatches) * 100 : null;
   }
 
   // ── M141: Maçın Haftası (Round) Etkisi ──
+  const standingsRows = data.standingsTotal?.standings?.[0]?.rows || [];
   const currentRound = event?.roundInfo?.round || 0;
-  const totalRounds = 38; // Çoğu lig 38 hafta — standings row count'tan da alınabilir
-  const M141 = totalRounds > 0 ? currentRound / totalRounds : 0.5;
+  const teamCount = standingsRows.length;
+  const totalRounds = teamCount >= 4 ? (teamCount - 1) * 2 : null;
+  const M141 = currentRound > 0 && totalRounds != null ? currentRound / totalRounds : null;
 
   // ── M142-M143: Puan Durumu Farkı ──
   const homeRow = findTeamRow(standings, homeTeamId);
   const awayRow = findTeamRow(standings, awayTeamId);
   const totalTeams = getTotalTeams(standings);
 
-  const homePos = homeRow?.position || totalTeams / 2;
-  const awayPos = awayRow?.position || totalTeams / 2;
-  const M142 = totalTeams > 0 ? Math.abs(homePos - awayPos) / totalTeams : 0;
+  const homePos = homeRow?.position ?? null;
+  const awayPos = awayRow?.position ?? null;
+  const M142 = (homePos != null && awayPos != null && totalTeams > 0) ? Math.abs(homePos - awayPos) / totalTeams : null;
 
-  const homePoints = homeRow?.points || 0;
-  const awayPoints = awayRow?.points || 0;
-  const M143 = Math.abs(homePoints - awayPoints);
+  const homePoints = homeRow?.points ?? null;
+  const awayPoints = awayRow?.points ?? null;
+  const M143 = (homePoints != null && awayPoints != null) ? Math.abs(homePoints - awayPoints) : null;
 
   // ── M144: Lig Gücü İndeksi (normalize) ──
-  // Birincil: standings üzerinden dinamik hesap (avgGoals + takım sayısı)
-  // Fallback: bilinen lig ID'leri için hardcoded map (standings yetersizse)
-  const ligGücüMap = { 17: 100, 8: 95, 35: 88, 23: 90, 34: 82, 52: 65, 7: 100, 679: 85 };
-  const standingsRows = data.standingsTotal?.standings?.[0]?.rows || [];
-  let M144;
+  // Standings üzerinden dinamik hesap (avgGoals + takım sayısı)
+  // Standings yetersizse null (hardcoded fallback kaldırıldı)
+  let M144 = null;
   if (standingsRows.length >= 4) {
     const totalGoals = standingsRows.reduce((s, r) => s + (r.scoresFor || 0), 0);
     const totalGames = Math.max(standingsRows.reduce((s, r) => s + (r.played || 0), 0), 1);
     const avgGoals = totalGoals / totalGames;
     const teamCount = standingsRows.length;
     M144 = Math.min(100, Math.round(50 + avgGoals * 10 + (teamCount >= 18 ? 10 : 0)));
-  } else {
-    M144 = ligGücüMap[data.tournamentId] || 50;
   }
 
   // ── M145: Transfer Net Harcama Etkisi ──
@@ -151,8 +151,8 @@ function calculateContextualMetrics(data) {
   for (const p of homePl) homeMarketValue += p.player?.proposedMarketValue || 0;
   for (const p of awayPl) awayMarketValue += p.player?.proposedMarketValue || 0;
 
-  const maxValue = Math.max(homeMarketValue, awayMarketValue, 1);
-  const M145 = homeMarketValue / maxValue; // Ev sahibinin görece gücü
+  const maxValue = Math.max(homeMarketValue, awayMarketValue);
+  const M145 = maxValue > 0 ? homeMarketValue / maxValue : null;
 
   return {
     M131, M132, M133, M134, M134b, M134c, M135, M136, M137, M138, M139, M140,
@@ -176,9 +176,9 @@ function findTeamRow(standings, teamId) {
 }
 
 function getTotalTeams(standings) {
-  if (!standings?.standings) return 20;
+  if (!standings?.standings) return null;
   for (const s of standings.standings) return (s.rows || []).length;
-  return 20;
+  return null;
 }
 
 module.exports = { calculateContextualMetrics };

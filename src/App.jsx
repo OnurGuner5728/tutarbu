@@ -5,6 +5,7 @@ import {
   TrendingUp, Target, Shield, Activity, History, Bug
 } from 'lucide-react';
 import DebugPage from './DebugPage';
+import SimulationPage from './SimulationPage';
 
 export default function App() {
   const [matches, setMatches] = useState([]);
@@ -295,6 +296,7 @@ export default function App() {
                   { key: 'form', label: 'Form & H2H', icon: <History size={14} /> },
                   { key: 'workshop', label: 'Workshop', icon: <Users size={14} /> },
                   { key: 'metrics', label: 'Metric Ledger', icon: <Activity size={14} /> },
+                  { key: 'simulation', label: 'Simülasyon', icon: <Zap size={14} /> },
                 ].map(t => (
                   <button
                     key={t.key}
@@ -890,6 +892,11 @@ export default function App() {
                       </div>
                     </div>
                   </div>
+                )}
+
+                {/* ──── SIMULATION ──── */}
+                {activeTab === 'simulation' && (
+                  <SimulationPage prediction={prediction} selectedMatch={selectedMatch} />
                 )}
                 </>)}
               </div>

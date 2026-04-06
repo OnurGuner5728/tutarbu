@@ -25,107 +25,95 @@ function calculateRefereeMetrics(data) {
   }
 
   const stats = currentSeason?.statistics || currentSeason || {};
-  const totalMatches = stats.matches || stats.gamesPlayed || stats.totalMatches || 0;
+  const totalMatches = stats.matches ?? stats.gamesPlayed ?? stats.totalMatches ?? null;
 
-  if (totalMatches === 0) {
+  if (!totalMatches) {
     if (event?.referee && event.referee.games > 0) {
       // Fallback to basic referee object provided inside the event body
       stats.matches = event.referee.games;
-      stats.yellowCards = event.referee.yellowCards || 0;
-      stats.redCards = (event.referee.redCards || 0) + (event.referee.yellowRedCards || 0);
+      stats.yellowCards = event.referee.yellowCards ?? null;
+      stats.redCards = (event.referee.redCards != null && event.referee.yellowRedCards != null)
+        ? event.referee.redCards + event.referee.yellowRedCards
+        : (event.referee.redCards ?? event.referee.yellowRedCards ?? null);
     } else {
       return createEmptyRefereeMetricsWithMeta(refereeId);
     }
   }
 
-  const matchesCount = stats.matches || stats.gamesPlayed || stats.totalMatches || 0;
+  const matchesCount = stats.matches ?? stats.gamesPlayed ?? stats.totalMatches ?? null;
 
   // ── M109: Maç Başı Sarı Kart Ortalaması ──
-  const totalYellows = stats.yellowCards || stats.totalYellowCards || 0;
-  const M109 = matchesCount > 0 ? totalYellows / matchesCount : 0;
+  const totalYellows = stats.yellowCards ?? stats.totalYellowCards ?? null;
+  const M109 = (matchesCount != null && matchesCount > 0 && totalYellows != null)
+    ? totalYellows / matchesCount : null;
 
   // ── M110: Maç Başı Kırmızı Kart Ortalaması ──
-  const totalReds = stats.redCards || stats.totalRedCards || 0;
-  const M110 = matchesCount > 0 ? totalReds / matchesCount : 0;
+  const totalReds = stats.redCards ?? stats.totalRedCards ?? null;
+  const M110 = (matchesCount != null && matchesCount > 0 && totalReds != null)
+    ? totalReds / matchesCount : null;
 
   // ── M111: Kırmızı Kart Oranı (redCards / matchesOfficiated) ──
-  const totalPenalties = stats.penalties || stats.penaltiesAwarded || 0;
+  const totalPenalties = stats.penalties ?? stats.penaltiesAwarded ?? null;
   let M111;
-  if (matchesCount > 0 && totalReds > 0) {
+  if (matchesCount != null && matchesCount > 0 && totalReds != null && totalReds > 0) {
     M111 = totalReds / matchesCount; // Gerçek veri: kırmızı kart / maç
-  } else if (matchesCount > 0 && totalPenalties > 0) {
+  } else if (matchesCount != null && matchesCount > 0 && totalPenalties != null && totalPenalties > 0) {
     M111 = totalPenalties / matchesCount; // Penaltı verisi varsa kullan
   } else {
-    M111 = 0.24; // Fallback: lig ortalaması tahmini (gerçek veri yok)
+    M111 = null;
   }
 
   // ── M112: Faul / Maç Ortalaması (fouls / matchesOfficiated) ──
-  const homeWins = stats.homeWins || stats.homeTeamWins || 0;
-  const totalFoulsForM112 = stats.fouls || stats.totalFouls || 0;
-  let M112;
-  if (matchesCount > 0 && totalFoulsForM112 > 0) {
-    M112 = totalFoulsForM112 / matchesCount; // Gerçek veri: faul / maç
-  } else if (matchesCount > 0 && homeWins > 0) {
-    M112 = (homeWins / matchesCount) * 100; // Ev sahibi galibiyet oranı (yedek)
-  } else {
-    M112 = 45.5; // Fallback: lig ortalaması tahmini (gerçek veri yok)
-  }
+  const homeWins = stats.homeWins ?? stats.homeTeamWins ?? null;
+  const totalFoulsForM112 = stats.fouls ?? stats.totalFouls ?? null;
+  const M112 = (matchesCount != null && matchesCount > 0 && totalFoulsForM112 != null && totalFoulsForM112 > 0)
+    ? totalFoulsForM112 / matchesCount : null;
 
   // ── M113: Sarı Kart / Maç Ortalaması (yellowCards / matchesOfficiated) ──
-  const totalGoals = stats.goals || stats.totalGoals || 0;
-  let M113;
-  if (matchesCount > 0 && totalYellows > 0) {
-    M113 = totalYellows / matchesCount; // Gerçek veri: sarı kart / maç
-  } else if (matchesCount > 0 && totalGoals > 0) {
-    M113 = totalGoals / matchesCount; // Gol verisi varsa kullan
-  } else {
-    M113 = 2.65; // Fallback: lig ortalaması tahmini (gerçek veri yok)
-  }
+  const M113 = (matchesCount != null && matchesCount > 0 && totalYellows != null && totalYellows > 0)
+    ? totalYellows / matchesCount : null;
 
   // ── M114: Dakika / Faul Oranı (minutes / fouls) ──
-  const over25 = stats.over25 || stats.overTwoFiveGoals || 0;
-  const totalMinutes = stats.minutes || stats.totalMinutes || 0;
-  let M114;
-  if (matchesCount > 0 && totalFoulsForM112 > 0 && totalMinutes > 0) {
-    M114 = totalMinutes / totalFoulsForM112; // Gerçek veri: dakika / faul
-  } else if (matchesCount > 0 && over25 > 0) {
-    M114 = (over25 / matchesCount) * 100; // Üst 2.5 oranı (yedek)
-  } else {
-    M114 = 52.0; // Fallback: lig ortalaması tahmini (gerçek veri yok)
-  }
+  const totalMinutes = stats.minutes ?? stats.totalMinutes ?? null;
+  const M114 = (matchesCount != null && matchesCount > 0 && totalFoulsForM112 != null && totalFoulsForM112 > 0 && totalMinutes != null && totalMinutes > 0)
+    ? totalMinutes / totalFoulsForM112 : null;
 
   // ── M115-M116: Hakem Home/Away Bias (ev sahibi / deplasman faul oranı) ──
-  // homeFouls/awayFouls ayrıştırılmış veri varsa kullan, yoksa nötr 50.
+  // homeFouls/awayFouls ayrıştırılmış veri varsa kullan, yoksa null.
   // M112 kopyası KULLANILMAZ.
-  const homeFouls = stats.homeFouls || stats.homeTeamFouls || 0;
-  const awayFouls = stats.awayFouls || stats.awayTeamFouls || 0;
+  const homeFouls = stats.homeFouls ?? stats.homeTeamFouls ?? null;
+  const awayFouls = stats.awayFouls ?? stats.awayTeamFouls ?? null;
   let M115, M116;
-  if (matchesCount > 0 && homeFouls > 0) {
-    M115 = (homeFouls / matchesCount) * 100; // Ev sahibi faul oranı (0-100 ölçek)
+  if (matchesCount != null && matchesCount > 0 && homeFouls != null && homeFouls > 0) {
+    M115 = (homeFouls / matchesCount) * 100;
   } else {
-    M115 = 50; // Veri yok → nötr
+    M115 = null;
   }
-  if (matchesCount > 0 && awayFouls > 0) {
-    M116 = (awayFouls / matchesCount) * 100; // Deplasman faul oranı (0-100 ölçek)
+  if (matchesCount != null && matchesCount > 0 && awayFouls != null && awayFouls > 0) {
+    M116 = (awayFouls / matchesCount) * 100;
   } else {
-    M116 = 50; // Veri yok → nötr
+    M116 = null;
   }
 
   // ── M117: Sertlik İndeksi ──
-  const M117 = matchesCount > 0 ? (totalYellows + totalReds * 3) / matchesCount : 0;
+  const M117 = (matchesCount != null && matchesCount > 0 && totalYellows != null && totalReds != null)
+    ? (totalYellows + totalReds * 3) / matchesCount : null;
 
   // ── M118: Faul Toleransı ──
-  const avgFouls = matchesCount > 0 && totalFoulsForM112 > 0 ? totalFoulsForM112 / matchesCount : 25;
-  const M118 = avgFouls / 25; // 25 = lig ortalaması yaklaşık (API'den hesaplanacak)
+  const avgFouls = (matchesCount != null && matchesCount > 0 && totalFoulsForM112 != null && totalFoulsForM112 > 0)
+    ? totalFoulsForM112 / matchesCount : null;
+  const M118 = avgFouls;
 
   // ── M118b: Hakem Ev Sahibi Yanlılık İndeksi ──
   // İdeal hakem: 50 (tam tarafsız)
   // >50: ev sahibi lehine eğilim  <50: deplasman lehine eğilim
   // Hesaplama: ev sahibi kazanma oranı vs lig ortalaması karşılaştırması
   // Not: homeWins M112 bloğunda zaten tanımlı, burada awayWins/draws ekleniyor
-  const awayWins = stats.awayWins || stats.awayTeamWins || 0;
-  const draws = stats.draws || 0;
-  const totalGamesForBias = homeWins + awayWins + draws;
+  const awayWins = stats.awayWins ?? stats.awayTeamWins ?? null;
+  const draws = stats.draws ?? null;
+  const totalGamesForBias = (homeWins != null && awayWins != null && draws != null)
+    ? homeWins + awayWins + draws
+    : null;
 
   // Lig ev sahibi kazanma ortalamasını standingsHome'dan dinamik hesapla
   const homeRows = data.standingsHome?.standings?.[0]?.rows || [];
@@ -133,18 +121,16 @@ function calculateRefereeMetrics(data) {
   const totalHomePlayed = homeRows.reduce((s, r) => s + (r.played || 0), 0);
   const leagueHomeWinAvg = totalHomePlayed >= 10
     ? totalHomeWins / totalHomePlayed
-    : 0.46; // Fallback: standingsHome verisi yetersizse Avrupa ortalaması
+    : null;
 
-  let M118b = 50; // Nötr başlangıç
-  if (totalGamesForBias >= 10) {
-    const homeWinRate = homeWins / totalGamesForBias; // Hakeme göre ev kazanma oranı
-    // 50 + (hakemde ev kazanma oranı - lig ortalaması) × 100
+  let M118b = null;
+  if (leagueHomeWinAvg != null && totalGamesForBias != null && totalGamesForBias >= 10) {
+    const homeWinRate = homeWins / totalGamesForBias;
     M118b = 50 + (homeWinRate - leagueHomeWinAvg) * 100;
     M118b = Math.max(0, Math.min(100, M118b));
-  } else if (totalGamesForBias > 0) {
-    // Az veri: lig ortalamasına çek
+  } else if (leagueHomeWinAvg != null && totalGamesForBias != null && totalGamesForBias > 0) {
     const homeWinRate = homeWins / totalGamesForBias;
-    M118b = 50 + (homeWinRate - leagueHomeWinAvg) * 50; // Daha az ağırlık (az veri)
+    M118b = 50 + (homeWinRate - leagueHomeWinAvg) * 50;
     M118b = Math.max(20, Math.min(80, M118b));
   }
 

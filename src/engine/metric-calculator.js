@@ -136,10 +136,10 @@ function countMetrics(groups) {
 
 function computeLeagueAvgGoals(standingsTotal) {
   const rows = standingsTotal?.standings?.[0]?.rows || [];
-  if (rows.length < 4) return 1.35; // Yeterli veri yok, Avrupa ortalamasına dön
+  if (rows.length < 4) return null; // Yeterli veri yok, fallback kullanılmaz
   const totalGoals = rows.reduce((s, r) => s + (r.scoresFor || 0), 0);
   const totalGames = rows.reduce((s, r) => s + (r.played || 0), 0);
-  return totalGames > 0 ? totalGoals / totalGames : 1.35;
+  return totalGames > 0 ? totalGoals / totalGames : null;
 }
 
 module.exports = { calculateAllMetrics };

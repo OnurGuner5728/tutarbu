@@ -5,6 +5,7 @@
  */
 
 const api = require('./playwright-client');
+const { fetchWeatherData, computeWeatherMetrics } = require('./weather-service');
 
 /**
  * Verilen event ID için tahmin motorunun ihtiyaç duyduğu tüm ham verileri toplar.
@@ -316,8 +317,7 @@ async function fetchAllMatchData(eventId) {
       _detail: awayPlayerLog,
     },
   ];
-
-  return {
+  const result = {
     event: eventData,
     eventId,
     homeTeamId,
@@ -368,9 +368,51 @@ async function fetchAllMatchData(eventId) {
     homePlayerStats,
     awayPlayerStats,
 
+    // Hava durumu
+    weatherMetrics: null, // Asenkron olarak eklenecek
+
     // Debug
     _apiLog,
   };
+
+  // Hava durumu (stadyum koordinatları ve tarih var ise)
+  try {
+    if (eventData.event && eventData.event.startTimestamp) {
+      const ts = eventData.event.startTimestamp * 1000;
+      const d = new Date(ts);
+      const matchDate = d.toISOString().split('T')[0];
+      const matchHour = d.getHours();
+      let lat, lon;
+      
+      // SofaScore verisinde stadyum konumu
+      if (eventData.event.venue && eventData.event.venue.coordinates) {
+         lat = eventData.event.venue.coordinates.latitude;
+         lon = eventData.event.venue.coordinates.longitude;
+      } else if (eventData.event.venue?.city?.location) {
+         lat = eventData.event.venue.city.location.latitude;
+         lon = eventData.event.venue.city.location.longitude;
+      }
+      
+      // Şimdilik default bir konum (Londra) kullan (stadyum koordinatsız maçlar için bypass etme)
+      if (!lat || !lon) {
+         lat = 51.5074;
+         lon = -0.1278;
+      }
+      
+      if (lat && lon) {
+        // Asenkron olarak hava durumunu çekip beklemeden döndürebiliriz ama
+        // Metrik hesaplaması hemen olacağı için beklememiz lazım.
+        const weatherRaw = await fetchWeatherData(lat, lon, matchDate, matchHour);
+        if (weatherRaw) {
+           result.weatherMetrics = computeWeatherMetrics(weatherRaw);
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[DataFetcher] Weather fetch failed:', err.message);
+  }
+
+  return result;
 }
 
 /**

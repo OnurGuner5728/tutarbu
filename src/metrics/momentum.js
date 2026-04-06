@@ -34,7 +34,7 @@ function calculateMomentumMetrics(data, side) {
       }
     }
   }
-  const M146 = pressureMatchCount > 0 ? totalPositivePressure / pressureMatchCount : 50;
+  const M146 = pressureMatchCount > 0 ? totalPositivePressure / pressureMatchCount : null;
 
   // ── M147: Son 5 Maç Baskı Yeme İndeksi ──
   let totalNegativePressure = 0;
@@ -56,7 +56,7 @@ function calculateMomentumMetrics(data, side) {
       }
     }
   }
-  const M147 = negPressureCount > 0 ? totalNegativePressure / negPressureCount : 50;
+  const M147 = negPressureCount > 0 ? totalNegativePressure / negPressureCount : null;
 
   // ── M148: Baskı Altında Gol Atma ──
   let goalsUnderOppPressure = 0;
@@ -71,15 +71,17 @@ function calculateMomentumMetrics(data, side) {
       if (inc.incidentType !== 'goal' || inc.isHome !== isMatchHome) continue;
       totalGoalsScored++;
 
-      const minute = inc.time || 0;
-      const nearPoint = graphPoints.find(p => Math.abs(p.minute - minute) <= 2);
-      if (nearPoint) {
-        const teamVal = isMatchHome ? nearPoint.value : -nearPoint.value;
-        if (teamVal < -30) goalsUnderOppPressure++; // Rakip baskıda iken gol
+      const minute = inc.time;
+      if (minute != null) {
+        const nearPoint = graphPoints.find(p => Math.abs(p.minute - minute) <= 2);
+        if (nearPoint) {
+          const teamVal = isMatchHome ? nearPoint.value : -nearPoint.value;
+          if (teamVal < -30) goalsUnderOppPressure++; // Rakip baskıda iken gol
+        }
       }
     }
   }
-  const M148 = totalGoalsScored > 0 ? (goalsUnderOppPressure / totalGoalsScored) * 100 : 0;
+  const M148 = totalGoalsScored > 0 ? (goalsUnderOppPressure / totalGoalsScored) * 100 : null;
 
   // ── M149: Baskı Kurarken Gol Atma ──
   let goalsWhileDominating = 0;
@@ -98,7 +100,7 @@ function calculateMomentumMetrics(data, side) {
       }
     }
   }
-  const M149 = totalGoalsScored > 0 ? (goalsWhileDominating / totalGoalsScored) * 100 : 0;
+  const M149 = totalGoalsScored > 0 ? (goalsWhileDominating / totalGoalsScored) * 100 : null;
 
   // ── M150: Topla Oynama Ortalaması ──
   let totalPossession = 0;
@@ -111,7 +113,7 @@ function calculateMomentumMetrics(data, side) {
       possessionMatches++;
     }
   }
-  const M150 = possessionMatches > 0 ? totalPossession / possessionMatches : 50;
+  const M150 = possessionMatches > 0 ? totalPossession / possessionMatches : null;
 
   // ── M151: Topla Oynama vs Gol Korelasyonu ──
   const possessionArr = [];
@@ -127,8 +129,8 @@ function calculateMomentumMetrics(data, side) {
       goalsArr.push(scored);
     }
   }
-  const M151raw = pearsonCorrelation(possessionArr, goalsArr); // -1..+1
-  const M151 = ((M151raw + 1) / 2) * 100; // -1..+1 → 0..100
+  const M151raw = pearsonCorrelation(possessionArr, goalsArr);
+  const M151 = M151raw == null ? null : ((M151raw + 1) / 2) * 100;
 
   // ── M152: Pas Tamamlama Oranı ──
   let totalAccPasses = 0, totalPasses = 0;
@@ -139,7 +141,7 @@ function calculateMomentumMetrics(data, side) {
       totalPasses += stats.totalPasses || 0;
     }
   }
-  const M152 = totalPasses > 0 ? (totalAccPasses / totalPasses) * 100 : 78.5;
+  const M152 = totalPasses > 0 ? (totalAccPasses / totalPasses) * 100 : null;
 
   // ── M153: Uzun Pas Başarısı ──
   let totalAccLong = 0, totalLong = 0;
@@ -150,7 +152,7 @@ function calculateMomentumMetrics(data, side) {
       totalLong += stats.totalLongBalls || 0;
     }
   }
-  const M153 = totalLong > 0 ? (totalAccLong / totalLong) * 100 : 58.0;
+  const M153 = totalLong > 0 ? (totalAccLong / totalLong) * 100 : null;
 
   // ── M154: Cross Başarısı ──
   let totalAccCross = 0, totalCross = 0;
@@ -161,7 +163,7 @@ function calculateMomentumMetrics(data, side) {
       totalCross += stats.totalCrosses || 0;
     }
   }
-  const M154 = totalCross > 0 ? (totalAccCross / totalCross) * 100 : 28.5;
+  const M154 = totalCross > 0 ? (totalAccCross / totalCross) * 100 : null;
 
   // ── M155: Gole Katkı Sağlama İndeksi ──
   let goalContribs = 0;
@@ -174,7 +176,7 @@ function calculateMomentumMetrics(data, side) {
       if (inc.assist1) goalContribs++; // asist
     }
   }
-  const M155 = matchCount > 0 ? goalContribs / matchCount : 0;
+  const M155 = matchCount > 0 ? goalContribs / matchCount : null;
 
   return {
     M146, M147, M148, M149, M150, M151, M152, M153, M154, M155,
@@ -183,7 +185,7 @@ function calculateMomentumMetrics(data, side) {
 }
 
 function pearsonCorrelation(x, y) {
-  if (x.length < 3 || x.length !== y.length) return 0;
+  if (x.length < 3 || x.length !== y.length) return null;
   const n = x.length;
   const meanX = x.reduce((a, b) => a + b, 0) / n;
   const meanY = y.reduce((a, b) => a + b, 0) / n;
@@ -197,7 +199,7 @@ function pearsonCorrelation(x, y) {
     denY += dy * dy;
   }
   const den = Math.sqrt(denX * denY);
-  return den > 0 ? num / den : 0;
+  return den > 0 ? num / den : null;
 }
 
 function createEmptyMomentumMetrics() {

@@ -179,6 +179,142 @@ app.post('/api/workshop/:eventId', async (req, res) => {
   }
 });
 
+// GET /api/metrics/:eventId — Returns flat metric values + metadata for MetricsSelector UI
+app.get('/api/metrics/:eventId', async (req, res) => {
+  const { eventId } = req.params;
+  if (!/^\d+$/.test(eventId)) {
+    return res.status(400).json({ error: 'Invalid eventId: must be a positive integer.' });
+  }
+  const numericEventId = parseInt(eventId, 10);
+  try {
+    const { METRIC_METADATA } = require('./engine/metric-metadata');
+
+    let cachedData = getCachedMatchData(eventId);
+    if (!cachedData) {
+      cachedData = await fetchAllMatchData(numericEventId);
+      setCachedMatchData(eventId, cachedData);
+    }
+
+    const metrics = calculateAllMetrics(cachedData);
+
+    // Flatten each side's nested metric groups into a single { M001: value, ... } map
+    function flattenSide(side) {
+      const result = {};
+      const groups = Object.values(side);
+      for (const group of groups) {
+        if (group && typeof group === 'object') {
+          for (const [key, val] of Object.entries(group)) {
+            if (/^M\d{3}$/.test(key)) result[key] = val;
+          }
+        }
+      }
+      return result;
+    }
+
+    const flatHome = flattenSide(metrics.home);
+    const flatAway = flattenSide(metrics.away);
+
+    // Also merge shared metrics into both sides
+    const sharedFlat = {};
+    const sharedGroups = Object.values(metrics.shared || {});
+    for (const group of sharedGroups) {
+      if (group && typeof group === 'object') {
+        for (const [key, val] of Object.entries(group)) {
+          if (/^M\d{3}$/.test(key)) sharedFlat[key] = val;
+        }
+      }
+    }
+    Object.assign(flatHome, sharedFlat);
+    Object.assign(flatAway, sharedFlat);
+
+    // Enrich with metadata
+    function enrichWithMeta(flatMetrics) {
+      const enriched = {};
+      for (const [id, value] of Object.entries(flatMetrics)) {
+        const meta = METRIC_METADATA[id];
+        if (!meta) continue;
+        enriched[id] = {
+          value,
+          name: meta.name,
+          category: meta.category,
+          unit: meta.unit,
+          description: meta.description,
+          leagueAvg: meta.leagueAvg,
+          simulationRole: meta.simulationRole,
+          weight: meta.weight,
+        };
+      }
+      return enriched;
+    }
+
+    res.json({ home: enrichWithMeta(flatHome), away: enrichWithMeta(flatAway) });
+  } catch (err) {
+    console.error(`[API ERROR] metrics/${eventId}: ${err.message}`);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/simulate/:eventId
+app.post('/api/simulate/:eventId', async (req, res) => {
+  const { eventId } = req.params;
+  if (!/^\d+$/.test(eventId)) {
+    return res.status(400).json({ error: 'Invalid eventId: must be a positive integer.' });
+  }
+  const numericEventId = parseInt(eventId, 10);
+  try {
+    const { selectedMetrics = [], runs = 1 } = req.body;
+    const { simulateMatch } = require('./engine/match-simulator');
+
+    let cachedData = getCachedMatchData(eventId);
+    if (!cachedData) {
+      cachedData = await fetchAllMatchData(numericEventId);
+      setCachedMatchData(eventId, cachedData);
+    }
+
+    const metrics = calculateAllMetrics(cachedData);
+
+    function flattenSide(side) {
+      const result = {};
+      const groups = Object.values(side);
+      for (const group of groups) {
+        if (group && typeof group === 'object') {
+          for (const [key, val] of Object.entries(group)) {
+            if (/^M\d{3}$/.test(key)) result[key] = val;
+          }
+        }
+      }
+      return result;
+    }
+
+    const sharedFlat = {};
+    const sharedGroups = Object.values(metrics.shared || {});
+    for (const group of sharedGroups) {
+      if (group && typeof group === 'object') {
+        for (const [key, val] of Object.entries(group)) {
+          if (/^M\d{3}$/.test(key)) sharedFlat[key] = val;
+        }
+      }
+    }
+
+    const homeMetrics = Object.assign(flattenSide(metrics.home), sharedFlat);
+    const awayMetrics = Object.assign(flattenSide(metrics.away), sharedFlat);
+
+    const result = simulateMatch({
+      homeMetrics,
+      awayMetrics,
+      selectedMetrics: new Set(selectedMetrics),
+      runs,
+      lineups: cachedData.lineups,
+      weatherMetrics: cachedData.weatherMetrics,
+    });
+
+    res.json(result);
+  } catch (err) {
+    console.error(`[API ERROR] simulate/${eventId}: ${err.message}`);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Team Events — "Load more" pagination for Form & H2H sections
 app.get('/api/team-events/:teamId/:page', async (req, res) => {
   const { teamId, page } = req.params;

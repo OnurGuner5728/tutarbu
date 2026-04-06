@@ -26,14 +26,17 @@ function calculateTeamAttackMetrics(data, side) {
   }
 
   // ── M001: Maç Başı Atılan Gol Ortalaması ──
-  let totalGoalsScored = 0;
+  let totalGoalsScored = 0, m001ValidMatches = 0;
   for (const ev of last20) {
     const isEvHome = ev.homeTeam?.id === teamId;
-    totalGoalsScored += isEvHome
-      ? (ev.homeScore?.current || ev.homeScore?.display || 0)
-      : (ev.awayScore?.current || ev.awayScore?.display || 0);
+    const score = isEvHome
+      ? (ev.homeScore?.current ?? ev.homeScore?.display ?? null)
+      : (ev.awayScore?.current ?? ev.awayScore?.display ?? null);
+    if (score == null) continue;
+    totalGoalsScored += score;
+    m001ValidMatches++;
   }
-  const M001 = totalGoalsScored / totalMatches;
+  const M001 = m001ValidMatches > 0 ? totalGoalsScored / m001ValidMatches : null;
 
   // ── M002: Ev/Deplasman Gol Ortalaması ──
   let locationGoals = 0;
@@ -42,13 +45,15 @@ function calculateTeamAttackMetrics(data, side) {
     const isEvHome = ev.homeTeam?.id === teamId;
     // Mevcut maçın konumuna göre filtrele
     if ((isHome && isEvHome) || (!isHome && !isEvHome)) {
-      locationGoals += isEvHome
-        ? (ev.homeScore?.current || ev.homeScore?.display || 0)
-        : (ev.awayScore?.current || ev.awayScore?.display || 0);
+      const score = isEvHome
+        ? (ev.homeScore?.current ?? ev.homeScore?.display ?? null)
+        : (ev.awayScore?.current ?? ev.awayScore?.display ?? null);
+      if (score == null) continue;
+      locationGoals += score;
       locationMatches++;
     }
   }
-  const M002 = locationMatches > 0 ? locationGoals / locationMatches : M001;
+  const M002 = locationMatches > 0 ? locationGoals / locationMatches : null;
 
   // ── M003-M010: Dakika Bazlı Gol Dağılımı ──
   // recentDetails'deki incidents'lardan hesapla
@@ -80,49 +85,53 @@ function calculateTeamAttackMetrics(data, side) {
     }
   }
 
-  const recentMatchCount = recentDetails.length || 1;
-  const M003 = firstHalfGoals / recentMatchCount;
-  const M004 = secondHalfGoals / recentMatchCount;
+  const recentMatchCount = recentDetails.length;
+  const M003 = recentMatchCount > 0 ? firstHalfGoals / recentMatchCount : null;
+  const M004 = recentMatchCount > 0 ? secondHalfGoals / recentMatchCount : null;
 
-  const safeTotal = totalGoalsFromIncidents || 1;
-  const M005 = (goalsByPeriod['0-15'] / safeTotal) * 100;
-  const M006 = (goalsByPeriod['16-30'] / safeTotal) * 100;
-  const M007 = (goalsByPeriod['31-45'] / safeTotal) * 100;
-  const M008 = (goalsByPeriod['46-60'] / safeTotal) * 100;
-  const M009 = (goalsByPeriod['61-75'] / safeTotal) * 100;
-  const M010 = (goalsByPeriod['76-90'] / safeTotal) * 100;
+  const M005 = totalGoalsFromIncidents > 0 ? (goalsByPeriod['0-15'] / totalGoalsFromIncidents) * 100 : null;
+  const M006 = totalGoalsFromIncidents > 0 ? (goalsByPeriod['16-30'] / totalGoalsFromIncidents) * 100 : null;
+  const M007 = totalGoalsFromIncidents > 0 ? (goalsByPeriod['31-45'] / totalGoalsFromIncidents) * 100 : null;
+  const M008 = totalGoalsFromIncidents > 0 ? (goalsByPeriod['46-60'] / totalGoalsFromIncidents) * 100 : null;
+  const M009 = totalGoalsFromIncidents > 0 ? (goalsByPeriod['61-75'] / totalGoalsFromIncidents) * 100 : null;
+  const M010 = totalGoalsFromIncidents > 0 ? (goalsByPeriod['76-90'] / totalGoalsFromIncidents) * 100 : null;
 
   // FALLBACK: Eğer 0 ise, sezon ortalaması veya genel bir dağılım (simülasyon) yerine 0 bırakıyoruz 
   // ancak numuneyi 7 maça çıkardığımız için 0 olma ihtimali azaldı.
 
   // ── M011-M014: Şut ve İsabetli Şut Metrikleri ──
-  let totalShots = 0;
-  let shotsOnTarget = 0;
-  let matchesWithStats = 0;
+  let totalShots = 0, shotsOnTarget = 0;
+  let matchesWithStats = 0, totalShotsMatches = 0, shotsOnTargetMatches = 0;
 
   for (const match of recentDetails) {
     const stats = extractTeamStats(match.stats, match.homeTeam?.id === teamId);
     if (stats) {
-      totalShots += stats.totalShots || 0;
-      shotsOnTarget += stats.shotsOnTarget || 0;
       matchesWithStats++;
+      if (stats.totalShots != null) { totalShots += stats.totalShots; totalShotsMatches++; }
+      if (stats.shotsOnTarget != null) { shotsOnTarget += stats.shotsOnTarget; shotsOnTargetMatches++; }
     }
   }
 
   // teamSeasonStats fallback helpers — recentDetails sparse olduğunda kullanılır
-  const seasonStat = (name) =>
-    teamSeasonStats?.statistics?.find(s => s.name === name)?.value ?? null;
+  const seasonMatches = teamSeasonStats?.statistics?.matches || null;
+  const seasonStat = (key) => {
+    const val = teamSeasonStats?.statistics?.[key];
+    return val != null ? val : null;
+  };
+  const seasonStatPerGame = (key) => {
+    const val = seasonStat(key);
+    if (val == null || !seasonMatches) return null;
+    return val / seasonMatches;
+  };
 
-  const M011 = totalShots > 0 ? Math.min((totalGoalsFromIncidents / totalShots) * 100, 100) : 0;
-  const M012 = shotsOnTarget > 0 ? Math.min((totalGoalsFromIncidents / shotsOnTarget) * 100, 100) : 0;
-  // M013: Maç başı toplam şut — recentDetails yoksa sezon "Shots per Game" kullan
-  const M013 = matchesWithStats > 0
-    ? totalShots / matchesWithStats
-    : (seasonStat('Shots per Game') ?? 0);
-  // M014: Maç başı isabetli şut — recentDetails yoksa sezon "Shots on Target per Game" kullan
-  const M014 = matchesWithStats > 0
-    ? shotsOnTarget / matchesWithStats
-    : (seasonStat('Shots on Target per Game') ?? 0);
+  const M011 = totalShots > 0 ? Math.min((totalGoalsFromIncidents / totalShots) * 100, 100) : null;
+  const M012 = shotsOnTarget > 0 ? Math.min((totalGoalsFromIncidents / shotsOnTarget) * 100, 100) : null;
+  const M013 = totalShotsMatches > 0
+    ? totalShots / totalShotsMatches
+    : seasonStatPerGame('shots');
+  const M014 = shotsOnTargetMatches > 0
+    ? shotsOnTarget / shotsOnTargetMatches
+    : seasonStatPerGame('shotsOnTarget');
 
   // ── M015-M016: xG Metrikleri ──
   let totalXG = 0;
@@ -145,32 +154,25 @@ function calculateTeamAttackMetrics(data, side) {
     }
   }
 
-  const M015 = matchesWithXG > 0 ? totalXG / matchesWithXG : 0;
-  const M016 = totalXG > 0 ? totalGoalsFromIncidents / totalXG : 1;
+  const M015 = matchesWithXG > 0 ? totalXG / matchesWithXG : null;
+  const M016 = totalXG > 0 ? totalGoalsFromIncidents / totalXG : null;
 
   // ── M017-M018: Büyük Şans (Big Chances) ──
-  let totalBigChances = 0;
-  let totalBigChancesScored = 0;
+  let totalBigChances = 0, totalBigChancesScored = 0, bigChancesMatches = 0;
 
   for (const match of recentDetails) {
     const stats = extractTeamStats(match.stats, match.homeTeam?.id === teamId);
-    if (stats) {
-      totalBigChances += stats.bigChances || 0;
-      totalBigChancesScored += stats.bigChancesScored || 0;
+    if (stats && stats.bigChances != null) {
+      totalBigChances += stats.bigChances;
+      if (stats.bigChancesScored != null) totalBigChancesScored += stats.bigChancesScored;
+      bigChancesMatches++;
     }
   }
 
-  // M017: Maç başı büyük şans — recentDetails yoksa sezon "Big Chances" değerini
-  // totalMatches'e bölerek ortalama olarak kullan
-  const M017 = matchesWithStats > 0
-    ? totalBigChances / matchesWithStats
-    : (() => {
-        const seasonBigChances = seasonStat('Big Chances');
-        return seasonBigChances != null && totalMatches > 0
-          ? seasonBigChances / totalMatches
-          : 0;
-      })();
-  const M018 = totalBigChances > 0 ? Math.min((totalBigChancesScored / totalBigChances) * 100, 100) : 0;
+  const M017 = bigChancesMatches > 0
+    ? totalBigChances / bigChancesMatches
+    : seasonStatPerGame('bigChances');
+  const M018 = totalBigChances > 0 ? Math.min((totalBigChancesScored / totalBigChances) * 100, 100) : null;
 
   // ── M019-M020: Penaltı Metrikleri ──
   let penaltiesWon = 0;
@@ -196,8 +198,8 @@ function calculateTeamAttackMetrics(data, side) {
 
   }
 
-  const M019 = recentMatchCount > 0 ? penaltiesWon / recentMatchCount : 0;
-  const M020 = penaltiesTaken > 0 ? (penaltiesScored / penaltiesTaken) * 100 : 0;
+  const M019 = recentMatchCount > 0 ? penaltiesWon / recentMatchCount : null;
+  const M020 = penaltiesTaken > 0 ? (penaltiesScored / penaltiesTaken) * 100 : null;
 
   // ── M021: Hücum Baskı İndeksi (Graph'ten) ──
   let totalPositivePressure = 0;
@@ -229,33 +231,33 @@ function calculateTeamAttackMetrics(data, side) {
   }
 
   const M021 = pressureMatches > 0
-    ? Math.min(Math.max(totalPositivePressure / pressureMatches, 0), 100) : 50;
+    ? Math.min(Math.max(totalPositivePressure / pressureMatches, 0), 100) : null;
 
   // ── M022-M023: Korner Metrikleri ──
-  let totalCorners = 0;
+  let totalCorners = 0, cornersMatches = 0;
   let cornerGoalsCount = 0;
 
   for (const match of recentDetails) {
     const stats = extractTeamStats(match.stats, match.homeTeam?.id === teamId);
-    if (stats) {
-      totalCorners += stats.cornerKicks || 0;
+    if (stats && stats.cornerKicks != null) {
+      totalCorners += stats.cornerKicks;
+      cornersMatches++;
     }
     // Kornerden gol tespiti — shotmap "situation" bilgisi kullanılıyor
     const shotmapData = match.shotmap?.shotmap || [];
     const isMatchHome = match.homeTeam?.id === teamId;
     for (const shot of shotmapData) {
-      if (shot.isHome === isMatchHome && shot.situation === 'corner' && shot.shotType === 'goal') {
+      if (shot.isHome === isMatchHome && shot.situation === 'corner' && shot.isGoal === true) {
         cornerGoalsCount++;
       }
     }
   }
 
-  // M022: Maç başı korner — recentDetails yoksa sezon "Corners per Game" kullan
-  const M022 = matchesWithStats > 0
-    ? totalCorners / matchesWithStats
-    : (seasonStat('Corners per Game') ?? 0);
-  // Fallback: Eğer shotmap'te bulamazsak seasonStats'ten bakmayı deneyebiliriz (varsa)
-  const M023 = totalCorners > 0 ? (cornerGoalsCount / totalCorners) * 100 : 0;
+  // M022: Maç başı korner — recentDetails yoksa sezon istatistiğinden hesapla
+  const M022 = cornersMatches > 0
+    ? totalCorners / cornersMatches
+    : seasonStatPerGame('corners');
+  const M023 = totalCorners > 0 ? (cornerGoalsCount / totalCorners) * 100 : null;
 
   // ── M024: Serbest Vuruş Gol Oranı ──
   let freeKickGoals = 0;
@@ -266,14 +268,14 @@ function calculateTeamAttackMetrics(data, side) {
     const isMatchHome = match.homeTeam?.id === teamId;
 
     for (const shot of shotmapData) {
-      if (shot.isHome === isMatchHome && shot.situation === 'set-piece') {
+      if (shot.isHome === isMatchHome && shot.situation === 'setPiece') {
         totalFreeKicks++;
-        if (shot.shotType === 'goal') freeKickGoals++;
+        if (shot.isGoal === true) freeKickGoals++;
       }
     }
   }
 
-  const M024 = totalFreeKicks > 0 ? (freeKickGoals / totalFreeKicks) * 100 : 0;
+  const M024 = totalFreeKicks > 0 ? (freeKickGoals / totalFreeKicks) * 100 : null;
 
   // ── M025: Hücum Üçüncü Bölge Pas Başarısı ──
   let totalAccFinalThird = 0;
@@ -282,59 +284,44 @@ function calculateTeamAttackMetrics(data, side) {
   for (const match of recentDetails) {
     const stats = extractTeamStats(match.stats, match.homeTeam?.id === teamId);
     if (stats) {
-      totalAccFinalThird += stats.accuratePassesFinalThird || 0;
-      totalFinalThird += stats.totalPassesFinalThird || 0;
+      if (stats.accuratePassesFinalThird != null) totalAccFinalThird += stats.accuratePassesFinalThird;
+      if (stats.totalPassesFinalThird != null) totalFinalThird += stats.totalPassesFinalThird;
     }
   }
 
-  const M025 = totalFinalThird > 0 ? Math.min((totalAccFinalThird / totalFinalThird) * 100, 100) : 0;
+  const M025 = totalFinalThird > 0 ? Math.min((totalAccFinalThird / totalFinalThird) * 100, 100) : null;
 
   // ── M025b: Set Piece (Korner + Serbest Vuruş) Gol Etkinliği ──
-  // Son N maçtaki korner + serbest vuruştan gelen gollerin toplam gollere oranı
+  // Shotmap situation alanından korner/set-piece gollerini tespit et
   let setPieceGoals = 0;
   let totalGoalsForSP = 0;
 
   for (const match of recentDetails) {
-    const incidents = match.incidents?.incidents || [];
-    for (const inc of incidents) {
-      if (inc.incidentType !== 'goal') continue;
-      const isMatchHome = match.homeTeam?.id === teamId;
-      if (inc.isHome !== isMatchHome) continue;
+    const shotmapData = match.shotmap?.shotmap || [];
+    const isMatchHome = match.homeTeam?.id === teamId;
+    for (const shot of shotmapData) {
+      if (shot.isHome !== isMatchHome) continue;
+      if (!shot.isGoal) continue;
       totalGoalsForSP++;
-      // Set piece gol: direkt serbest vuruş, kornerden, penaltı hariç
-      const isSetPiece = inc.goalType === 'header' || // Kornerden kafa
-        inc.description?.toLowerCase().includes('corner') ||
-        inc.description?.toLowerCase().includes('free kick') ||
-        (inc.goalType === 'free-kick');
-      if (isSetPiece) setPieceGoals++;
-    }
-  }
-  const M025b = totalGoalsForSP > 0 ? (setPieceGoals / totalGoalsForSP) * 100 : 0;
-
-  // ── M025c: Korner Başına Tehlike Oranı ──
-  // Son maçlardaki korner istatistiklerinden hesaplanır
-  let totalCornersForM025c = 0;
-  let matchCountForCorners = 0;
-  for (const match of recentDetails) {
-    const stats = match.stats?.statistics || [];
-    for (const period of stats) {
-      const groups = period.groups || [];
-      for (const group of groups) {
-        for (const item of (group.statisticsItems || [])) {
-          if (item.name?.toLowerCase().includes('corner') || item.key === 'cornerKicks') {
-            const isMatchHome = match.homeTeam?.id === teamId;
-            const val = isMatchHome
-              ? parseInt(item.home, 10) || 0
-              : parseInt(item.away, 10) || 0;
-            totalCornersForM025c += val;
-            matchCountForCorners++;
-            break;
-          }
-        }
+      if (shot.situation === 'corner' || shot.situation === 'setPiece' || shot.situation === 'freekick') {
+        setPieceGoals++;
       }
     }
   }
-  const M025c = matchCountForCorners > 0 ? totalCornersForM025c / recentDetails.length : 0;
+  const M025b = totalGoalsForSP > 0 ? (setPieceGoals / totalGoalsForSP) * 100 : null;
+
+  // ── M025c: Korner Başına Tehlike Oranı ──
+  // extractTeamStats zaten period='ALL' filtrelemesini yapıyor
+  let totalCornersForM025c = 0;
+  let cornerMatchCount = 0;
+  for (const match of recentDetails) {
+    const stats = extractTeamStats(match.stats, match.homeTeam?.id === teamId);
+    if (stats && stats.cornerKicks != null) {
+      totalCornersForM025c += stats.cornerKicks;
+      cornerMatchCount++;
+    }
+  }
+  const M025c = cornerMatchCount > 0 ? totalCornersForM025c / cornerMatchCount : null;
 
   return {
     M001, M002, M003, M004, M005, M006, M007, M008, M009, M010,
@@ -371,7 +358,8 @@ function parseStatValue(item, isHome) {
     return { current: parseInt(percMatch[1], 10), total: 100 };
   }
 
-  return { current: parseFloat(str) || 0, total: null };
+  const parsed = parseFloat(str);
+  return isNaN(parsed) ? { current: null, total: null } : { current: parsed, total: null };
 }
 
 /**
@@ -381,15 +369,15 @@ function extractTeamStats(statsResponse, isHome) {
   if (!statsResponse?.statistics) return null;
 
   const result = {
-    totalShots: 0, shotsOnTarget: 0, cornerKicks: 0, bigChances: 0,
-    bigChancesScored: 0, bigChancesMissed: 0, fouls: 0, possession: 50,
-    expectedGoals: 0, blockedShots: 0, shotsOffTarget: 0, hitWoodwork: 0,
-    shotsInsideBox: 0, shotsOutsideBox: 0, accuratePasses: 0, totalPasses: 0,
-    accurateLongBalls: 0, totalLongBalls: 0, accurateCrosses: 0, totalCrosses: 0,
-    duelsWon: 0, totalDuels: 0, aerialDuelsWon: 0, totalAerialDuels: 0,
-    interceptions: 0, tackles: 0, clearances: 0, saves: 0,
-    accuratePassesFinalThird: 0, totalPassesFinalThird: 0,
-    yellowCards: 0, redCards: 0, offsides: 0
+    totalShots: null, shotsOnTarget: null, cornerKicks: null, bigChances: null,
+    bigChancesScored: null, bigChancesMissed: null, fouls: null, possession: null,
+    expectedGoals: null, blockedShots: null, shotsOffTarget: null, hitWoodwork: null,
+    shotsInsideBox: null, shotsOutsideBox: null, accuratePasses: null, totalPasses: null,
+    accurateLongBalls: null, totalLongBalls: null, accurateCrosses: null, totalCrosses: null,
+    duelsWon: null, totalDuels: null, aerialDuelsWon: null, totalAerialDuels: null,
+    interceptions: null, tackles: null, clearances: null, saves: null,
+    accuratePassesFinalThird: null, totalPassesFinalThird: null,
+    yellowCards: null, redCards: null, offsides: null
   };
 
   // Key-based lookup map (locale-independent — SofaScore sabit İngilizce key döner).
@@ -522,8 +510,8 @@ function createEmptyAttackMetrics() {
   for (let i = 1; i <= 25; i++) {
     metrics[`M${String(i).padStart(3, '0')}`] = null;
   }
-  metrics.M025b = 0;
-  metrics.M025c = 0;
+  metrics.M025b = null;
+  metrics.M025c = null;
   metrics._meta = { totalMatchesAnalyzed: 0, error: 'No finished matches found' };
   return metrics;
 }

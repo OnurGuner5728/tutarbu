@@ -23,43 +23,52 @@ function calculateTeamDefenseMetrics(data, side) {
 
   // ── M026: Maç Başı Yenilen Gol Ortalaması ──
   let totalGoalsConceded = 0;
+  let m026ValidMatches = 0;
   for (const ev of last20) {
     const isEvHome = ev.homeTeam?.id === teamId;
-    totalGoalsConceded += isEvHome
-      ? (ev.awayScore?.current || ev.awayScore?.display || 0)
-      : (ev.homeScore?.current || ev.homeScore?.display || 0);
+    const score = isEvHome
+      ? (ev.awayScore?.current ?? ev.awayScore?.display)
+      : (ev.homeScore?.current ?? ev.homeScore?.display);
+    if (score == null) continue;
+    totalGoalsConceded += score;
+    m026ValidMatches++;
   }
-  const M026 = totalGoalsConceded / totalMatches;
+  const M026 = m026ValidMatches > 0 ? totalGoalsConceded / m026ValidMatches : null;
 
   // ── M027: Ev/Deplasman Yenilen Gol Ortalaması ──
   let locConceded = 0, locMatches = 0;
   for (const ev of last20) {
     const isEvHome = ev.homeTeam?.id === teamId;
     if ((isHome && isEvHome) || (!isHome && !isEvHome)) {
-      locConceded += isEvHome
-        ? (ev.awayScore?.current || ev.awayScore?.display || 0)
-        : (ev.homeScore?.current || ev.homeScore?.display || 0);
+      const score = isEvHome
+        ? (ev.awayScore?.current ?? ev.awayScore?.display)
+        : (ev.homeScore?.current ?? ev.homeScore?.display);
+      if (score == null) continue;
+      locConceded += score;
       locMatches++;
     }
   }
-  const M027 = locMatches > 0 ? locConceded / locMatches : M026;
+  const M027 = locMatches > 0 ? locConceded / locMatches : null;
 
   // ── M028: Clean Sheet Oranı ──
   let cleanSheets = 0;
+  let m028ValidMatches = 0;
   for (const ev of last20) {
     const isEvHome = ev.homeTeam?.id === teamId;
-    const conceded = isEvHome
-      ? (ev.awayScore?.current || ev.awayScore?.display || 0)
-      : (ev.homeScore?.current || ev.homeScore?.display || 0);
-    if (conceded === 0) cleanSheets++;
+    const score = isEvHome
+      ? (ev.awayScore?.current ?? ev.awayScore?.display)
+      : (ev.homeScore?.current ?? ev.homeScore?.display);
+    if (score == null) continue;
+    if (score === 0) cleanSheets++;
+    m028ValidMatches++;
   }
-  const M028 = Math.min((cleanSheets / totalMatches) * 100, 100);
+  const M028 = m028ValidMatches > 0 ? Math.min((cleanSheets / m028ValidMatches) * 100, 100) : null;
 
   // ── M029-M032: Yarı Bazlı ve Dakika Bazlı Gol Yeme ──
   let firstHalfConceded = 0, secondHalfConceded = 0;
   let conceded015 = 0, conceded7690 = 0;
   let totalConcededInc = 0;
-  const recentMatchCount = recentDetails.length || 1;
+  const recentMatchCount = recentDetails.length;
 
   for (const match of recentDetails) {
     const incidents = match.incidents?.incidents || [];
@@ -69,8 +78,10 @@ function calculateTeamDefenseMetrics(data, side) {
       if (inc.incidentType !== 'goal') continue;
       if (inc.isHome === isMatchHome) continue; // Rakibin golü
 
+      const minute = inc.time;
+      if (minute == null) continue; // Dakika verisi yoksa atla
+
       totalConcededInc++;
-      const minute = inc.time || 0;
 
       if (minute <= 45) firstHalfConceded++;
       else secondHalfConceded++;
@@ -80,13 +91,10 @@ function calculateTeamDefenseMetrics(data, side) {
     }
   }
 
-  const M029 = firstHalfConceded / recentMatchCount;
-  const M030 = secondHalfConceded / recentMatchCount;
-  const safeConceded = totalConcededInc || 1;
-  const M031 = (conceded015 / safeConceded) * 100;
-  const M032 = (conceded7690 / safeConceded) * 100;
-
-  // FALLBACK: Eğer 0 ise, %0 olarak kalıyor ama numuneyi 7 maça çıkardık.
+  const M029 = recentMatchCount > 0 ? firstHalfConceded / recentMatchCount : null;
+  const M030 = recentMatchCount > 0 ? secondHalfConceded / recentMatchCount : null;
+  const M031 = totalConcededInc > 0 ? (conceded015 / totalConcededInc) * 100 : null;
+  const M032 = totalConcededInc > 0 ? (conceded7690 / totalConcededInc) * 100 : null;
 
   // ── M033: Rakip xG'yi Düşürme Oranı ──
   let totalOpponentXG = 0;
@@ -106,7 +114,7 @@ function calculateTeamDefenseMetrics(data, side) {
       xgMatches++;
     }
   }
-  const avgOpponentXG = xgMatches > 0 ? totalOpponentXG / xgMatches : 1.5;
+  const avgOpponentXG = xgMatches > 0 ? totalOpponentXG / xgMatches : null;
   const M033 = avgOpponentXG; // Düşük = iyi defans
 
   // ── M034-M038: Defansif İstatistikler ──
@@ -122,27 +130,30 @@ function calculateTeamDefenseMetrics(data, side) {
     const oppStats = extractTeamStats(match.stats, match.homeTeam?.id !== teamId);
 
     if (teamStats) {
-      totalBlocked += teamStats.blockedShots || 0;
-      totalDuelsWon += teamStats.duelsWon || 0;
-      totalAerialWon += teamStats.aerialDuelsWon || 0;
-      totalAerial += teamStats.totalAerialDuels || 0;
-      totalInterceptions += teamStats.interceptions || 0;
-      totalFouls += teamStats.fouls || 0;
+      if (teamStats.blockedShots != null) totalBlocked += teamStats.blockedShots;
+      if (teamStats.duelsWon != null) totalDuelsWon += teamStats.duelsWon;
+      if (teamStats.aerialDuelsWon != null) totalAerialWon += teamStats.aerialDuelsWon;
+      if (teamStats.totalAerialDuels != null) totalAerial += teamStats.totalAerialDuels;
+      if (teamStats.interceptions != null) totalInterceptions += teamStats.interceptions;
+      if (teamStats.fouls != null) totalFouls += teamStats.fouls;
       matchesWithStats++;
     }
     if (oppStats) {
-      totalOpponentShots += oppStats.totalShots || 0;
-      totalDuels += (teamStats?.totalDuels || 0) > 0
-        ? (teamStats.totalDuels || 0)
-        : (teamStats?.duelsWon || 0) + (teamStats?.duelsLost || 0);
+      if (oppStats.totalShots != null) totalOpponentShots += oppStats.totalShots;
+      const duelsTotal = teamStats?.totalDuels != null
+        ? teamStats.totalDuels
+        : (teamStats?.duelsWon != null && teamStats?.duelsLost != null)
+          ? teamStats.duelsWon + teamStats.duelsLost
+          : null;
+      if (duelsTotal != null) totalDuels += duelsTotal;
     }
   }
 
-  const M034 = totalOpponentShots > 0 ? Math.min((totalBlocked / totalOpponentShots) * 100, 100) : 0;
-  const M035 = totalDuels > 0 ? Math.min((totalDuelsWon / totalDuels) * 100, 100) : 50;
-  const M036 = totalAerial > 0 ? Math.min((totalAerialWon / totalAerial) * 100, 100) : 50;
-  const M037 = matchesWithStats > 0 ? totalInterceptions / matchesWithStats : 0;
-  const M038 = matchesWithStats > 0 ? totalFouls / matchesWithStats : 0;
+  const M034 = totalOpponentShots > 0 ? Math.min((totalBlocked / totalOpponentShots) * 100, 100) : null;
+  const M035 = totalDuels > 0 ? Math.min((totalDuelsWon / totalDuels) * 100, 100) : null;
+  const M036 = totalAerial > 0 ? Math.min((totalAerialWon / totalAerial) * 100, 100) : null;
+  const M037 = matchesWithStats > 0 ? totalInterceptions / matchesWithStats : null;
+  const M038 = matchesWithStats > 0 ? totalFouls / matchesWithStats : null;
 
   // ── M039-M040: Kart Metrikleri ──
   let totalYellows = 0, totalReds = 0;
@@ -157,8 +168,8 @@ function calculateTeamDefenseMetrics(data, side) {
       if (inc.incidentClass === 'red' || inc.incidentClass === 'yellowRed') totalReds++;
     }
   }
-  const M039 = recentMatchCount > 0 ? totalYellows / recentMatchCount : 0;
-  const M040 = recentMatchCount > 0 ? totalReds / recentMatchCount : 0;
+  const M039 = recentMatchCount > 0 ? totalYellows / recentMatchCount : null;
+  const M040 = recentMatchCount > 0 ? totalReds / recentMatchCount : null;
 
   // ── M041: Defansif Baskı Altında Gol Yeme ──
   let goalsUnderPressure = 0;
@@ -171,7 +182,8 @@ function calculateTeamDefenseMetrics(data, side) {
       if (inc.incidentType !== 'goal') continue;
       if (inc.isHome === isMatchHome) continue;
 
-      const minute = inc.time || 0;
+      const minute = inc.time;
+      if (minute == null) continue;
       const nearPoint = graphPoints.find(p => Math.abs(p.minute - minute) <= 2);
       if (nearPoint) {
         const pressure = isMatchHome ? nearPoint.value : -nearPoint.value;
@@ -179,7 +191,7 @@ function calculateTeamDefenseMetrics(data, side) {
       }
     }
   }
-  const M041 = totalConcededInc > 0 ? (goalsUnderPressure / totalConcededInc) * 100 : 0;
+  const M041 = totalConcededInc > 0 ? (goalsUnderPressure / totalConcededInc) * 100 : null;
 
   // ── M042: Geri Düşünce Gol Yeme (önde gidip yenilme) ──
   // ── M043: Öne Geçince Maç Kapatma ──
@@ -218,18 +230,15 @@ function calculateTeamDefenseMetrics(data, side) {
     }
 
     if (everWentAhead) {
-      const finalTeam = isMatchHome
-        ? (match.homeScore?.current || 0)
-        : (match.awayScore?.current || 0);
-      const finalOpp = isMatchHome
-        ? (match.awayScore?.current || 0)
-        : (match.homeScore?.current || 0);
-      if (finalOpp >= finalTeam) lostFromAhead++;
-      if (finalTeam > finalOpp) wonFromAhead++;
+      const finalTeamHome = isMatchHome ? match.homeScore?.current : match.awayScore?.current;
+      const finalOppHome = isMatchHome ? match.awayScore?.current : match.homeScore?.current;
+      if (finalTeamHome == null || finalOppHome == null) continue;
+      if (finalOppHome >= finalTeamHome) lostFromAhead++;
+      if (finalTeamHome > finalOppHome) wonFromAhead++;
     }
   }
-  const M042 = timesAhead > 0 ? (lostFromAhead / timesAhead) * 100 : 0;
-  const M043 = timesAhead > 0 ? (wonFromAhead / timesAhead) * 100 : 0;
+  const M042 = timesAhead > 0 ? (lostFromAhead / timesAhead) * 100 : null;
+  const M043 = timesAhead > 0 ? (wonFromAhead / timesAhead) * 100 : null;
 
   // ── M044: Gol Yedikten Sonra Tepki Süresi ──
   let totalReactionMinutes = 0;
@@ -252,7 +261,7 @@ function calculateTeamDefenseMetrics(data, side) {
       }
     }
   }
-  const M044 = reactionCount > 0 ? totalReactionMinutes / reactionCount : 90;
+  const M044 = reactionCount > 0 ? totalReactionMinutes / reactionCount : null;
 
   // ── M045: Rakip Korner Engelleme Verimi ──
   let totalOppCorners = 0;
@@ -260,19 +269,19 @@ function calculateTeamDefenseMetrics(data, side) {
 
   for (const match of recentDetails) {
     const oppStats = extractTeamStats(match.stats, match.homeTeam?.id !== teamId);
-    if (oppStats) {
-      totalOppCorners += oppStats.cornerKicks || 0;
+    if (oppStats && oppStats.cornerKicks != null) {
+      totalOppCorners += oppStats.cornerKicks;
     }
     // Rakip kornerden gol bulmuş mu?
     const shotmapData = match.shotmap?.shotmap || [];
     const isMatchHome = match.homeTeam?.id === teamId;
     for (const shot of shotmapData) {
-      if (shot.isHome !== isMatchHome && shot.situation === 'corner' && shot.shotType === 'goal') {
+      if (shot.isHome !== isMatchHome && shot.situation === 'corner' && shot.isGoal === true) {
         goalsFromOppCorner++;
       }
     }
   }
-  const M045 = totalOppCorners > 0 ? (1 - (goalsFromOppCorner / totalOppCorners)) * 100 : 100;
+  const M045 = totalOppCorners > 0 ? (1 - (goalsFromOppCorner / totalOppCorners)) * 100 : null;
 
   return {
     M026, M027, M028, M029, M030, M031, M032, M033, M034, M035,
