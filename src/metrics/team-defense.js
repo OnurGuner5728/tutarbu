@@ -14,12 +14,34 @@ function calculateTeamDefenseMetrics(data, side) {
   const teamId = isHome ? data.homeTeamId : data.awayTeamId;
   const lastEvents = isHome ? data.homeLastEvents : data.awayLastEvents;
   const recentDetails = (isHome ? data.homeRecentMatchDetails : data.awayRecentMatchDetails) || [];
+  const seasonStats = (isHome ? data.homeTeamSeasonStats : data.awayTeamSeasonStats)?.statistics ?? null;
 
   const finishedEvents = (lastEvents || []).filter(e => e.status?.type === 'finished');
   const last20 = finishedEvents.slice(0, 20);
   const totalMatches = last20.length;
 
   if (totalMatches === 0) return createEmptyDefenseMetrics();
+
+  // --- Unified Stat Helper ---
+  const unifiedStat = (key, extractKey = key) => {
+    let total = 0, count = 0;
+    for (const match of recentDetails) {
+      const ts = extractTeamStats(match.stats, match.homeTeam?.id === teamId);
+      if (ts && ts[extractKey] != null) {
+        total += ts[extractKey];
+        count++;
+      }
+    }
+    if (count > 0) return total / count;
+
+    const sVal = seasonStats?.[extractKey] ?? (isHome ? data.homeTeamSeasonStats?.[extractKey] : data.awayTeamSeasonStats?.[extractKey]);
+    const sMatches = seasonStats?.matches ?? (isHome ? data.homeTeamSeasonStats?.matches : data.awayTeamSeasonStats?.matches);
+    if (sVal != null && sMatches > 0) {
+      if (extractKey.toLowerCase().includes('percentage')) return sVal;
+      return sVal / sMatches;
+    }
+    return null;
+  };
 
   // ── M026: Maç Başı Yenilen Gol Ortalaması ──
   let totalGoalsConceded = 0;
@@ -149,11 +171,23 @@ function calculateTeamDefenseMetrics(data, side) {
     }
   }
 
-  const M034 = totalOpponentShots > 0 ? Math.min((totalBlocked / totalOpponentShots) * 100, 100) : null;
-  const M035 = totalDuels > 0 ? Math.min((totalDuelsWon / totalDuels) * 100, 100) : null;
-  const M036 = totalAerial > 0 ? Math.min((totalAerialWon / totalAerial) * 100, 100) : null;
-  const M037 = matchesWithStats > 0 ? totalInterceptions / matchesWithStats : null;
-  const M038 = matchesWithStats > 0 ? totalFouls / matchesWithStats : null;
+  const M034 = totalOpponentShots > 0
+    ? Math.min((totalBlocked / totalOpponentShots) * 100, 100)
+    : (seasonStats?.blockedScoringAttemptAgainst != null && seasonStats?.shotsAgainst > 0
+        ? Math.min((seasonStats.blockedScoringAttemptAgainst / seasonStats.shotsAgainst) * 100, 100)
+        : null);
+  const M035 = totalDuels > 0
+    ? Math.min((totalDuelsWon / totalDuels) * 100, 100)
+    : unifiedStat('duelsWonPercentage', 'duelsWonPercentage');
+  const M036 = totalAerial > 0
+    ? Math.min((totalAerialWon / totalAerial) * 100, 100)
+    : unifiedStat('aerialDuelsWonPercentage', 'aerialDuelsWonPercentage');
+  const M037 = (matchesWithStats > 0 && totalInterceptions > 0)
+    ? totalInterceptions / matchesWithStats
+    : unifiedStat('interceptions', 'interceptions');
+  const M038 = (matchesWithStats > 0 && totalFouls > 0)
+    ? totalFouls / matchesWithStats
+    : unifiedStat('fouls', 'fouls');
 
   // ── M039-M040: Kart Metrikleri ──
   let totalYellows = 0, totalReds = 0;

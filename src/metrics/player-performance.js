@@ -149,7 +149,8 @@ function calculatePlayerMetrics(data, side) {
   let teamTotalGoals = 0;
 
   for (const p of starters) {
-    const goals = p.seasonStats?.statistics?.goals || 0;
+    const goals = p.seasonStats?.statistics?.goals;
+    if (goals == null) continue;
     const assists = p.seasonStats?.statistics?.assists || 0;
     teamTotalGoals += goals;
     if (p.position === 'F' || p.position === 'FW') {
@@ -157,7 +158,10 @@ function calculatePlayerMetrics(data, side) {
     }
   }
   const totalContrib = starters.reduce((sum, p) => {
-    return sum + (p.seasonStats?.statistics?.goals || 0) + (p.seasonStats?.statistics?.assists || 0);
+    const pG = p.seasonStats?.statistics?.goals;
+    const pA = p.seasonStats?.statistics?.assists;
+    if (pG == null && pA == null) return sum;
+    return sum + (pG || 0) + (pA || 0);
   }, 0);
   const M069 = totalContrib > 0 ? (forwardGoalContrib / totalContrib) * 100 : null;
 
@@ -165,10 +169,12 @@ function calculatePlayerMetrics(data, side) {
   const midfielders = starters.filter(p => p.position === 'M' || p.position === 'MF');
   let midCreativity = 0;
   for (const p of midfielders) {
-    const keyPasses = p.seasonStats?.statistics?.keyPasses || p.seasonStats?.statistics?.bigChancesCreated || 0;
-    const assists = p.seasonStats?.statistics?.assists || 0;
-    const appearances = p.seasonStats?.statistics?.appearances || 0;
-    if (appearances > 0) midCreativity += (keyPasses + assists) / appearances;
+    const keyPasses = p.seasonStats?.statistics?.keyPasses || p.seasonStats?.statistics?.bigChancesCreated;
+    const assists = p.seasonStats?.statistics?.assists;
+    const appearances = p.seasonStats?.statistics?.appearances;
+    if (appearances > 0 && (keyPasses != null || assists != null)) {
+      midCreativity += ((keyPasses || 0) + (assists || 0)) / appearances;
+    }
   }
   const M070 = midfielders.length > 0 ? midCreativity / midfielders.length : null;
 
@@ -183,16 +189,20 @@ function calculatePlayerMetrics(data, side) {
   // ── M072: Oyuncu xG Katkısı ──
   let playerXG = 0;
   for (const p of starters) {
-    playerXG += p.seasonStats?.statistics?.expectedGoals || 0;
+    const xg = p.seasonStats?.statistics?.expectedGoals;
+    if (xg != null) playerXG += xg;
   }
-  const topScorerXG = Math.max(...starters.map(p => p.seasonStats?.statistics?.expectedGoals || 0), 0);
+  const xgArray = starters.map(p => p.seasonStats?.statistics?.expectedGoals).filter(x => x != null);
+  const topScorerXG = xgArray.length > 0 ? Math.max(...xgArray) : null;
   const M072 = playerXG > 0 ? topScorerXG / playerXG : null;
 
   // ── M073: Kilit Oyuncu Bağımlılık İndeksi ──
   // Temel hesap: kadro içinde en yüksek gol+asist katkısına sahip oyuncunun payı
   const playerContribs = starters.map(p => {
-    return (p.seasonStats?.statistics?.goals || 0) + (p.seasonStats?.statistics?.assists || 0);
-  });
+    const pg = p.seasonStats?.statistics?.goals;
+    const pa = p.seasonStats?.statistics?.assists;
+    return (pg == null && pa == null) ? null : (pg || 0) + (pa || 0);
+  }).filter(c => c != null);
   const maxContrib = Math.max(...playerContribs, 0);
   const baseM073 = totalContrib > 0 ? (maxContrib / totalContrib) * 100 : null;
 
@@ -203,7 +213,8 @@ function calculatePlayerMetrics(data, side) {
   if (topPlayersList.length > 0) {
     let starScoreSum = 0;
     for (const tp of topPlayersList) {
-      const rating = tp.statistics?.rating || 0;
+      const rating = tp.statistics?.rating;
+      if (rating == null) continue;
       const goals = tp.statistics?.goals || 0;
       const assists = tp.statistics?.assists || 0;
       // Yıldız kriter: rating > 8.0 → yüksek etki, goals > 10 → ek bonus
@@ -233,17 +244,29 @@ function calculatePlayerMetrics(data, side) {
   // ── M075: Pas Tamamlama Oranı ──
   let totalAccPass = 0, totalPass = 0;
   for (const p of starters) {
-    totalAccPass += p.seasonStats?.statistics?.accuratePasses || p.seasonStats?.statistics?.accuratePassesPercentage || 0;
-    totalPass += p.seasonStats?.statistics?.totalPasses || 0;
+    const pTotal = p.seasonStats?.statistics?.totalPasses ?? 0;
+    const pAcc = p.seasonStats?.statistics?.accuratePasses ?? null;
+    const pAccPct = p.seasonStats?.statistics?.accuratePassesPercentage ?? null;
+    totalPass += pTotal;
+    if (pAcc != null) {
+      totalAccPass += pAcc;
+    } else if (pAccPct != null && pTotal > 0) {
+      // Yüzde değerinden mutlak sayıya dönüştür
+      totalAccPass += Math.round(pTotal * pAccPct / 100);
+    }
   }
   const M075 = totalPass > 0 ? (totalAccPass / totalPass) * 100 : null;
 
   // ── M076: Hava Topu Gücü ──
   let totalAerialWon = 0, totalAerial = 0;
   for (const p of starters) {
-    totalAerialWon += p.seasonStats?.statistics?.aerialDuelsWon || 0;
-    totalAerial += (p.seasonStats?.statistics?.aerialDuelsWon || 0) +
-      (p.seasonStats?.statistics?.aerialDuelsLost || 0);
+    const aWon = p.seasonStats?.statistics?.aerialDuelsWon;
+    const aTotal = p.seasonStats?.statistics?.aerialDuelsTotal || 
+                  ((p.seasonStats?.statistics?.aerialDuelsWon || 0) + (p.seasonStats?.statistics?.aerialDuelsLost || 0));
+    if (aTotal > 0 && aWon != null) {
+      totalAerialWon += aWon;
+      totalAerial += aTotal;
+    }
   }
   const M076 = totalAerial > 0 ? (totalAerialWon / totalAerial) * 100 : null;
 
@@ -307,8 +330,8 @@ function calculatePlayerMetrics(data, side) {
 
   // ── M080: Dakika Dağılımı (Yorgunluk) ──
   const minutes = starters
-    .map(p => p.seasonStats?.statistics?.minutesPlayed || 0)
-    .filter(m => m > 0);
+    .map(p => p.seasonStats?.statistics?.minutesPlayed)
+    .filter(m => m != null && m > 0);
   const M080 = minutes.length > 1
     ? Math.max(...minutes) - Math.min(...minutes) : null;
 
@@ -365,9 +388,9 @@ function calculatePlayerMetrics(data, side) {
     }
   }
   // M087: Ham £ piyasa değerini log-scale ile 0-100'e normalize et
-  // log10(starterValue_M€ + 1) * 50 → 1M€≈15, 10M€≈35, 100M€≈65, 1000M€≈100
+  // log10(starterValue_M€ + 1) * 33.33 → 1M€≈10, 10M€≈23, 100M€≈43, 1000M€≈100
   const M087 = starterValue > 0
-    ? Math.min(100, Math.log10(starterValue / 1_000_000 + 1) * 50)
+    ? Math.min(100, Math.log10(starterValue / 1_000_000 + 1) * 33.33)
     : null;
   // M088: Yedek/Starter değer oranı — 1.0 = eşit güç, >1.0 = yedekler daha değerli
   const M088 = starterValue > 0 ? subValue / starterValue : null;
@@ -378,7 +401,7 @@ function calculatePlayerMetrics(data, side) {
   // M089 = playerH2HPresence * 100 → 0-100 scale
   // Fallback: h2hEvents yoksa veya lineup verisi yoksa M066 kullanılır (sezon rating bazlı)
   let M089;
-  const h2hEvents = data.h2hEvents || [];
+  const h2hEvents = data.h2hEvents?.events || [];
   const starterPlayerIdSet = new Set(starters.map(p => p.playerId).filter(Boolean));
 
   if (h2hEvents.length === 0 || starterPlayerIdSet.size === 0) {
@@ -526,6 +549,7 @@ function calculatePlayerMetrics(data, side) {
     M066, M067, M068, M069, M070, M071, M072, M073, M074, M075,
     M076, M077, M078, M079, M079b, M080, M081, M082, M083, M084, M085,
     M086, M087, M088, M089, M090, M091, M092, M093, M094, M095,
+    M178: M067,
     _meta: { starterCount: starters.length, subCount: subs.length, missingCount: teamMissing.length }
   };
 }

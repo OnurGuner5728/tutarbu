@@ -30,6 +30,8 @@ async function fetchAllMatchData(eventId) {
   const refereeId = event.referee?.id || null;
   const homeManagerId = event.homeTeam?.manager?.id || null;
   const awayManagerId = event.awayTeam?.manager?.id || null;
+  // SofaScore h2h/events endpoint'i customId (slug) ile çalışır, numeric ID ile değil
+  const eventCustomId = event.customId || eventId;
 
   console.log(`[DataFetcher] Match: ${event.homeTeam.name} vs ${event.awayTeam.name}`);
   console.log(`[DataFetcher] Tournament: ${tournamentId}, Season: ${seasonId}`);
@@ -43,18 +45,17 @@ async function fetchAllMatchData(eventId) {
   const matchLevelResults = await Promise.allSettled([
     api.getEventLineups(eventId),               // 0
     api.getEventH2H(eventId),                   // 1
-    api.getEventH2HEvents(eventId),             // 2
-    api.getTeamH2H(homeTeamId, awayTeamId),     // 3  ← team-level H2H history
-    api.getEventOdds(eventId),                  // 4
-    api.getEventMissingPlayers(eventId),        // 5
-    api.getEventStreaks(eventId),               // 6
-    api.getEventForm(eventId),                  // 7
-    api.getEventManagers(eventId),              // 8
-    api.getEventVotes(eventId),                 // 9
+    api.getEventH2HEvents(eventCustomId),       // 2 — customId (slug) gerektirir
+    api.getEventOdds(eventId),                  // 3
+    api.getEventMissingPlayers(eventId),        // 4
+    api.getEventStreaks(eventId),               // 5
+    api.getEventForm(eventId),                  // 6
+    api.getEventManagers(eventId),              // 7
+    api.getEventVotes(eventId),                 // 8
   ]);
 
   const matchLevelNames = [
-    'lineups', 'h2h', 'h2hEvents', 'teamH2H', 'odds', 'missingPlayers',
+    'lineups', 'h2h', 'h2hEvents', 'odds', 'missingPlayers',
     'streaks', 'form', 'managers', 'votes',
   ];
   matchLevelResults.forEach((r, i) => {
@@ -64,9 +65,10 @@ async function fetchAllMatchData(eventId) {
   });
 
   let [
-    lineups, h2h, h2hEvents, teamH2H, odds, missingPlayers,
+    lineups, h2h, h2hEvents, odds, missingPlayers,
     streaks, form, managers, votes
   ] = matchLevelResults.map(r => (r.status === 'fulfilled' ? r.value : null));
+  const teamH2H = null;
 
   // 3 + 4. Takım verileri — Ev sahibi ve deplasman (paralel)
   const teamLevelResults = await Promise.allSettled([
@@ -133,15 +135,18 @@ async function fetchAllMatchData(eventId) {
   }
 
   // 6. Hakem verisi
-  let refereeStats = null;
-  if (refereeId) {
-    refereeStats = await api.getRefereeStats(refereeId);
+  let refereeStats = refereeId ? (await api.getRefereeStats(refereeId).catch(() => null)) || null : null;
+  // Root event içindeki hakem verisini refereeStats'a ekle (Kariyer verisi burada mevcut)
+  if (event.referee && refereeId) {
+    if (!refereeStats) refereeStats = { statistics: {} };
+    refereeStats.eventReferee = event.referee; // Kariyer verilerini (games, yellowCards, redCards) taşıyan düğüm
   }
+  // Hakemin son maçları — M115/M116 (kırmızı kart bias), M118b (ev yanlılık), gol/maç verileri için
+  const refereeLastEvents = refereeId
+    ? (await api.getRefereeLastEvents(refereeId, 0).catch(() => null)) || null
+    : null;
 
   // 7. Menajer verileri
-  let homeManagerCareer = null;
-  let awayManagerCareer = null;
-
   // Manager ID'leri event'ten veya managers endpoint'ten al
   let actualHomeManagerId = homeManagerId;
   let actualAwayManagerId = awayManagerId;
@@ -157,12 +162,14 @@ async function fetchAllMatchData(eventId) {
     actualAwayManagerId = awayTeam.team.manager.id;
   }
 
-  if (actualHomeManagerId) {
-    homeManagerCareer = await api.getManagerCareer(actualHomeManagerId);
-  }
-  if (actualAwayManagerId) {
-    awayManagerCareer = await api.getManagerCareer(actualAwayManagerId);
-  }
+  // Manager son maçları — M139/M140 için (/manager/{id}/career 404 döner, son maçlar kullanılır)
+  const [homeManagerCareer, awayManagerCareer] = await Promise.all([
+    actualHomeManagerId ? api.getManagerLastEvents(actualHomeManagerId, 0).catch(() => null) : Promise.resolve(null),
+    actualAwayManagerId ? api.getManagerLastEvents(actualAwayManagerId, 0).catch(() => null) : Promise.resolve(null),
+  ]);
+
+  // 7b. H2H maçlarının kart/korner verilerini çek — M129/M130 için
+  const h2hMatchDetails = await fetchH2HMatchDetails(h2hEvents);
 
   // 8. Son maçların incident/stats verilerini çek (son 5 maç deep-dive)
   // Her iki sayfa birleştirilip sıralanarak gerçek son 5 maç alınır (cross-competition).
@@ -268,8 +275,7 @@ async function fetchAllMatchData(eventId) {
   const matchLevelUrls = {
     lineups: `/event/${eventId}/lineups`,
     h2h: `/event/${eventId}/h2h`,
-    h2hEvents: `/event/${eventId}/h2h/events`,
-    teamH2H: `/team/${homeTeamId}/head2head/${awayTeamId}`,
+    h2hEvents: `/event/${eventCustomId}/h2h/events`,
     odds: `/event/${eventId}/odds/1/all`,
     missingPlayers: `/event/${eventId}/missing-players`,
     streaks: `/event/${eventId}/team-streaks`,
@@ -299,6 +305,37 @@ async function fetchAllMatchData(eventId) {
         data: val,
       };
     }),
+    // Hakem son maçları
+    {
+      endpoint: 'refereeLastEvents',
+      url: refereeId ? `/referee/${refereeId}/events/last/0` : 'N/A (no referee)',
+      success: !!refereeLastEvents,
+      responseSize: refereeLastEvents ? JSON.stringify(refereeLastEvents).length : 0,
+      data: refereeLastEvents,
+    },
+    // Menajer kariyer
+    {
+      endpoint: 'homeManagerLastEvents',
+      url: actualHomeManagerId ? `/manager/${actualHomeManagerId}/events/last/0` : 'N/A (no manager)',
+      success: !!homeManagerCareer,
+      responseSize: homeManagerCareer ? JSON.stringify(homeManagerCareer).length : 0,
+      data: homeManagerCareer,
+    },
+    {
+      endpoint: 'awayManagerLastEvents',
+      url: actualAwayManagerId ? `/manager/${actualAwayManagerId}/events/last/0` : 'N/A (no manager)',
+      success: !!awayManagerCareer,
+      responseSize: awayManagerCareer ? JSON.stringify(awayManagerCareer).length : 0,
+      data: awayManagerCareer,
+    },
+    // H2H maç detayları (M129/M130)
+    {
+      endpoint: 'h2hMatchDetails',
+      url: `fetchH2HMatchDetails × ${h2hMatchDetails.length} maç`,
+      success: h2hMatchDetails.length > 0,
+      responseSize: JSON.stringify(h2hMatchDetails).length,
+      data: h2hMatchDetails,
+    },
     // Player stats summary entries (grouped by team, not per-player)
     {
       endpoint: 'homePlayerStats',
@@ -343,8 +380,8 @@ async function fetchAllMatchData(eventId) {
     awayTeam,
     homePlayers,
     awayPlayers,
-    homeLastEvents: mergeEventPages(homeLastEvents0, homeLastEvents1),
-    awayLastEvents: mergeEventPages(awayLastEvents0, awayLastEvents1),
+    homeLastEvents: mergeAndSortEvents(homeLastEvents0, homeLastEvents1),
+    awayLastEvents: mergeAndSortEvents(awayLastEvents0, awayLastEvents1),
 
     // Lig
     standingsTotal,
@@ -357,10 +394,12 @@ async function fetchAllMatchData(eventId) {
 
     // Hakem & Menajer
     refereeStats,
+    refereeLastEvents,
     homeManagerCareer,
     awayManagerCareer,
     homeManagerId: actualHomeManagerId,
     awayManagerId: actualAwayManagerId,
+    h2hMatchDetails,
 
     // Deep-dive
     homeRecentMatchDetails,
@@ -376,40 +415,34 @@ async function fetchAllMatchData(eventId) {
   };
 
   // Hava durumu (stadyum koordinatları ve tarih var ise)
-  try {
-    if (eventData.event && eventData.event.startTimestamp) {
-      const ts = eventData.event.startTimestamp * 1000;
-      const d = new Date(ts);
-      const matchDate = d.toISOString().split('T')[0];
-      const matchHour = d.getHours();
-      let lat, lon;
-      
-      // SofaScore verisinde stadyum konumu
-      if (eventData.event.venue && eventData.event.venue.coordinates) {
-         lat = eventData.event.venue.coordinates.latitude;
-         lon = eventData.event.venue.coordinates.longitude;
-      } else if (eventData.event.venue?.city?.location) {
-         lat = eventData.event.venue.city.location.latitude;
-         lon = eventData.event.venue.city.location.longitude;
-      }
-      
-      // Şimdilik default bir konum (Londra) kullan (stadyum koordinatsız maçlar için bypass etme)
-      if (!lat || !lon) {
-         lat = 51.5074;
-         lon = -0.1278;
-      }
-      
-      if (lat && lon) {
-        // Asenkron olarak hava durumunu çekip beklemeden döndürebiliriz ama
-        // Metrik hesaplaması hemen olacağı için beklememiz lazım.
-        const weatherRaw = await fetchWeatherData(lat, lon, matchDate, matchHour);
-        if (weatherRaw) {
-           result.weatherMetrics = computeWeatherMetrics(weatherRaw);
-        }
-      }
+  let weatherPromise = Promise.resolve(null);
+  if (eventData.event && eventData.event.startTimestamp) {
+    const ts = eventData.event.startTimestamp * 1000;
+    const d = new Date(ts);
+    const matchDate = d.toISOString().split('T')[0];
+    const matchHour = d.getHours();
+    let lat, lon;
+    
+    if (eventData.event.venue && eventData.event.venue.venueCoordinates) {
+       lat = eventData.event.venue.venueCoordinates.latitude;
+       lon = eventData.event.venue.venueCoordinates.longitude;
+    } else if (eventData.event.venue?.city?.location) {
+       lat = eventData.event.venue.city.location.latitude;
+       lon = eventData.event.venue.city.location.longitude;
     }
-  } catch (err) {
-    console.warn('[DataFetcher] Weather fetch failed:', err.message);
+    
+    if (lat && lon) {
+      weatherPromise = fetchWeatherData(lat, lon, matchDate, matchHour).catch(err => {
+        console.warn('[DataFetcher] Weather fetch failed:', err.message);
+        return null;
+      });
+    }
+  }
+
+  // Final merge (Hava durumu zaten paralel gidiyor)
+  const weatherRaw = await weatherPromise;
+  if (weatherRaw) {
+    result.weatherMetrics = computeWeatherMetrics(weatherRaw);
   }
 
   return result;
@@ -428,15 +461,16 @@ async function fetchRecentMatchDetails(eventsArray, count = 5) {
     .filter(e => e.status?.type === 'finished')
     .slice(0, count);
 
-  const details = [];
-  for (const ev of recentFinished) {
-    const incidents = await api.getEventIncidents(ev.id);
-    const stats = await api.getEventStats(ev.id);
-    const shotmap = await api.getEventShotmap(ev.id);
-    const graph = await api.getEventGraph(ev.id);
-    const lineups = await api.getEventLineups(ev.id);
+  const details = await Promise.all(recentFinished.map(async (ev) => {
+    const [incidents, stats, shotmap, graph, lineups] = await Promise.all([
+      api.getEventIncidents(ev.id).catch(() => null),
+      api.getEventStats(ev.id).catch(() => null),
+      api.getEventShotmap(ev.id).catch(() => null),
+      api.getEventGraph(ev.id).catch(() => null),
+      api.getEventLineups(ev.id).catch(() => null),
+    ]);
 
-    details.push({
+    return {
       eventId: ev.id,
       homeTeam: ev.homeTeam,
       awayTeam: ev.awayTeam,
@@ -449,8 +483,8 @@ async function fetchRecentMatchDetails(eventsArray, count = 5) {
       shotmap,
       graph,
       lineups,
-    });
-  }
+    };
+  }));
   return details;
 }
 
@@ -467,53 +501,95 @@ async function fetchPlayerStats(players, tournamentId, seasonId) {
 
   const stats = [];
   const log = [];
+  const batchSize = 5;
 
-  for (const p of targetPlayers) {
-    const playerId = p.player?.id;
-    if (!playerId) continue;
+  for (let i = 0; i < targetPlayers.length; i += batchSize) {
+    const batch = targetPlayers.slice(i, i + batchSize);
+    
+    await Promise.all(batch.map(async (p) => {
+      const playerId = p.player?.id;
+      if (!playerId) return;
 
-    const t0 = Date.now();
-    const [seasonStats, attributes, characteristics] = await Promise.all([
-      api.getPlayerSeasonStats(playerId, tournamentId, seasonId).catch(() => null),
-      api.getPlayerAttributes(playerId).catch(() => null),
-      api.getPlayerCharacteristics(playerId).catch(() => null),
-    ]);
-    const duration = Date.now() - t0;
+      const t0 = Date.now();
+      const [seasonStats, attributes, characteristics] = await Promise.all([
+        api.getPlayerSeasonStats(playerId, tournamentId, seasonId).catch(() => null),
+        api.getPlayerAttributes(playerId).catch(() => null),
+        api.getPlayerCharacteristics(playerId).catch(() => null),
+      ]);
+      const duration = Date.now() - t0;
 
-    stats.push({
-      playerId,
-      name: p.player.name,
-      position: p.player.position || p.position,
-      shirtNumber: p.shirtNumber,
-      substitute: p.substitute || false,
-      seasonStats,
-      attributes,
-      characteristics,
-    });
+      stats.push({
+        playerId,
+        name: p.player.name,
+        position: p.player.position || p.position,
+        shirtNumber: p.shirtNumber,
+        substitute: p.substitute || false,
+        seasonStats,
+        attributes,
+        characteristics,
+      });
 
-    log.push({
-      playerId,
-      name: p.player.name,
-      substitute: p.substitute || false,
-      durationMs: duration,
-      hasSeasonStats: !!seasonStats,
-      hasAttributes: !!attributes,
-      hasCharacteristics: !!characteristics,
-      rating: seasonStats?.statistics?.rating ?? null,
-    });
+      log.push({
+        playerId,
+        name: p.player.name,
+        substitute: p.substitute || false,
+        durationMs: duration,
+        hasSeasonStats: !!seasonStats,
+        hasAttributes: !!attributes,
+        hasCharacteristics: !!characteristics,
+        rating: seasonStats?.statistics?.rating ?? null,
+      });
+    }));
   }
   return { stats, log };
 }
 
 /**
- * İki sayfa event verisini birleştirir ve startTimestamp'e göre azalan sırada döner.
- * Tüm turnuvalardan (lig, kupa, Avrupa) gerçek kronolojik sıra korunur.
+ * H2H maçlarının kart ve korner verilerini çeker — M129/M130 için.
+ * h2hEvents.events içindeki son 5 bitmiş maçın incidents + statistics'ini çeker,
+ * her event'e { incidents, statistics } olarak gömülü döner.
  */
-function mergeEventPages(page0, page1) {
-  const events0 = page0?.events || [];
-  const events1 = page1?.events || [];
-  return [...events0, ...events1].sort((a, b) => (b.startTimestamp || 0) - (a.startTimestamp || 0));
+async function fetchH2HMatchDetails(h2hEventsData) {
+  const events = h2hEventsData?.events || [];
+  const finished = events
+    .filter(e => e.status?.type === 'finished' || e.homeScore?.current != null)
+    .slice(0, 5);
+
+  const details = await Promise.all(finished.map(async (ev) => {
+    const [incidentsData, statsData] = await Promise.all([
+      api.getEventIncidents(ev.id).catch(() => null),
+      api.getEventStats(ev.id).catch(() => null),
+    ]);
+
+    // İstatistikleri düzleştir
+    const statsArr = statsData?.statistics || [];
+    const allPeriod = statsArr.find(p => p.period === 'ALL') || statsArr[0] || null;
+    const flatStats = [];
+    for (const group of (allPeriod?.groups || [])) {
+      for (const item of (group.statisticsItems || [])) {
+        flatStats.push({
+          name: item.name,
+          homeValue: item.homeValue ?? item.home ?? null,
+          awayValue: item.awayValue ?? item.away ?? null,
+        });
+      }
+    }
+
+    return {
+      eventId: ev.id,
+      homeTeamId: ev.homeTeam?.id,
+      awayTeamId: ev.awayTeam?.id,
+      homeScore: ev.homeScore,
+      awayScore: ev.awayScore,
+      incidents: incidentsData?.incidents || [],
+      statistics: flatStats,
+    };
+  }));
+
+  return details;
 }
+
+
 
 /**
  * İki sayfa event verisini birleştirip startTimestamp'e göre azalan sırada

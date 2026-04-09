@@ -68,6 +68,8 @@ function calculateAllMetrics(data) {
     homeMomentum, awayMomentum,
     leagueAvgGoals,
     homeFormation, awayFormation,
+    homeMatchCount: data.homeLastEvents?.length || 0,
+    awayMatchCount: data.awayLastEvents?.length || 0,
   });
 
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
@@ -120,13 +122,14 @@ function calculateAllMetrics(data) {
 
 function countMetrics(groups) {
   let count = 0;
+  const metricRegex = /^M[0-9]{3}[a-z]?$/i;
   for (const [key, group] of Object.entries(groups)) {
     if (typeof group !== 'object' || !group) continue;
     for (const [k, v] of Object.entries(group)) {
-      if (k.startsWith('M') && k.length === 4 && !isNaN(k.slice(1))) count++;
+      if (metricRegex.test(k)) count++;
       if (k === 'home' || k === 'away') {
         for (const [kk] of Object.entries(v || {})) {
-          if (kk.startsWith('M') && kk.length === 4) count++;
+          if (metricRegex.test(kk)) count++;
         }
       }
     }
@@ -137,7 +140,7 @@ function countMetrics(groups) {
 function computeLeagueAvgGoals(standingsTotal) {
   const rows = standingsTotal?.standings?.[0]?.rows || [];
   if (rows.length < 4) return null; // Yeterli veri yok, fallback kullanılmaz
-  const totalGoals = rows.reduce((s, r) => s + (r.scoresFor || 0), 0);
+  const totalGoals = rows.reduce((s, r) => s + (r.scoresFor || r.goalsFor || 0), 0);
   const totalGames = rows.reduce((s, r) => s + (r.played || 0), 0);
   return totalGames > 0 ? totalGoals / totalGames : null;
 }

@@ -22,6 +22,8 @@ export default function App() {
   const [originalLineupIds, setOriginalLineupIds] = useState({ home: new Set(), away: new Set() });
   const [swapMode, setSwapMode] = useState(null);
   const [debugEventId, setDebugEventId] = useState(null);
+  // Match detail modal (form & H2H click-to-expand)
+  const [matchDetail, setMatchDetail] = useState(null); // { event, incidents, stats, loading }
   // Form & H2H pagination
   const [h2hAll, setH2hAll] = useState([]);
   const [homeFormAll, setHomeFormAll] = useState([]);
@@ -165,6 +167,18 @@ export default function App() {
       }
     } catch (e) {
       console.error('loadMoreEvents failed', e);
+    }
+  };
+
+  const openMatchDetail = async (eventId, eventSnapshot) => {
+    if (!eventId) return;
+    setMatchDetail({ event: eventSnapshot, incidents: [], stats: [], loading: true });
+    try {
+      const res = await fetch(`/api/match-events/${eventId}`);
+      const data = res.ok ? await res.json() : { incidents: [], stats: [] };
+      setMatchDetail({ event: eventSnapshot, incidents: data.incidents || [], stats: data.stats || [], loading: false });
+    } catch {
+      setMatchDetail({ event: eventSnapshot, incidents: [], stats: [], loading: false });
     }
   };
 
@@ -594,18 +608,31 @@ export default function App() {
                       )}
                       
                       <div className="match-history-list">
-                        {h2hAll.length > 0 ? h2hAll.slice(0, h2hShown).map((m, i) => (
-                          <div key={i} className="history-row">
-                            <div className="history-date">{m.startTimestamp ? m.startTimestamp.split('T')[0] : ''}</div>
-                            <div className="history-teams">
-                              <span className="history-team home">{m.homeTeam?.name || m.homeTeam}</span>
-                              <span className="history-score">{m.homeScore?.current ?? '-'} : {m.awayScore?.current ?? '-'}</span>
-                              <span className="history-team away">{m.awayTeam?.name || m.awayTeam}</span>
+                        {h2hAll.length > 0 ? h2hAll.slice(0, h2hShown).map((m, i) => {
+                          const homeTeamName = prediction.match?.homeTeam;
+                          const isCurrentHome = m.homeTeam?.name === homeTeamName || m.homeTeam === homeTeamName;
+                          const hs = m.homeScore?.current ?? null;
+                          const as = m.awayScore?.current ?? null;
+                          let res = 'D';
+                          if (hs != null && as != null) {
+                            if (hs > as) res = isCurrentHome ? 'W' : 'L';
+                            else if (hs < as) res = isCurrentHome ? 'L' : 'W';
+                          }
+                          const dateStr = m.startTimestamp ? m.startTimestamp.split('T')[0] : '';
+                          return (
+                            <div key={i} className="history-row clickable-row" onClick={() => openMatchDetail(m.id, m)}>
+                              <div className={`f-badge ${res}`} style={{marginRight: '6px', flexShrink: 0}}>{res}</div>
+                              <div className="history-date">{dateStr}</div>
+                              <div className="history-teams">
+                                <span className={`history-team home${isCurrentHome ? ' bold' : ''}`}>{m.homeTeam?.name || m.homeTeam}</span>
+                                <span className="history-score">{hs ?? '-'} : {as ?? '-'}</span>
+                                <span className={`history-team away${!isCurrentHome ? ' bold' : ''}`}>{m.awayTeam?.name || m.awayTeam}</span>
+                              </div>
                             </div>
-                          </div>
-                        )) : (
+                          );
+                        }) : (
                           <div className="history-row" style={{justifyContent: 'center', color: 'var(--text-secondary)'}}>
-                            Son dönemde aralarında resmi maç bulunmuyor.
+                            Aralarında geçmiş maç verisi bulunamadı.
                           </div>
                         )}
                         {h2hAll.length > h2hShown && (
@@ -633,7 +660,7 @@ export default function App() {
                         </div>
                         <div className="match-history-list">
                           {homeFormAll.slice(0, homeFormShown).map((m, i) => (
-                            <div key={i} className="history-row">
+                            <div key={i} className="history-row clickable-row" onClick={() => openMatchDetail(m.id, m)}>
                               <div className="history-date">{m.startTimestamp ? m.startTimestamp.split('T')[0] : ''}</div>
                               <div className="history-teams">
                                 <span className={`history-team home ${(m.homeTeam?.name === prediction.match?.homeTeam || m.homeTeam === prediction.match?.homeTeam) ? 'bold' : ''}`}>{m.homeTeam?.name || m.homeTeam}</span>
@@ -668,7 +695,7 @@ export default function App() {
                         </div>
                         <div className="match-history-list">
                           {awayFormAll.slice(0, awayFormShown).map((m, i) => (
-                            <div key={i} className="history-row">
+                            <div key={i} className="history-row clickable-row" onClick={() => openMatchDetail(m.id, m)}>
                               <div className="history-date">{m.startTimestamp ? m.startTimestamp.split('T')[0] : ''}</div>
                               <div className="history-teams">
                                 <span className={`history-team home ${(m.homeTeam?.name === prediction.match?.awayTeam || m.homeTeam === prediction.match?.awayTeam) ? 'bold' : ''}`}>{m.homeTeam?.name || m.homeTeam}</span>
@@ -982,6 +1009,9 @@ export default function App() {
             <h3>Select a match from the sidebar to begin analysis</h3>
           </div>
         )}
+      {matchDetail && (
+        <MatchDetailModal detail={matchDetail} onClose={() => setMatchDetail(null)} />
+      )}
       </main>
     </div>
   );
@@ -1107,6 +1137,171 @@ function LineupColumn({ title, players, icon, side, swapMode, onSwapMode, onSwap
               ))}
             </div>
           </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ─── Match Detail Modal ─────────────────────────────────────── */
+function MatchDetailModal({ detail, onClose }) {
+  const { event, incidents, stats, loading } = detail;
+  const homeTeam = event?.homeTeam?.name || event?.homeTeam || '?';
+  const awayTeam = event?.awayTeam?.name || event?.awayTeam || '?';
+  const hs = event?.homeScore?.current ?? '-';
+  const as = event?.awayScore?.current ?? '-';
+  const dateStr = event?.startTimestamp ? event.startTimestamp.split('T')[0] : '';
+  const comp = event?.tournament?.uniqueTournament?.name || event?.tournament?.name || '';
+
+  // Group incidents by type for clean rendering
+  const goals = [];
+  const cards = [];
+  const subs = [];
+  const penalties = [];
+  const varDecisions = [];
+
+  for (const inc of incidents) {
+    const type = inc.incidentType;
+    const cls  = inc.incidentClass;
+    if (type === 'goal') {
+      if (cls === 'penalty') penalties.push(inc);
+      else goals.push(inc);
+    } else if (type === 'card') {
+      cards.push(inc);
+    } else if (type === 'substitution') {
+      subs.push(inc);
+    } else if (type === 'varDecision') {
+      varDecisions.push(inc);
+    }
+  }
+
+  // Sort all events by minute
+  const timeline = [...incidents].filter(i =>
+    ['goal','card','substitution','varDecision'].includes(i.incidentType)
+  ).sort((a, b) => (a.time ?? 0) - (b.time ?? 0));
+
+  function incidentIcon(inc) {
+    const type = inc.incidentType;
+    const cls  = inc.incidentClass;
+    if (type === 'goal') {
+      if (cls === 'ownGoal') return '⚽ OG';
+      if (cls === 'penalty') return '⚽ P';
+      return '⚽';
+    }
+    if (type === 'card') {
+      if (cls === 'yellowCard')     return <span style={{color:'#f7dc6f'}}>🟨</span>;
+      if (cls === 'redCard')        return <span style={{color:'#e74c3c'}}>🟥</span>;
+      if (cls === 'yellowRedCard')  return <span style={{color:'#e67e22'}}>🟨🟥</span>;
+    }
+    if (type === 'substitution') return '🔄';
+    if (type === 'varDecision') return '📺';
+    return '•';
+  }
+
+  function playerName(inc) {
+    if (inc.player?.name) return inc.player.name;
+    if (inc.playerName) return inc.playerName;
+    return '—';
+  }
+
+  function assistName(inc) {
+    if (inc.assist1?.name) return inc.assist1.name;
+    if (inc.assistName) return inc.assistName;
+    return null;
+  }
+
+  // Stats table — all rows from flat stats array (server already flattened)
+  const statRows = stats.slice(0, 24);
+
+  return (
+    <div className="match-detail-overlay" onClick={onClose}>
+      <div className="match-detail-modal" onClick={e => e.stopPropagation()}>
+        <button className="match-detail-close" onClick={onClose}>✕</button>
+
+        {/* Header */}
+        <div className="match-detail-header">
+          {comp && <div className="match-detail-comp">{comp}</div>}
+          <div className="match-detail-score-row">
+            <span className="match-detail-team">{homeTeam}</span>
+            <span className="match-detail-score">{hs} — {as}</span>
+            <span className="match-detail-team">{awayTeam}</span>
+          </div>
+          {dateStr && <div className="match-detail-date">{dateStr}</div>}
+        </div>
+
+        {loading ? (
+          <div className="match-detail-loading">Yükleniyor...</div>
+        ) : (
+          <div className="match-detail-body">
+            {/* Timeline */}
+            {timeline.length > 0 && (
+              <div className="match-detail-section">
+                <div className="match-detail-section-title">Olaylar</div>
+                <div className="match-detail-timeline">
+                  {timeline.map((inc, i) => {
+                    const isHome = inc.isHome;
+                    const name = playerName(inc);
+                    const assist = assistName(inc);
+                    const icon = incidentIcon(inc);
+                    const minute = inc.time != null ? `${inc.time}'` : '';
+                    const addedTime = inc.addedTime ? `+${inc.addedTime}` : '';
+                    return (
+                      <div key={i} className={`timeline-row ${isHome ? 'home-side' : 'away-side'}`}>
+                        {isHome ? (
+                          <>
+                            <span className="tl-name">{name}{assist ? <span className="tl-assist"> ({assist})</span> : null}</span>
+                            <span className="tl-icon">{icon}</span>
+                            <span className="tl-minute">{minute}{addedTime}</span>
+                            <span className="tl-spacer" />
+                          </>
+                        ) : (
+                          <>
+                            <span className="tl-spacer" />
+                            <span className="tl-minute">{minute}{addedTime}</span>
+                            <span className="tl-icon">{icon}</span>
+                            <span className="tl-name">{name}{assist ? <span className="tl-assist"> ({assist})</span> : null}</span>
+                          </>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Stats */}
+            {statRows.length > 0 && (
+              <div className="match-detail-section">
+                <div className="match-detail-section-title">İstatistikler</div>
+                <div className="match-detail-stats">
+                  {statRows.map((s, i) => {
+                    const label = s.name || s.key || s.statisticsType || '';
+                    const hv = s.homeValue ?? s.home ?? '-';
+                    const av = s.awayValue ?? s.away ?? '-';
+                    const hNum = parseFloat(hv);
+                    const aNum = parseFloat(av);
+                    const total = hNum + aNum;
+                    const hPct = total > 0 ? (hNum / total) * 100 : 50;
+                    return (
+                      <div key={i} className="stat-row-detail">
+                        <span className="stat-val-home">{hv}</span>
+                        <div className="stat-bar-wrap">
+                          <div className="stat-bar-home" style={{width: `${hPct}%`}} />
+                          <span className="stat-label-center">{label}</span>
+                          <div className="stat-bar-away" style={{width: `${100-hPct}%`}} />
+                        </div>
+                        <span className="stat-val-away">{av}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {timeline.length === 0 && statRows.length === 0 && (
+              <div className="match-detail-empty">Bu maç için detay verisi bulunamadı.</div>
+            )}
+          </div>
         )}
       </div>
     </div>

@@ -11,8 +11,8 @@ function calculateH2HMetrics(data) {
 
   if (!h2h && !h2hEvents) return createEmptyH2HMetrics();
 
-  // ── M119-M121: Galibiyet Dağılımı ──
-  const teamDuel = h2h?.teamDuel || h2h?.h2h || {};
+  // ── M119-M121: Galibiyet Dağılımı — /event/:id/h2h endpoint'inden gelen teamDuel
+  const teamDuel = h2h?.teamDuel || {};
   const _m119Raw = teamDuel.homeWins ?? teamDuel.team1Wins;
   const _m120Raw = teamDuel.draws;
   const _m121Raw = teamDuel.awayWins ?? teamDuel.team2Wins;
@@ -20,30 +20,14 @@ function calculateH2HMetrics(data) {
   const M120 = (_m120Raw != null) ? _m120Raw : null;
   const M121 = (_m121Raw != null) ? _m121Raw : null;
 
-  // H2H Events analizi — çoklu kaynak ile fallback zinciri
-  let events = h2hEvents?.events || [];
-  if (events.length === 0) {
-    events = data.teamH2H?.events || data.teamH2H?.previousEvents || data.teamH2H?.teamDuel?.events || [];
-  }
-  if (events.length === 0) {
-    events = h2h?.events || h2h?.previousEvents || h2h?.lastH2H || [];
-  }
-  // FALLBACK: Her iki takımın son maçlarını tara
-  if (events.length === 0) {
-    const homeLast = Array.isArray(data.homeLastEvents) ? data.homeLastEvents : [];
-    const awayLast = Array.isArray(data.awayLastEvents) ? data.awayLastEvents : [];
-    const merged = [...homeLast, ...awayLast];
-    const seenIds = new Set();
-    events = merged.filter(ev => {
-      if (!ev || seenIds.has(ev.id)) return false;
-      seenIds.add(ev.id);
-      const isHomeTeamPresent = ev.homeTeam?.id === homeTeamId || ev.awayTeam?.id === homeTeamId;
-      const isAwayTeamPresent = ev.homeTeam?.id === awayTeamId || ev.awayTeam?.id === awayTeamId;
-      return isHomeTeamPresent && isAwayTeamPresent;
-    });
-  }
+  // H2H Events — yalnızca /event/:id/h2h/events endpoint'inden
+  const events = h2hEvents?.events || [];
 
-  const last5H2H = events.slice(0, 5);
+  // Sadece skoru belli bitmiş maçları al (upcoming maç kendisi filtrelenir)
+  const finishedForForm = events.filter(e =>
+    e.homeScore?.current != null && e.awayScore?.current != null
+  );
+  const last5H2H = finishedForForm.slice(0, 5);
 
   // ── M122: Son 5 H2H'de Ev Sahibi Performansı ──
   let homePoints = 0, m122Valid = 0;
@@ -98,19 +82,23 @@ function calculateH2HMetrics(data) {
   const M125 = m125Valid > 0 ? (h2hBTTS / m125Valid) * 100 : null;
 
   // ── M126: Son Maç Skoru Etkisi ──
+  // events[0] upcoming maç olabilir (henüz oynanmamış); sadece bitmiş maçlara bak.
   let M126 = null;
-  if (events.length > 0) {
-    const lastMatch = events[0];
+  const finishedEvents = events.filter(e =>
+    e.homeScore?.current != null && e.awayScore?.current != null
+  );
+  if (finishedEvents.length > 0) {
+    const lastMatch = finishedEvents[0];
     const isLastHome = lastMatch.homeTeam?.id === homeTeamId;
     const scored = isLastHome
-      ? (lastMatch.homeScore?.current ?? null) : (lastMatch.awayScore?.current ?? null);
+      ? lastMatch.homeScore.current : lastMatch.awayScore.current;
     const conceded = isLastHome
-      ? (lastMatch.awayScore?.current ?? null) : (lastMatch.homeScore?.current ?? null);
-    if (scored != null && conceded != null) M126 = scored - conceded;
+      ? lastMatch.awayScore.current : lastMatch.homeScore.current;
+    M126 = scored - conceded;
   }
 
-  // ── M127: Menajer H2H Galibiyet Oranı ──
-  const managerH2H = h2h?.managerDuel || h2h?.managerH2h || {};
+  // ── M127: Menajer H2H Galibiyet Oranı — /event/:id/h2h endpoint'inden
+  const managerH2H = h2h?.managerDuel || {};
   const mgr1Wins = managerH2H.homeWins ?? managerH2H.manager1Wins ?? managerH2H.homeManagerWins ?? null;
   const mgr2Wins = managerH2H.awayWins ?? managerH2H.manager2Wins ?? managerH2H.awayManagerWins ?? null;
   const mgrDraws = managerH2H.draws ?? null;
@@ -120,8 +108,8 @@ function calculateH2HMetrics(data) {
 
   // ── M128: H2H Gol Farkı Trendi ──
   let goalDiffTrend = 0, m128Valid = 0;
-  for (let i = 0; i < Math.min(5, events.length); i++) {
-    const ev = events[i];
+  for (let i = 0; i < Math.min(5, finishedForForm.length); i++) {
+    const ev = finishedForForm[i];
     const isEvHome = ev.homeTeam?.id === homeTeamId;
     const teamGoals = isEvHome ? (ev.homeScore?.current ?? null) : (ev.awayScore?.current ?? null);
     const oppGoals = isEvHome ? (ev.awayScore?.current ?? null) : (ev.homeScore?.current ?? null);
@@ -131,47 +119,63 @@ function calculateH2HMetrics(data) {
   }
   const M128 = m128Valid > 0 ? goalDiffTrend / m128Valid : null;
 
-  // ── M129: H2H Kart Ortalaması (gerçek incident verilerinden) ──
-  // ── M130: H2H Korner Ortalaması (gerçek incident verilerinden) ──
+  // ── M129: H2H Kart Ortalaması ──
+  // ── M130: H2H Korner Ortalaması ──
+  // data.h2hMatchDetails'ten gelir (data-fetcher tarafından ayrı ayrı çekilen incidents/stats).
+  // Yoksa h2hEvents içindeki gömülü veriyi fallback olarak dener.
+  const h2hMatchDetails = data.h2hMatchDetails || [];
+
   let totalH2HCards = 0;
   let totalH2HCorners = 0;
   let matchesWithIncidents = 0;
 
-  for (const ev of events) {
-    let matchCards = 0;
-    let matchCorners = 0;
-    let foundData = false;
+  // Her maç için önce h2hMatchDetails'ten ara, yoksa event'in kendi incidents/statistics'ine bak
+  const eventsToScan = events.slice(0, 5);
+  for (const ev of eventsToScan) {
+    const detail = h2hMatchDetails.find(d => d.eventId === ev.id);
+    let matchCards = 0, matchCorners = 0, foundData = false;
 
-    // Önce incidents dizisini kontrol et
-    if (Array.isArray(ev.incidents) && ev.incidents.length > 0) {
-      for (const inc of ev.incidents) {
-        if (inc.incidentType === 'card') {
-          matchCards++;
+    // 1. h2hMatchDetails'ten (ayrı çekilen incidents)
+    if (detail) {
+      for (const inc of (detail.incidents || [])) {
+        if (inc.incidentType === 'card') { matchCards++; foundData = true; }
+      }
+      for (const stat of (detail.statistics || [])) {
+        const name = (stat.name || '').toLowerCase();
+        if (name.includes('corner kick') || name === 'corner kicks') {
+          const h = Number(stat.homeValue ?? 0);
+          const a = Number(stat.awayValue ?? 0);
+          matchCorners += h + a;
           foundData = true;
-        } else if (
-          inc.incidentType === 'corner' ||
-          (typeof inc.description === 'string' && inc.description.toLowerCase().includes('corner'))
-        ) {
-          matchCorners++;
+        }
+        if (!name.includes('corner') && (name.includes('yellow card') || name.includes('red card'))) {
+          const h = Number(stat.homeValue ?? 0);
+          const a = Number(stat.awayValue ?? 0);
+          matchCards += h + a;
           foundData = true;
         }
       }
     }
 
-    // incidents yoksa ya da boşsa statistics dizisini dene
-    if (!foundData && Array.isArray(ev.statistics) && ev.statistics.length > 0) {
-      for (const stat of ev.statistics) {
-        const name = (stat.name || stat.type || stat.statisticsType || '').toLowerCase();
-        if (name.includes('yellow card') || name.includes('red card') || name === 'cards') {
-          const home = Number(stat.homeValue ?? stat.home ?? 0);
-          const away = Number(stat.awayValue ?? stat.away ?? 0);
-          matchCards += home + away;
-          foundData = true;
-        } else if (name.includes('corner')) {
-          const home = Number(stat.homeValue ?? stat.home ?? 0);
-          const away = Number(stat.awayValue ?? stat.away ?? 0);
-          matchCorners += home + away;
-          foundData = true;
+    // 2. Gömülü incidents/statistics (nadiren dolu gelir)
+    if (!foundData) {
+      if (Array.isArray(ev.incidents) && ev.incidents.length > 0) {
+        for (const inc of ev.incidents) {
+          if (inc.incidentType === 'card') { matchCards++; foundData = true; }
+          if (inc.incidentType === 'corner') { matchCorners++; foundData = true; }
+        }
+      }
+      if (!foundData && Array.isArray(ev.statistics) && ev.statistics.length > 0) {
+        for (const stat of ev.statistics) {
+          const name = (stat.name || '').toLowerCase();
+          if (name.includes('corner')) {
+            matchCorners += Number(stat.homeValue ?? 0) + Number(stat.awayValue ?? 0);
+            foundData = true;
+          }
+          if (name.includes('yellow card') || name.includes('red card')) {
+            matchCards += Number(stat.homeValue ?? 0) + Number(stat.awayValue ?? 0);
+            foundData = true;
+          }
         }
       }
     }
@@ -189,6 +193,13 @@ function calculateH2HMetrics(data) {
   return {
     M119, M120, M121, M122, M123, M124, M125, M126, M127, M128,
     M129, M130,
+    // --- New Advanced H2H Metrics (M18x Series) ---
+    M183: M123,
+    M184: M124,
+    M185: M125,
+    M187: M127,
+    M188: M128,
+    M189: M129,
     _meta: {
       totalH2HMatches: events.length,
       homeTeamH2HWins: M119,

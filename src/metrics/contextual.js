@@ -13,58 +13,87 @@ function calculateContextualMetrics(data) {
   const homePlayers = data.homePlayers;
   const awayPlayers = data.awayPlayers;
 
+  // ── Bahis Oranı Yardımcısı ──
+  // SofaScore bazen decimalValue, bazen fractionalValue döndürür.
+  // fractionalValue: "163/100" → decimal = (163+100)/100 = 2.63
+  function parseOddsDecimal(choice) {
+    if (choice.decimalValue != null) {
+      const d = parseFloat(choice.decimalValue);
+      return (!isNaN(d) && d > 1) ? d : null;
+    }
+    if (choice.fractionalValue != null) {
+      const parts = String(choice.fractionalValue).split('/');
+      if (parts.length !== 2) return null;
+      const num = parseFloat(parts[0]);
+      const den = parseFloat(parts[1]);
+      if (isNaN(num) || isNaN(den) || den === 0) return null;
+      return (num + den) / den;
+    }
+    return null;
+  }
+
   // ── M131-M134: Bahis Oranı İma Edilen Olasılıklar ──
   let M131 = null, M132 = null, M133 = null, M134 = null;
   let M134b = null, M134c = null, ahLine = null;
 
+  // Ev takımı adı (AH choice name eşleşmesi için)
+  const homeTeamName = (event?.homeTeam?.name || '').toLowerCase();
+
   const markets = odds?.markets || [];
   for (const market of markets) {
-    if (market.marketId === 1 || market.marketName === '1X2' || market.marketName === 'Full time') {
+    const mId = market.marketId;
+    const mName = (market.marketName || '').toLowerCase();
+
+    // 1X2 (Full time)
+    if (mId === 1 || mName === '1x2' || mName === 'full time') {
       for (const choice of (market.choices || [])) {
-        const decimal = parseFloat(choice.decimalValue) || 0;
-        if (decimal > 0) {
+        const decimal = parseOddsDecimal(choice);
+        if (decimal != null) {
           if (choice.name === '1') M131 = (1 / decimal) * 100;
           if (choice.name === 'X') M132 = (1 / decimal) * 100;
           if (choice.name === '2') M133 = (1 / decimal) * 100;
         }
       }
     }
-    if (market.marketId === 11 || market.marketName === 'Over/Under') {
+
+    // Over/Under 2.5 — marketId=9 (choiceGroup="2.5") veya marketId=11 veya marketName içerir
+    const isMatchGoals = mId === 9 || mId === 11 || mName.includes('over/under') || mName.includes('match goals');
+    if (isMatchGoals) {
+      const cg = String(market.choiceGroup ?? '');
+      const is25 = cg === '2.5' || cg === '2,5';
+      // choiceGroup bilgisi yoksa sadece 'Over 2.5' isimli choice'ı al
       for (const choice of (market.choices || [])) {
-        const decimal = parseFloat(choice.decimalValue) || 0;
-        if (decimal > 0 && (choice.name === 'Over 2.5' || choice.name === 'Over')) {
-          M134 = (1 / decimal) * 100;
-        }
+        const decimal = parseOddsDecimal(choice);
+        if (decimal == null) continue;
+        const isOver = choice.name === 'Over 2.5' || (choice.name === 'Over' && is25);
+        if (isOver) M134 = (1 / decimal) * 100;
       }
     }
-  }
 
-  // ── M134b: Asian Handicap İma Edilen Olasılık (Ev Sahibi) ──
-  // AH hat 0 ise dengeli maç; negatif hat → ev sahibi favori
-  for (const market of markets) {
-    const mName = (market.marketName || '').toLowerCase();
-    const mId = market.marketId;
-
-    // Asian Handicap tespiti
-    if (mId === 2 || mName.includes('asian handicap') || mName.includes('asian')) {
+    // Asian Handicap — marketId=17 veya mName içerir
+    if (mId === 17 || mName.includes('asian handicap') || mName.includes('asian')) {
       for (const choice of (market.choices || [])) {
-        const decimal = parseFloat(choice.decimalValue) || 0;
-        if (decimal > 0 && (choice.name === '1' || choice.name?.includes('Home'))) {
+        const decimal = parseOddsDecimal(choice);
+        if (decimal == null) continue;
+        const cName = (choice.name || '').toLowerCase();
+        // choice.name = "(0) Real Madrid" veya "1" veya "Home" gibi olabilir
+        const isHome = cName === '1' || cName.includes('home') || (homeTeamName && cName.includes(homeTeamName));
+        if (isHome) {
           M134b = (1 / decimal) * 100;
-          // Handicap hattını çıkarmaya çalış
-          const handicapMatch = (choice.name + (choice.handicap || '')).match(/[-+]?\d*\.?\d+/);
-          if (handicapMatch) ahLine = parseFloat(handicapMatch[0]);
+          const hMatch = (choice.name + (choice.handicap || '')).match(/[-+]?\d*\.?\d+/);
+          if (hMatch) ahLine = parseFloat(hMatch[0]);
         }
       }
     }
 
-    // Draw No Bet (DNB) tespiti
-    if (mId === 3 || mName.includes('draw no bet') || mName.includes('dnb')) {
+    // Draw No Bet — marketId=4 veya mName içerir
+    if (mId === 4 || mName.includes('draw no bet') || mName.includes('dnb')) {
       for (const choice of (market.choices || [])) {
-        const decimal = parseFloat(choice.decimalValue) || 0;
-        if (decimal > 0 && (choice.name === '1' || choice.name?.includes('Home'))) {
-          M134c = (1 / decimal) * 100;
-        }
+        const decimal = parseOddsDecimal(choice);
+        if (decimal == null) continue;
+        const cName = (choice.name || '').toLowerCase();
+        const isHome = cName === '1' || cName.includes('home') || (homeTeamName && cName.includes(homeTeamName));
+        if (isHome) M134c = (1 / decimal) * 100;
       }
     }
   }
@@ -87,36 +116,41 @@ function calculateContextualMetrics(data) {
   }
 
   // ── M138: Stadyum Kapasitesi Etkisi ──
-  const capacity = event?.venue?.stadium?.capacity || 0;
-  const M138 = capacity > 0 ? Math.min(capacity / 80000, 1) : null; // 80K = normalize ref
+  const capacity = event?.venue?.stadium?.capacity;
+  const M138 = (capacity != null && capacity > 0) ? Math.min(capacity / 80000, 1) : null; 
 
-  // ── M139-M140: Menajer Deneyimi ──
+  // ── M139-M140: Menajer Deneyimi & Galibiyet Oranı ──
+  // homeManagerCareer = getManagerLastEvents sonucu: { events: [...] }
+  // M139: Son sayfada kaç maç var (0-20) → deneyim skoru (0-100)
+  // M140: Mevcut takımla (homeTeamId) son maçlardaki galibiyet oranı
   let M139 = null, M140 = null;
-  const homeCareer = data.homeManagerCareer;
-  const awayCareer = data.awayManagerCareer;
+  const homeMgrLastEv = data.homeManagerCareer?.events || [];
+  const finishedMgrEv = homeMgrLastEv.filter(e =>
+    e.status?.type === 'finished' && e.homeScore?.current != null && e.awayScore?.current != null
+  );
 
-  if (homeCareer?.career || homeCareer) {
-    const entries = homeCareer.career || [homeCareer];
-    let totalMgrMatches = 0;
+  if (finishedMgrEv.length > 0) {
+    M139 = Math.min((finishedMgrEv.length / 20) * 100, 100);
+
     let currentTeamWins = 0, currentTeamMatches = 0;
-
-    for (const entry of entries) {
-      totalMgrMatches += entry.matches || entry.totalMatches || 0;
-      if (entry.team?.id === homeTeamId || entry.teamId === homeTeamId) {
-        currentTeamWins += entry.wins || 0;
-        currentTeamMatches += entry.matches || entry.totalMatches || 0;
-      }
+    for (const ev of finishedMgrEv) {
+      const isHome = ev.homeTeam?.id === homeTeamId;
+      const isAway = ev.awayTeam?.id === homeTeamId;
+      if (!isHome && !isAway) continue;
+      currentTeamMatches++;
+      const hs = ev.homeScore.current;
+      const as = ev.awayScore.current;
+      if ((isHome && hs > as) || (isAway && as > hs)) currentTeamWins++;
     }
-    M139 = Math.min((totalMgrMatches / 500) * 100, 100); // 500 maç = max deneyim
     M140 = currentTeamMatches > 0 ? (currentTeamWins / currentTeamMatches) * 100 : null;
   }
 
   // ── M141: Maçın Haftası (Round) Etkisi ──
   const standingsRows = data.standingsTotal?.standings?.[0]?.rows || [];
-  const currentRound = event?.roundInfo?.round || 0;
+  const currentRound = event?.roundInfo?.round;
   const teamCount = standingsRows.length;
   const totalRounds = teamCount >= 4 ? (teamCount - 1) * 2 : null;
-  const M141 = currentRound > 0 && totalRounds != null ? currentRound / totalRounds : null;
+  const M141 = (currentRound != null && currentRound > 0 && totalRounds != null) ? currentRound / totalRounds : null;
 
   // ── M142-M143: Puan Durumu Farkı ──
   const homeRow = findTeamRow(standings, homeTeamId);
@@ -133,14 +167,16 @@ function calculateContextualMetrics(data) {
 
   // ── M144: Lig Gücü İndeksi (normalize) ──
   // Standings üzerinden dinamik hesap (avgGoals + takım sayısı)
-  // Standings yetersizse null (hardcoded fallback kaldırıldı)
   let M144 = null;
   if (standingsRows.length >= 4) {
-    const totalGoals = standingsRows.reduce((s, r) => s + (r.scoresFor || 0), 0);
-    const totalGames = Math.max(standingsRows.reduce((s, r) => s + (r.played || 0), 0), 1);
+    const totalGoals = standingsRows.reduce((s, r) => s + (r.scoresFor ?? 0), 0);
+    const totalGames = Math.max(standingsRows.reduce((s, r) => s + (r.played ?? 0), 0), 1);
     const avgGoals = totalGoals / totalGames;
     const teamCount = standingsRows.length;
-    M144 = Math.min(100, Math.round(50 + avgGoals * 10 + (teamCount >= 18 ? 10 : 0)));
+    // Yeni Formül: 40 baz puan + (Gol ortalaması * 15) + (takım sayısı >= 18 ? 15 : 0)
+    // Örnek: UCL (3.0 gol, 36 takım) -> 40 + 45 + 15 = 100
+    // Örnek: Yerel Lig (2.4 gol, 14 takım) -> 40 + 36 + 0 = 76
+    M144 = Math.min(100, Math.round(40 + avgGoals * 15 + (teamCount >= 18 ? 15 : 0)));
   }
 
   // ── M145: Transfer Net Harcama Etkisi ──
@@ -148,8 +184,14 @@ function calculateContextualMetrics(data) {
   const homePl = homePlayers?.players || [];
   const awayPl = awayPlayers?.players || [];
 
-  for (const p of homePl) homeMarketValue += p.player?.proposedMarketValue || 0;
-  for (const p of awayPl) awayMarketValue += p.player?.proposedMarketValue || 0;
+  for (const p of homePl) {
+    const val = p.player?.proposedMarketValue;
+    if (val != null) homeMarketValue += val;
+  }
+  for (const p of awayPl) {
+    const val = p.player?.proposedMarketValue;
+    if (val != null) awayMarketValue += val;
+  }
 
   const maxValue = Math.max(homeMarketValue, awayMarketValue);
   const M145 = maxValue > 0 ? homeMarketValue / maxValue : null;

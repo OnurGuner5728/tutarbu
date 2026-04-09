@@ -38,15 +38,12 @@ function calculateTeamAttackMetrics(data, side) {
   }
   const M001 = m001ValidMatches > 0 ? totalGoalsScored / m001ValidMatches : null;
 
-  // ── M002: Ev/Deplasman Gol Ortalaması ──
-  let locationGoals = 0;
-  let locationMatches = 0;
+  // ── M002: Konum Gol/Maç (Ev/Dep) ──
+  let locationGoals = 0, locationMatches = 0;
   for (const ev of last20) {
     const isEvHome = ev.homeTeam?.id === teamId;
-    // Mevcut maçın konumuna göre filtrele
-    if ((isHome && isEvHome) || (!isHome && !isEvHome)) {
-      const score = isEvHome
-        ? (ev.homeScore?.current ?? ev.homeScore?.display ?? null)
+    if (isEvHome === isHome) {
+      const score = isHome ? (ev.homeScore?.current ?? ev.homeScore?.display ?? null)
         : (ev.awayScore?.current ?? ev.awayScore?.display ?? null);
       if (score == null) continue;
       locationGoals += score;
@@ -56,26 +53,21 @@ function calculateTeamAttackMetrics(data, side) {
   const M002 = locationMatches > 0 ? locationGoals / locationMatches : null;
 
   // ── M003-M010: Dakika Bazlı Gol Dağılımı ──
-  // recentDetails'deki incidents'lardan hesapla
   const goalsByPeriod = { '0-15': 0, '16-30': 0, '31-45': 0, '46-60': 0, '61-75': 0, '76-90': 0 };
   let totalGoalsFromIncidents = 0;
-  let firstHalfGoals = 0;
-  let secondHalfGoals = 0;
+  let firstHalfGoals = 0, secondHalfGoals = 0;
 
   for (const match of recentDetails) {
     const incidents = match.incidents?.incidents || [];
     const isMatchHome = match.homeTeam?.id === teamId;
-
     for (const inc of incidents) {
       if (inc.incidentType !== 'goal') continue;
       if (inc.isHome !== isMatchHome) continue;
-
       totalGoalsFromIncidents++;
-      const minute = inc.time || 0;
-
+      const minute = inc.time;
+      if (minute == null) continue;
       if (minute <= 45) firstHalfGoals++;
       else secondHalfGoals++;
-
       if (minute <= 15) goalsByPeriod['0-15']++;
       else if (minute <= 30) goalsByPeriod['16-30']++;
       else if (minute <= 45) goalsByPeriod['31-45']++;
@@ -88,7 +80,6 @@ function calculateTeamAttackMetrics(data, side) {
   const recentMatchCount = recentDetails.length;
   const M003 = recentMatchCount > 0 ? firstHalfGoals / recentMatchCount : null;
   const M004 = recentMatchCount > 0 ? secondHalfGoals / recentMatchCount : null;
-
   const M005 = totalGoalsFromIncidents > 0 ? (goalsByPeriod['0-15'] / totalGoalsFromIncidents) * 100 : null;
   const M006 = totalGoalsFromIncidents > 0 ? (goalsByPeriod['16-30'] / totalGoalsFromIncidents) * 100 : null;
   const M007 = totalGoalsFromIncidents > 0 ? (goalsByPeriod['31-45'] / totalGoalsFromIncidents) * 100 : null;
@@ -96,42 +87,41 @@ function calculateTeamAttackMetrics(data, side) {
   const M009 = totalGoalsFromIncidents > 0 ? (goalsByPeriod['61-75'] / totalGoalsFromIncidents) * 100 : null;
   const M010 = totalGoalsFromIncidents > 0 ? (goalsByPeriod['76-90'] / totalGoalsFromIncidents) * 100 : null;
 
-  // FALLBACK: Eğer 0 ise, sezon ortalaması veya genel bir dağılım (simülasyon) yerine 0 bırakıyoruz 
-  // ancak numuneyi 7 maça çıkardığımız için 0 olma ihtimali azaldı.
+  // --- Unified Stat Helper ---
+  const unifiedStat = (key, extractKey = key) => {
+    let total = 0, count = 0;
+    for (const match of recentDetails) {
+      const ts = extractTeamStats(match.stats, match.homeTeam?.id === teamId);
+      if (ts && ts[extractKey] != null) {
+        total += ts[extractKey];
+        count++;
+      }
+    }
+    if (count > 0) return total / count;
+    const sVal = teamSeasonStats?.statistics?.[extractKey] ?? teamSeasonStats?.[extractKey];
+    const sMatches = teamSeasonStats?.statistics?.matches ?? teamSeasonStats?.matches;
+    if (sVal != null && sMatches > 0) {
+      if (extractKey.toLowerCase().includes('percentage') || extractKey.toLowerCase().includes('rating')) return sVal;
+      return sVal / sMatches;
+    }
+    return null;
+  };
 
   // ── M011-M014: Şut ve İsabetli Şut Metrikleri ──
-  let totalShots = 0, shotsOnTarget = 0;
-  let matchesWithStats = 0, totalShotsMatches = 0, shotsOnTargetMatches = 0;
-
+  let totalShotsFound = 0, totalShotsMatchesFound = 0;
+  let totalOnTargetFound = 0, totalOnTargetMatchesFound = 0;
   for (const match of recentDetails) {
     const stats = extractTeamStats(match.stats, match.homeTeam?.id === teamId);
     if (stats) {
-      matchesWithStats++;
-      if (stats.totalShots != null) { totalShots += stats.totalShots; totalShotsMatches++; }
-      if (stats.shotsOnTarget != null) { shotsOnTarget += stats.shotsOnTarget; shotsOnTargetMatches++; }
+      if (stats.totalShots != null) { totalShotsFound += stats.totalShots; totalShotsMatchesFound++; }
+      if (stats.shotsOnTarget != null) { totalOnTargetFound += stats.shotsOnTarget; totalOnTargetMatchesFound++; }
     }
   }
 
-  // teamSeasonStats fallback helpers — recentDetails sparse olduğunda kullanılır
-  const seasonMatches = teamSeasonStats?.statistics?.matches || null;
-  const seasonStat = (key) => {
-    const val = teamSeasonStats?.statistics?.[key];
-    return val != null ? val : null;
-  };
-  const seasonStatPerGame = (key) => {
-    const val = seasonStat(key);
-    if (val == null || !seasonMatches) return null;
-    return val / seasonMatches;
-  };
-
-  const M011 = totalShots > 0 ? Math.min((totalGoalsFromIncidents / totalShots) * 100, 100) : null;
-  const M012 = shotsOnTarget > 0 ? Math.min((totalGoalsFromIncidents / shotsOnTarget) * 100, 100) : null;
-  const M013 = totalShotsMatches > 0
-    ? totalShots / totalShotsMatches
-    : seasonStatPerGame('shots');
-  const M014 = shotsOnTargetMatches > 0
-    ? shotsOnTarget / shotsOnTargetMatches
-    : seasonStatPerGame('shotsOnTarget');
+  const M011 = totalShotsFound > 0 ? Math.min((totalGoalsFromIncidents / totalShotsFound) * 100, 100) : null;
+  const M012 = totalOnTargetFound > 0 ? Math.min((totalGoalsFromIncidents / totalOnTargetFound) * 100, 100) : null;
+  const M013 = totalShotsMatchesFound > 0 ? (totalShotsFound / totalShotsMatchesFound) : unifiedStat('shots', 'shots');
+  const M014 = totalOnTargetMatchesFound > 0 ? (totalOnTargetFound / totalOnTargetMatchesFound) : unifiedStat('shotsOnTarget', 'shotsOnTarget');
 
   // ── M015-M016: xG Metrikleri ──
   let totalXG = 0;
@@ -171,8 +161,8 @@ function calculateTeamAttackMetrics(data, side) {
 
   const M017 = bigChancesMatches > 0
     ? totalBigChances / bigChancesMatches
-    : seasonStatPerGame('bigChances');
-  const M018 = totalBigChances > 0 ? Math.min((totalBigChancesScored / totalBigChances) * 100, 100) : null;
+    : unifiedStat('bigChances', 'bigChances');
+  const M018 = totalBigChances > 0 ? Math.min((totalBigChancesScored / totalBigChances) * 100, 100) : unifiedStat('bigChancesScoredPercentage', 'bigChancesScoredPercentage');
 
   // ── M019-M020: Penaltı Metrikleri ──
   let penaltiesWon = 0;
@@ -214,7 +204,8 @@ function calculateTeamAttackMetrics(data, side) {
       let positiveCount = 0;
 
       for (const point of graphPoints) {
-        const value = point.value || 0;
+        const value = point.value;
+        if (value == null) continue;
         // Ev sahibi için pozitif, deplasman için negatif baskı
         const teamPressure = isMatchHome ? value : -value;
         if (teamPressure > 0) {
@@ -256,7 +247,7 @@ function calculateTeamAttackMetrics(data, side) {
   // M022: Maç başı korner — recentDetails yoksa sezon istatistiğinden hesapla
   const M022 = cornersMatches > 0
     ? totalCorners / cornersMatches
-    : seasonStatPerGame('corners');
+    : unifiedStat('corners', 'corners');
   const M023 = totalCorners > 0 ? (cornerGoalsCount / totalCorners) * 100 : null;
 
   // ── M024: Serbest Vuruş Gol Oranı ──
@@ -275,7 +266,11 @@ function calculateTeamAttackMetrics(data, side) {
     }
   }
 
-  const M024 = totalFreeKicks > 0 ? (freeKickGoals / totalFreeKicks) * 100 : null;
+  const M024 = totalFreeKicks > 0
+    ? (freeKickGoals / totalFreeKicks) * 100
+    : (unifiedStat('freeKickGoals', 'freeKickGoals') != null && unifiedStat('freeKickShots', 'freeKickShots') > 0
+        ? (unifiedStat('freeKickGoals', 'freeKickGoals') / unifiedStat('freeKickShots', 'freeKickShots')) * 100
+        : null);
 
   // ── M025: Hücum Üçüncü Bölge Pas Başarısı ──
   let totalAccFinalThird = 0;
@@ -327,6 +322,13 @@ function calculateTeamAttackMetrics(data, side) {
     M001, M002, M003, M004, M005, M006, M007, M008, M009, M010,
     M011, M012, M013, M014, M015, M016, M017, M018, M019, M020,
     M021, M022, M023, M024, M025, M025b, M025c,
+    // --- New Advanced Metrics ---
+    M177: teamSeasonStats?.statistics?.accurateOppositionHalfPassesPercentage ?? teamSeasonStats?.accurateOppositionHalfPassesPercentage ?? null,
+    M179: (M015 && M015 > 0) ? M001 / M015 : null,
+    M186: last20.length >= 2 ? (
+      (isHome ? (last20[0].homeScore?.current - last20[0].awayScore?.current) : (last20[0].awayScore?.current - last20[0].homeScore?.current)) -
+      (isHome ? (last20[1].homeScore?.current - last20[1].awayScore?.current) : (last20[1].awayScore?.current - last20[1].homeScore?.current))
+    ) : null,
     _matchCount: totalMatches,
     _meta: {
       totalMatchesAnalyzed: totalMatches,
@@ -411,6 +413,8 @@ function extractTeamStats(statsResponse, isHome) {
     'yellowCards':               (r, v)     => { r.yellowCards = v; },
     'redCards':                  (r, v)     => { r.redCards = v; },
     'offsides':                  (r, v)     => { r.offsides = v; },
+    'blockedScoringAttempt':     (r, v)     => { r.blockedShots = v; },
+    'blockedScoringAttemptAgainst': (r, v)  => { r.blockedScoringAttemptAgainst = v; },
     // Fraction case'ler: current + total birlikte yazılır
     'accuratePasses':            (r, v, st) => { r.accuratePasses = v; if (st.total) r.totalPasses = st.total; },
     'accurateLongBalls':         (r, v, st) => { r.accurateLongBalls = v; if (st.total) r.totalLongBalls = st.total; },
@@ -498,6 +502,8 @@ function extractTeamStats(statsResponse, isHome) {
           case 'Yellow cards': result.yellowCards = val; break;
           case 'Red cards': result.redCards = val; break;
           case 'Offsides': result.offsides = val; break;
+          case 'Blocked scoring attempt': result.blockedShots = val; break;
+          case 'Blocked scoring attempt against': result.blockedScoringAttemptAgainst = val; break;
         }
       }
     }

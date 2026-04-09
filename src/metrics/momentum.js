@@ -9,6 +9,7 @@ function calculateMomentumMetrics(data, side) {
   const isHome = side === 'home';
   const teamId = isHome ? data.homeTeamId : data.awayTeamId;
   const recentDetails = isHome ? data.homeRecentMatchDetails : data.awayRecentMatchDetails;
+  const seasonStats = (isHome ? data.homeTeamSeasonStats : data.awayTeamSeasonStats)?.statistics ?? null;
 
   if (!recentDetails || recentDetails.length === 0) return createEmptyMomentumMetrics();
 
@@ -25,7 +26,8 @@ function calculateMomentumMetrics(data, side) {
     if (graphPoints.length > 0) {
       let positiveSum = 0, positiveCount = 0;
       for (const point of graphPoints) {
-        const val = isMatchHome ? (point.value || 0) : -(point.value || 0);
+        const val = isMatchHome ? point.value : -point.value;
+        if (val == null) continue;
         if (val > 0) { positiveSum += val; positiveCount++; }
       }
       if (positiveCount > 0) {
@@ -47,7 +49,8 @@ function calculateMomentumMetrics(data, side) {
     if (graphPoints.length > 0) {
       let negSum = 0, negCount = 0;
       for (const point of graphPoints) {
-        const val = isMatchHome ? (point.value || 0) : -(point.value || 0);
+        const val = isMatchHome ? point.value : -point.value;
+        if (val == null) continue;
         if (val < 0) { negSum += Math.abs(val); negCount++; }
       }
       if (negCount > 0) {
@@ -92,7 +95,8 @@ function calculateMomentumMetrics(data, side) {
 
     for (const inc of incidents) {
       if (inc.incidentType !== 'goal' || inc.isHome !== isMatchHome) continue;
-      const minute = inc.time || 0;
+      const minute = inc.time;
+      if (minute == null) continue;
       const nearPoint = graphPoints.find(p => Math.abs(p.minute - minute) <= 2);
       if (nearPoint) {
         const teamVal = isMatchHome ? nearPoint.value : -nearPoint.value;
@@ -113,7 +117,9 @@ function calculateMomentumMetrics(data, side) {
       possessionMatches++;
     }
   }
-  const M150 = possessionMatches > 0 ? totalPossession / possessionMatches : null;
+  const M150 = possessionMatches > 0
+    ? totalPossession / possessionMatches
+    : (seasonStats?.averageBallPossession ?? null);
 
   // ── M151: Topla Oynama vs Gol Korelasyonu ──
   const possessionArr = [];
@@ -122,7 +128,7 @@ function calculateMomentumMetrics(data, side) {
     const stats = extractTeamStats(match.stats, match.homeTeam?.id === teamId);
     const isMatchHome = match.homeTeam?.id === teamId;
     const scored = isMatchHome
-      ? (match.homeScore?.current || 0) : (match.awayScore?.current || 0);
+      ? (match.homeScore?.current ?? null) : (match.awayScore?.current ?? null);
 
     if (stats?.possession) {
       possessionArr.push(stats.possession);
@@ -141,7 +147,11 @@ function calculateMomentumMetrics(data, side) {
       totalPasses += stats.totalPasses || 0;
     }
   }
-  const M152 = totalPasses > 0 ? (totalAccPasses / totalPasses) * 100 : null;
+  const M152 = totalPasses > 0
+    ? (totalAccPasses / totalPasses) * 100
+    : (seasonStats?.accuratePasses != null && seasonStats?.totalPasses > 0
+        ? (seasonStats.accuratePasses / seasonStats.totalPasses) * 100
+        : null);
 
   // ── M153: Uzun Pas Başarısı ──
   let totalAccLong = 0, totalLong = 0;
@@ -152,7 +162,11 @@ function calculateMomentumMetrics(data, side) {
       totalLong += stats.totalLongBalls || 0;
     }
   }
-  const M153 = totalLong > 0 ? (totalAccLong / totalLong) * 100 : null;
+  const M153 = totalLong > 0
+    ? (totalAccLong / totalLong) * 100
+    : (seasonStats?.accurateLongBalls != null && seasonStats?.totalLongBalls > 0
+        ? (seasonStats.accurateLongBalls / seasonStats.totalLongBalls) * 100
+        : null);
 
   // ── M154: Cross Başarısı ──
   let totalAccCross = 0, totalCross = 0;
@@ -163,7 +177,11 @@ function calculateMomentumMetrics(data, side) {
       totalCross += stats.totalCrosses || 0;
     }
   }
-  const M154 = totalCross > 0 ? (totalAccCross / totalCross) * 100 : null;
+  const M154 = totalCross > 0
+    ? (totalAccCross / totalCross) * 100
+    : (seasonStats?.accurateCrosses != null && seasonStats?.totalCrosses > 0
+        ? (seasonStats.accurateCrosses / seasonStats.totalCrosses) * 100
+        : null);
 
   // ── M155: Gole Katkı Sağlama İndeksi ──
   let goalContribs = 0;

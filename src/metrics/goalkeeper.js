@@ -65,7 +65,12 @@ function calculateGoalkeeperMetrics(data, side) {
       }
     }
   }
-  const M099 = penaltiesFaced > 0 ? (penaltiesSaved / penaltiesFaced) * 100 : null;
+  const seasonPenaltySaved = gkStats.penaltySaved;
+  const seasonPenaltyFaced = gkStats.penaltyFaced;
+  const M099_season = (seasonPenaltyFaced != null && seasonPenaltyFaced > 0 && seasonPenaltySaved != null) 
+    ? (seasonPenaltySaved / seasonPenaltyFaced) * 100 : null;
+  const M099 = penaltiesFaced > 0 ? (penaltiesSaved / penaltiesFaced) * 100 : M099_season;
+  const M180 = M099; // Sync with M099 but specific ID as requested
 
   // ── M100: 1v1 Kurtarma (Big Chance) ──
   const bigChancesSaved = gkStats.savedShotsFromInsideTheBox ?? gkStats.bigChancesSaved ?? null;
@@ -132,6 +137,13 @@ function calculateGoalkeeperMetrics(data, side) {
     ? null
     : (punches + highClaims) / appearances;
 
+  // --- GK Advanced Attributes (M180 range) ---
+  const M180_att = gkAttrs?.attacking ?? null;
+  const M180_tec = gkAttrs?.technical ?? null;
+  const M180_tac = gkAttrs?.tactical ?? null;
+  const M180_def = gkAttrs?.defending ?? null;
+  const M180_cre = gkAttrs?.creativity ?? null;
+
   // ── M108: Kaleci Son 5 Maç Rating Ortalaması ──
   const gkRatings = [];
   for (const match of recentDetails) {
@@ -150,6 +162,7 @@ function calculateGoalkeeperMetrics(data, side) {
   return {
     M096, M097, M098, M099, M100, M101, M102, M103, M104, M105,
     M106, M107, M108,
+    M180, M180_att, M180_tec, M180_tac, M180_def, M180_cre,
     _meta: { goalkeeperName: gk.name, goalkeeperRating: M102 }
   };
 }

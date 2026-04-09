@@ -229,9 +229,9 @@ function calculateTeamFormMetrics(data, side) {
 
     if (wasBehind) {
       timesBehind++;
-      const finalTeam = isMatchHome ? (match.homeScore?.current ?? 0) : (match.awayScore?.current ?? 0);
-      const finalOpp = isMatchHome ? (match.awayScore?.current ?? 0) : (match.homeScore?.current ?? 0);
-      if (finalTeam >= finalOpp) comebacks++;
+      const finalTeam = isMatchHome ? (match.homeScore?.current ?? null) : (match.awayScore?.current ?? null);
+      const finalOpp = isMatchHome ? (match.awayScore?.current ?? null) : (match.homeScore?.current ?? null);
+      if (finalTeam != null && finalOpp != null && finalTeam >= finalOpp) comebacks++;
     }
   }
   const M064 = timesBehind > 0 ? (comebacks / timesBehind) * 100 : null;
@@ -243,9 +243,9 @@ function calculateTeamFormMetrics(data, side) {
     if (r === 'W') {
       totalWins++;
       const isEvHome = ev.homeTeam?.id === teamId;
-      const scored = isEvHome ? (ev.homeScore?.current ?? 0) : (ev.awayScore?.current ?? 0);
-      const conceded = isEvHome ? (ev.awayScore?.current ?? 0) : (ev.homeScore?.current ?? 0);
-      if (scored - conceded >= 2) bigWins++;
+      const scored = isEvHome ? (ev.homeScore?.current ?? null) : (ev.awayScore?.current ?? null);
+      const conceded = isEvHome ? (ev.awayScore?.current ?? null) : (ev.homeScore?.current ?? null);
+      if (scored != null && conceded != null && scored - conceded >= 2) bigWins++;
     }
   }
   const M065 = totalWins > 0 ? (bigWins / totalWins) * 100 : null;

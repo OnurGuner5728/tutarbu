@@ -4,6 +4,8 @@
  * Poisson dağılımı + bileşik skorlar + ek özel tahminler.
  */
 
+const { poissonPMF, poissonExceed, round2 } = require('./math-utils');
+
 /**
  * @param {object} metricsResult - calculateAllMetrics() çıktısı
  * @param {object} data - fetchAllMatchData() çıktısı
@@ -70,9 +72,15 @@ function generatePrediction(metricsResult, data) {
 
     // İlk gol tahmini — normalize so home+away sum to 100
     firstGoal: (() => {
-      const rawHome = (home.form.M062 || 50) * 0.6 + (prediction.homeWinProbability) * 0.4;
-      const rawAway = (away.form.M062 || 50) * 0.6 + (prediction.awayWinProbability) * 0.4;
-      const total = rawHome + rawAway || 100;
+      const m062h = home.form.M062;
+      const m062a = away.form.M062;
+      if (m062h == null && m062a == null && prediction.homeWinProbability == null) {
+        return { homeScoresFirst: null, awayScoresFirst: null };
+      }
+      const rawHome = (m062h ?? prediction.homeWinProbability ?? 50) * 0.6 + (prediction.homeWinProbability ?? 50) * 0.4;
+      const rawAway = (m062a ?? prediction.awayWinProbability ?? 50) * 0.6 + (prediction.awayWinProbability ?? 50) * 0.4;
+      const total = rawHome + rawAway;
+      if (total <= 0) return { homeScoresFirst: 50, awayScoresFirst: 50 };
       return {
         homeScoresFirst: round2((rawHome / total) * 100),
         awayScoresFirst: round2((rawAway / total) * 100),
@@ -103,6 +111,13 @@ function generatePrediction(metricsResult, data) {
         refereeImpact: round2(shared.sharedComposite.M161),
         h2hAdvantage: round2(shared.sharedComposite.M162),
         contextualAdvantage: round2(shared.sharedComposite.M163),
+        // Hakem son maç istatistikleri (refereeLastEvents'ten)
+        refGoalsPerMatch: shared.referee.refGoalsPerMatch != null ? round2(shared.referee.refGoalsPerMatch) : null,
+        refOver25Rate: shared.referee.refOver25Rate != null ? round2(shared.referee.refOver25Rate) : null,
+        refBTTSRate: shared.referee.refBTTSRate != null ? round2(shared.referee.refBTTSRate) : null,
+        refHomeWinRate: shared.referee.refHomeWinRate != null ? round2(shared.referee.refHomeWinRate) : null,
+        refAwayWinRate: shared.referee.refAwayWinRate != null ? round2(shared.referee.refAwayWinRate) : null,
+        refLastEventsAnalyzed: shared.referee._meta?.lastEventsAnalyzed || 0,
       },
     },
 
@@ -136,34 +151,7 @@ function generatePrediction(metricsResult, data) {
 
     // Form & H2H History
     h2hMatches: (() => {
-      // 1. Dedicated H2H events endpoint (event-level)
-      let _evs = data.h2hEvents?.events || [];
-      // 2. Team-level H2H history (/team/:id/head2head/:id) — various possible keys
-      if (_evs.length === 0) {
-        _evs = data.teamH2H?.events ||
-               data.teamH2H?.previousEvents ||
-               data.teamH2H?.teamDuel?.events ||
-               [];
-      }
-      // 3. Event-level h2h object (may nest events under various keys)
-      if (_evs.length === 0) {
-        _evs = data.h2h?.events ||
-               data.h2h?.previousEvents ||
-               data.h2h?.lastH2H ||
-               [];
-      }
-      // 4. Last-resort: scan both teams' recent matches for mutual games
-      if (_evs.length === 0) {
-        const hid = data.homeTeamId;
-        const aid = data.awayTeamId;
-        const seen = new Set();
-        _evs = [...(data.homeLastEvents || []), ...(data.awayLastEvents || [])].filter(ev => {
-          if (!ev || seen.has(ev.id)) return false;
-          seen.add(ev.id);
-          return (ev.homeTeam?.id === hid || ev.awayTeam?.id === hid) &&
-                 (ev.homeTeam?.id === aid || ev.awayTeam?.id === aid);
-        });
-      }
+      const _evs = data.h2hEvents?.events || [];
       return _evs
         .filter(e => e.status?.type === 'finished' || e.homeScore?.current != null)
         .sort((a, b) => (b.startTimestamp || 0) - (a.startTimestamp || 0))
@@ -173,10 +161,7 @@ function generatePrediction(metricsResult, data) {
         }));
     })(),
     h2hSummary: (() => {
-      // 1. Önce SofaScore teamDuel / teamDuels alanını dene (singular ve plural her ikisi)
-      const teamDuel = data.h2h?.teamDuel || data.h2h?.teamDuels ||
-                       data.h2hEvents?.teamDuel || data.h2hEvents?.teamDuels ||
-                       data.h2h?.h2h || null;
+      const teamDuel = data.h2h?.teamDuel ?? null;
       if (teamDuel && (teamDuel.homeWins != null || teamDuel.team1Wins != null)) {
         return {
           team1Wins: teamDuel.homeWins ?? teamDuel.team1Wins ?? 0,
@@ -184,29 +169,7 @@ function generatePrediction(metricsResult, data) {
           team2Wins: teamDuel.awayWins ?? teamDuel.team2Wins ?? 0,
         };
       }
-
-      // 2. Fallback: H2H maç listesini manuel say
-      const h2hGames = data.h2hEvents?.events || data.h2h?.events || [];
-      if (h2hGames.length === 0) return null;
-
-      const homeTeamId = data.event?.event?.homeTeam?.id;
-      let team1Wins = 0, draws = 0, team2Wins = 0;
-      for (const game of h2hGames) {
-        const homeScore = game.homeScore?.current ?? game.homeScore?.display ?? 0;
-        const awayScore = game.awayScore?.current ?? game.awayScore?.display ?? 0;
-        const gameHomeTeamId = game.homeTeam?.id;
-        if (homeScore === awayScore) {
-          draws++;
-        } else if (
-          (gameHomeTeamId === homeTeamId && homeScore > awayScore) ||
-          (gameHomeTeamId !== homeTeamId && awayScore > homeScore)
-        ) {
-          team1Wins++;
-        } else {
-          team2Wins++;
-        }
-      }
-      return { team1Wins, draws, team2Wins };
+      return null;
     })(),
     recentForm: {
       home: (data.homeLastEvents || [])
@@ -273,14 +236,20 @@ function generateFirstHalfPrediction(home, away) {
 }
 
 function generateCornerPrediction(home, away, shared) {
-  const homeCorners = home.attack.M022 || 5;
-  const awayCorners = away.attack.M022 || 4;
-  const totalCorners = homeCorners + awayCorners;
+  const homeCorners = home.attack.M022 ?? null;
+  const awayCorners = away.attack.M022 ?? null;
+  if (homeCorners == null && awayCorners == null) {
+    return { expectedHome: null, expectedAway: null, expectedTotal: null, over85: null, over95: null, over105: null };
+  }
+  // Eğer bir tarafın verisi varsa diğer tarafı simetrik fallback yap (aynı değer)
+  const hc = homeCorners ?? awayCorners;
+  const ac = awayCorners ?? homeCorners;
+  const totalCorners = hc + ac;
 
   // Poisson-based over/under: P(X > k) = 1 - CDF(k, lambda)
   return {
-    expectedHome: round2(homeCorners),
-    expectedAway: round2(awayCorners),
+    expectedHome: round2(hc),
+    expectedAway: round2(ac),
     expectedTotal: round2(totalCorners),
     over85: round2(Math.min(95, poissonExceed(totalCorners, 8.5) * 100)),
     over95: round2(Math.min(95, poissonExceed(totalCorners, 9.5) * 100)),
@@ -289,33 +258,35 @@ function generateCornerPrediction(home, away, shared) {
 }
 
 function generateCardPrediction(home, away, shared) {
-  const homeYellows = home.defense.M039 || 2;
-  const awayYellows = away.defense.M039 || 2;
-  const refYellows = shared.referee.M109 || 4;
+  const homeYellows = home.defense.M039 ?? null;
+  const awayYellows = away.defense.M039 ?? null;
+  const refYellows = shared.referee.M109 ?? null;
 
-  const expectedYellows = (homeYellows + awayYellows) * 0.6 + refYellows * 0.4;
-  const expectedReds = (home.defense.M040 || 0) + (away.defense.M040 || 0);
+  // En az bir kart verisi yoksa null dön
+  const hasTeamData = homeYellows != null || awayYellows != null;
+  const hasRefData = refYellows != null;
+  if (!hasTeamData && !hasRefData) {
+    return { expectedYellowCards: null, expectedRedCards: null, over35Cards: null, over45Cards: null, refereeSeverity: shared.referee.M117 ?? null };
+  }
+
+  // Mevcut verilerden ağırlıklı hesap
+  const teamAvg = hasTeamData ? (homeYellows ?? awayYellows) + (awayYellows ?? homeYellows) : null;
+  const expectedYellows = (teamAvg != null && hasRefData)
+    ? teamAvg * 0.6 + refYellows * 0.4
+    : (teamAvg ?? refYellows);
+
+  const expectedReds = (home.defense.M040 ?? 0) + (away.defense.M040 ?? 0);
 
   // Poisson-based over/under
   return {
-    expectedYellowCards: round2(expectedYellows),
+    expectedYellowCards: expectedYellows != null ? round2(expectedYellows) : null,
     expectedRedCards: round2(expectedReds),
-    over35Cards: round2(Math.min(95, poissonExceed(expectedYellows, 3.5) * 100)),
-    over45Cards: round2(Math.min(95, poissonExceed(expectedYellows, 4.5) * 100)),
-    refereeSeverity: shared.referee.M117 || 'N/A',
+    over35Cards: expectedYellows != null ? round2(Math.min(95, poissonExceed(expectedYellows, 3.5) * 100)) : null,
+    over45Cards: expectedYellows != null ? round2(Math.min(95, poissonExceed(expectedYellows, 4.5) * 100)) : null,
+    refereeSeverity: shared.referee.M117 ?? null,
   };
 }
 
-// P(X > threshold) for Poisson(lambda) — sums PMF from 0 to floor(threshold) and subtracts
-function poissonExceed(lambda, threshold) {
-  if (lambda <= 0) return 0;
-  const kMax = Math.floor(threshold);
-  let cdf = 0;
-  for (let k = 0; k <= kMax; k++) {
-    cdf += poissonPMF(k, lambda);
-  }
-  return Math.max(0, 1 - cdf);
-}
 
 function generateHighlights(home, away, shared, prediction) {
   const highlights = [];
@@ -366,10 +337,14 @@ function generateHighlights(home, away, shared, prediction) {
   }
 
   // Korner Dinamiği
-  const totalCorners = (home.attack.M022 || 5) + (away.attack.M022 || 4);
-  const pOver105 = Math.min(95, poissonExceed(totalCorners, 10.5) * 100);
-  if (pOver105 > 60) {
-    highlights.push(`🚩 Maçta her iki takımın temposuyla yoğun korner trafiği bekleniyor`);
+  const hCor = home.attack.M022 ?? null;
+  const aCor = away.attack.M022 ?? null;
+  const totalCorners = (hCor != null || aCor != null) ? (hCor ?? aCor) + (aCor ?? hCor) : null;
+  if (totalCorners != null) {
+    const pOver105 = Math.min(95, poissonExceed(totalCorners, 10.5) * 100);
+    if (pOver105 > 60) {
+      highlights.push(`🚩 Maçta her iki takımın temposuyla yoğun korner trafiği bekleniyor`);
+    }
   }
 
   return highlights;
@@ -412,15 +387,7 @@ function calculateConfidence(prediction, shared, home, away) {
   return Math.min(95, Math.max(15, baseConfidence));
 }
 
-function round2(val) {
-  return Math.round((val || 0) * 100) / 100;
-}
-
-function poissonPMF(k, lambda) {
-  let logP = -lambda + k * Math.log(lambda);
-  for (let i = 2; i <= k; i++) logP -= Math.log(i);
-  return Math.exp(logP);
-}
+// round2 ve poissonPMF artık math-utils.js'den import ediliyor
 
 function calculateGoalPeriods(team) {
   return {
@@ -448,23 +415,26 @@ function getMetricForPeriod(p) {
 }
 
 function calculatePenaltyChance(home, away, shared) {
-  const teamFreq = (home.attack.M019 || 0) + (away.attack.M019 || 0);
-  const refFreq = shared.referee.M111 || 0.24;
-  const chance = (teamFreq * 0.4) + (refFreq * 0.6 * 100);
+  const teamFreq = (home.attack.M019 ?? 0) + (away.attack.M019 ?? 0);
+  const refFreq = shared.referee.M111 ?? null;
+  if (teamFreq === 0 && refFreq == null) return null;
+  const chance = (teamFreq * 0.4) + ((refFreq ?? 0) * 0.6 * 100);
   return chance > 40 ? 'High' : chance > 20 ? 'Medium' : 'Low';
 }
 
 function calculateRedCardChance(home, away, shared) {
-  const teamAgg = (home.defense.M040 || 0) + (away.defense.M040 || 0);
-  const refAgg = shared.referee.M110 || 0.06;
-  const chance = (teamAgg * 50) + (refAgg * 100);
+  const teamAgg = (home.defense.M040 ?? 0) + (away.defense.M040 ?? 0);
+  const refAgg = shared.referee.M110 ?? null;
+  if (teamAgg === 0 && refAgg == null) return null;
+  const chance = (teamAgg * 50) + ((refAgg ?? 0) * 100);
   return chance > 20 ? 'High' : chance > 10 ? 'Medium' : 'Low';
 }
 
 function calculateSurpriseIndex(prediction, contextual) {
   // Bahis oranları ile Poisson arasındaki sapma
   const homeProb = prediction.homeWinProbability;
-  const marketProb = contextual.M131 || 33.3;
+  const marketProb = contextual.M131 ?? null;
+  if (homeProb == null || marketProb == null) return null;
   const delta = Math.abs(homeProb - marketProb);
   return round2(Math.min(100, delta * 2.5));
 }

@@ -13,9 +13,45 @@ const corsOrigin = process.env.CORS_ORIGIN || '*';
 app.use(cors({ origin: corsOrigin }));
 app.use(express.json());
 
-// Match data cache (5 dakika TTL)
+// 🛡️ Custom Rate Limiting Middleware
+const rateLimitStore = new Map();
+const RATE_LIMIT_WINDOW = 15 * 60 * 1000; // 15 dakika
+const MAX_REQUESTS = 100; // 15 dakikada 100 istek
+
+function rateLimitMiddleware(req, res, next) {
+  const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+  const now = Date.now();
+  
+  if (!rateLimitStore.has(ip)) {
+    rateLimitStore.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW });
+    return next();
+  }
+
+  const record = rateLimitStore.get(ip);
+  if (now > record.resetAt) {
+    record.count = 1;
+    record.resetAt = now + RATE_LIMIT_WINDOW;
+    return next();
+  }
+
+  record.count++;
+  if (record.count > MAX_REQUESTS) {
+    console.warn(`[Security] Rate limit exceeded for IP: ${ip}`);
+    return res.status(429).json({ 
+      error: 'Too many requests. Please try again later.',
+      retryAfter: Math.ceil((record.resetAt - now) / 1000)
+    });
+  }
+  
+  next();
+}
+
+app.use(rateLimitMiddleware);
+
+// Match data cache (5 dakika TTL, max 100 girdi)
 const matchDataCache = new Map();
 const MATCH_CACHE_TTL = 5 * 60 * 1000;
+const MAX_CACHE_SIZE = 100;
 
 function getCachedMatchData(eventId) {
   const entry = matchDataCache.get(eventId);
@@ -28,6 +64,12 @@ function getCachedMatchData(eventId) {
 }
 
 function setCachedMatchData(eventId, data) {
+  // Cache boyutu aşılırsa en eski (ilk) girdiyi sil
+  if (matchDataCache.size >= MAX_CACHE_SIZE && !matchDataCache.has(eventId)) {
+    const oldestKey = matchDataCache.keys().next().value;
+    matchDataCache.delete(oldestKey);
+  }
+
   matchDataCache.set(eventId, {
     data,
     expiresAt: Date.now() + MATCH_CACHE_TTL,
@@ -336,6 +378,43 @@ app.get('/api/team-events/:teamId/:page', async (req, res) => {
   }
 });
 
+// Match Events — incidents + stats for a past match (on-demand, click to expand)
+app.get('/api/match-events/:eventId', async (req, res) => {
+  const { eventId } = req.params;
+  if (!/^\d+$/.test(eventId)) {
+    return res.status(400).json({ error: 'Invalid eventId' });
+  }
+  try {
+    const api = require('./services/playwright-client');
+    const id = parseInt(eventId, 10);
+    const [incidentsData, statsData] = await Promise.all([
+      api.getEventIncidents(id),
+      api.getEventStats(id),
+    ]);
+
+    // Flatten nested stats: statistics[].groups[].statisticsItems[]
+    // Only use "ALL" period (full match) if available, else first period
+    const statsArray = statsData?.statistics || [];
+    const allPeriod = statsArray.find(p => p.period === 'ALL') || statsArray[0] || null;
+    const flatStats = [];
+    if (allPeriod?.groups) {
+      for (const group of allPeriod.groups) {
+        for (const item of (group.statisticsItems || [])) {
+          flatStats.push({
+            name: item.name,
+            homeValue: item.homeValue ?? item.home ?? null,
+            awayValue: item.awayValue ?? item.away ?? null,
+          });
+        }
+      }
+    }
+
+    res.json({ incidents: incidentsData?.incidents || [], stats: flatStats });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Match Debug Endpoint
 app.get('/api/match-debug/:eventId', async (req, res) => {
   const { eventId } = req.params;
@@ -366,8 +445,8 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`[SERVER] Football Prediction Engine API running on http://localhost:${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`[SERVER] Football Prediction Engine API running on port ${PORT} (Network Accessible)`);
   if (corsOrigin === '*') {
     console.warn('[SERVER] WARNING: CORS is open to all origins. Set CORS_ORIGIN env variable in production.');
   }

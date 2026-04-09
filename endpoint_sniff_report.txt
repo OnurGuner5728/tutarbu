@@ -1,0 +1,1907 @@
+
+
+=================================
+API ENDPOINT: https://api.sofascore.com/api/v1/country/alpha2
+=================================
+{
+  "alpha2": "TR",
+  "continent_code": "EU",
+  "country": "turkey",
+  "city": "esentepe mah.",
+  "region_code": "TR-34"
+}
+
+=================================
+API ENDPOINT: https://api.sofascore.com/api/v1/config/country-sport-priorities/country
+=================================
+{
+  "countrySportPriorities": "Array(25) [ { sport, position, id } ]"
+}
+
+=================================
+API ENDPOINT: https://api.sofascore.com/api/v1/sport/10800/event-count
+=================================
+{
+  "snooker": {
+    "live": 0,
+    "total": 14
+  },
+  "badminton": {
+    "live": 2,
+    "total": 96
+  },
+  "futsal": {
+    "live": 1,
+    "total": 39
+  },
+  "ice-hockey": {
+    "live": 0,
+    "total": 47
+  },
+  "minifootball": {
+    "live": 0,
+    "total": 20
+  },
+  "table-tennis": {
+    "live": 25,
+    "total": 1117
+  },
+  "darts": {
+    "live": 1,
+    "total": 15
+  },
+  "floorball": {
+    "live": 0,
+    "total": 3
+  },
+  "football": {
+    "live": 12,
+    "total": 446
+  },
+  "tennis": {
+    "live": 59,
+    "total": 408
+  },
+  "basketball": {
+    "live": 2,
+    "total": 125
+  },
+  "baseball": {
+    "live": 0,
+    "total": 69
+  },
+  "handball": {
+    "live": 0,
+    "total": 18
+  },
+  "cricket": {
+    "live": 3,
+    "total": 15
+  },
+  "rugby": {
+    "live": 0,
+    "total": 3
+  },
+  "waterpolo": {
+    "live": 1,
+    "total": 21
+  },
+  "volleyball": {
+    "live": 1,
+    "total": 32
+  },
+  "esports": {
+    "live": 5,
+    "total": 87
+  }
+}
+
+=================================
+API ENDPOINT: https://api.sofascore.com/api/v1/event/15632084/incidents
+=================================
+{
+  "incidents": "Array(0)",
+  "home": {
+    "goalkeeperColor": {
+      "primary": "535353",
+      "number": "ffffff",
+      "outline": "535353",
+      "fancyNumber": "ffffff"
+    },
+    "playerColor": {
+      "primary": "ffffff",
+      "number": "000000",
+      "outline": "ffffff",
+      "fancyNumber": "222226"
+    }
+  },
+  "away": {
+    "goalkeeperColor": {
+      "primary": "69d68d",
+      "number": "000000",
+      "outline": "69d68d",
+      "fancyNumber": "222226"
+    },
+    "playerColor": {
+      "primary": "ffffff",
+      "number": "405159",
+      "outline": "ffffff",
+      "fancyNumber": "222226"
+    }
+  }
+}
+
+=================================
+API ENDPOINT: https://api.sofascore.com/api/v1/event/15632084/pregame-form
+=================================
+Status: 404
+
+=================================
+API ENDPOINT: https://api.sofascore.com/api/v1/tv/event/15632084/country-channels
+=================================
+{
+  "countryChannels": {
+    "BJ": "Array(4)",
+    "TG": "Array(5)",
+    "MW": "Array(3)",
+    "SN": "Array(5)",
+    "TZ": "Array(3)",
+    "ZW": "Array(4)",
+    "BO": "Array(2)",
+    "GN": "Array(5)",
+    "GH": "Array(4)",
+    "PL": "Array(4)",
+    "CL": "Array(2)",
+    "ES": "Array(4)",
+    "SC": "Array(4)",
+    "CM": "Array(6)",
+    "GW": "Array(5)",
+    "MX": "Array(4)",
+    "QA": "Array(1)",
+    "AM": "Array(2)",
+    "SI": "Array(1)",
+    "BR": "Array(4)",
+    "CI": "Array(5)",
+    "SV": "Array(4)",
+    "BF": "Array(5)",
+    "NI": "Array(4)",
+    "NL": "Array(3)",
+    "PT": "Array(1)",
+    "ML": "Array(5)",
+    "SL": "Array(5)",
+    "UG": "Array(4)",
+    "CV": "Array(4)",
+    "BG": "Array(1)",
+    "PE": "Array(2)",
+    "KW": "Array(1)",
+    "ER": "Array(3)",
+    "BW": "Array(3)",
+    "ET": "Array(3)",
+    "SK": "Array(1)",
+    "ID": "Array(2)",
+    "FR": "Array(2)",
+    "CR": "Array(4)",
+    "NE": "Array(5)",
+    "IN": "Array(3)",
+    "CD": "Array(4)",
+    "MU": "Array(4)",
+    "RW": "Array(4)",
+    "RU": "Array(1)",
+    "LR": "Array(3)",
+    "LB": "Array(1)",
+    "DJ": "Array(6)",
+    "BI": "Array(5)",
+    "GA": "Array(5)",
+    "AF": "Array(3)",
+    "AR": "Array(4)",
+    "BT": "Array(2)",
+    "XK": "Array(1)",
+    "RE": "Array(2)",
+    "BD": "Array(2)",
+    "SD": "Array(4)",
+    "ZA": "Array(3)",
+    "VE": "Array(3)",
+    "IT": "Array(3)",
+    "KE": "Array(3)",
+    "LS": "Array(4)",
+    "BN": "Array(1)",
+    "LY": "Array(1)",
+    "MM": "Array(1)",
+    "PA": "Array(5)",
+    "SO": "Array(3)",
+    "BE": "Array(3)",
+    "TR": "Array(2)",
+    "US": "Array(10)",
+    "PY": "Array(2)",
+    "MV": "Array(2)",
+    "CF": "Array(4)",
+    "ZM": "Array(3)",
+    "CG": "Array(5)",
+    "DO": "Array(4)",
+    "DZ": "Array(1)",
+    "EC": "Array(3)",
+    "BA": "Array(2)",
+    "CY": "Array(2)",
+    "IE": "Array(3)",
+    "IR": "Array(1)",
+    "GL": "Array(1)",
+    "NG": "Array(3)",
+    "SZ": "Array(3)",
+    "LK": "Array(2)",
+    "CH": "Array(2)",
+    "UA": "Array(2)",
+    "KM": "Array(3)",
+    "BH": "Array(1)",
+    "YE": "Array(1)",
+    "UY": "Array(2)",
+    "FI": "Array(2)",
+    "AD": "Array(2)",
+    "CO": "Array(3)",
+    "AO": "Array(3)",
+    "GM": "Array(4)",
+    "MG": "Array(4)",
+    "DK": "Array(2)",
+    "KZ": "Array(1)",
+    "PK": "Array(2)",
+    "MR": "Array(6)",
+    "NP": "Array(2)",
+    "AE": "Array(1)",
+    "YT": "Array(2)",
+    "GE": "Array(1)",
+    "AZ": "Array(2)",
+    "IQ": "Array(1)",
+    "MZ": "Array(3)",
+    "JO": "Array(1)",
+    "SS": "Array(4)",
+    "GQ": "Array(4)",
+    "MK": "Array(2)",
+    "AL": "Array(1)",
+    "DE": "Array(1)",
+    "ST": "Array(2)",
+    "GB": "Array(2)",
+    "HN": "Array(4)",
+    "GT": "Array(4)",
+    "HR": "Array(1)",
+    "NA": "Array(3)",
+    "SE": "Array(1)",
+    "TD": "Array(6)",
+    "AU": "Array(2)",
+    "TN": "Array(1)",
+    "CA": "Array(1)",
+    "RS": "Array(2)",
+    "SA": "Array(1)",
+    "SM": "Array(3)",
+    "PS": "Array(1)",
+    "MY": "Array(3)",
+    "PR": "Array(2)",
+    "SY": "Array(1)",
+    "AT": "Array(4)",
+    "SG": "Array(1)",
+    "GR": "Array(1)",
+    "MO": "Array(1)",
+    "OM": "Array(1)",
+    "BZ": "Array(1)",
+    "CN": "Array(1)",
+    "NO": "Array(1)",
+    "LU": "Array(2)",
+    "MA": "Array(1)",
+    "JP": "Array(1)",
+    "RO": "Array(2)",
+    "IL": "Array(1)",
+    "CZ": "Array(1)",
+    "EG": "Array(1)"
+  }
+}
+
+=================================
+API ENDPOINT: https://api.sofascore.com/api/v1/team/2829/featured-players
+=================================
+{
+  "featuredPlayers": {
+    "14083191": {
+      "player": {
+        "name": "Éder Militão",
+        "slug": "eder-militao",
+        "shortName": "É. Militão",
+        "position": "D",
+        "jerseyNumber": "3",
+        "userCount": 158519,
+        "gender": "M",
+        "id": 822519,
+        "fieldTranslations": {
+          "nameTranslation": {
+            "ar": "إيدير ميليتاو",
+            "bn": "এডার মিলিটাও",
+            "hi": "एडर मिलिटाओ"
+          },
+          "shortNameTranslation": {
+            "ar": "إ. ميليتاو",
+            "bn": "এ. মিলিটাও",
+            "hi": "ई. मिलिटाओ"
+          }
+        }
+      },
+      "statistics": {
+        "rating": 7.4,
+        "statisticsType": {
+          "sportSlug": "football",
+          "statisticsType": "player"
+        }
+      },
+      "eventId": 14081816
+    },
+    "14083211": {
+      "player": {
+        "name": "Éder Militão",
+        "slug": "eder-militao",
+        "shortName": "É. Militão",
+        "position": "D",
+        "jerseyNumber": "3",
+        "userCount": 158519,
+        "gender": "M",
+        "id": 822519,
+        "fieldTranslations": {
+          "nameTranslation": {
+            "ar": "إيدير ميليتاو",
+            "bn": "এডার মিলিটাও",
+            "hi": "एडर मिलिटाओ"
+          },
+          "shortNameTranslation": {
+            "ar": "إ. ميليتاو",
+            "bn": "এ. মিলিটাও",
+            "hi": "ई. मिलिटाओ"
+          }
+        }
+      },
+      "statistics": {
+        "rating": 7.4,
+        "statisticsType": {
+          "sportSlug": "football",
+          "statisticsType": "player"
+        }
+      },
+      "eventId": 14081816
+    },
+    "14083295": {
+      "player": {
+        "name": "Éder Militão",
+        "slug": "eder-militao",
+        "shortName": "É. Militão",
+        "position": "D",
+        "jerseyNumber": "3",
+        "userCount": 158519,
+        "gender": "M",
+        "id": 822519,
+        "fieldTranslations": {
+          "nameTranslation": {
+            "ar": "إيدير ميليتاو",
+            "bn": "এডার মিলিটাও",
+            "hi": "एडर मिलिटाओ"
+          },
+          "shortNameTranslation": {
+            "ar": "إ. ميليتاو",
+            "bn": "এ. মিলিটাও",
+            "hi": "ई. मिलिटाओ"
+          }
+        }
+      },
+      "statistics": {
+        "rating": 7.4,
+        "statisticsType": {
+          "sportSlug": "football",
+          "statisticsType": "player"
+        }
+      },
+      "eventId": 14081816
+    },
+    "15632084": {
+      "player": {
+        "name": "Éder Militão",
+        "slug": "eder-militao",
+        "shortName": "É. Militão",
+        "position": "D",
+        "jerseyNumber": "3",
+        "userCount": 158519,
+        "gender": "M",
+        "id": 822519,
+        "fieldTranslations": {
+          "nameTranslation": {
+            "ar": "إيدير ميليتاو",
+            "bn": "এডার মিলিটাও",
+            "hi": "एडर मिलिटाओ"
+          },
+          "shortNameTranslation": {
+            "ar": "إ. ميليتاو",
+            "bn": "এ. মিলিটাও",
+            "hi": "ई. मिलिटाओ"
+          }
+        }
+      },
+      "statistics": {
+        "rating": 7.4,
+        "statisticsType": {
+          "sportSlug": "football",
+          "statisticsType": "player"
+        }
+      },
+      "eventId": 14081816
+    },
+    "15632088": {
+      "player": {
+        "name": "Éder Militão",
+        "slug": "eder-militao",
+        "shortName": "É. Militão",
+        "position": "D",
+        "jerseyNumber": "3",
+        "userCount": 158519,
+        "gender": "M",
+        "id": 822519,
+        "fieldTranslations": {
+          "nameTranslation": {
+            "ar": "إيدير ميليتاو",
+            "bn": "এডার মিলিটাও",
+            "hi": "एडर मिलिटाओ"
+          },
+          "shortNameTranslation": {
+            "ar": "إ. ميليتاو",
+            "bn": "এ. মিলিটাও",
+            "hi": "ई. मिलिटाओ"
+          }
+        }
+      },
+      "statistics": {
+        "rating": 7.4,
+        "statisticsType": {
+          "sportSlug": "football",
+          "statisticsType": "player"
+        }
+      },
+      "eventId": 14081816
+    }
+  }
+}
+
+=================================
+API ENDPOINT: https://api.sofascore.com/api/v1/team/2672/featured-players
+=================================
+{
+  "featuredPlayers": {
+    "14065219": {
+      "player": {
+        "name": "Tom Bischof",
+        "slug": "tom-bischof",
+        "shortName": "T. Bischof",
+        "position": "M",
+        "jerseyNumber": "20",
+        "userCount": 7037,
+        "gender": "M",
+        "id": 1129935,
+        "fieldTranslations": {
+          "nameTranslation": {
+            "ar": "توم بيشوف",
+            "bn": "টম বিশফ",
+            "hi": "टॉम बिशॉफ़"
+          },
+          "shortNameTranslation": {
+            "ar": "ت. بيشوف",
+            "bn": "টি. বিশফ.",
+            "hi": "टी. बिशॉफ़"
+          }
+        }
+      },
+      "statistics": {
+        "rating": 8.6,
+        "statisticsType": {
+          "sportSlug": "football",
+          "statisticsType": "player"
+        }
+      },
+      "eventId": 14065206
+    },
+    "14065222": {
+      "player": {
+        "name": "Tom Bischof",
+        "slug": "tom-bischof",
+        "shortName": "T. Bischof",
+        "position": "M",
+        "jerseyNumber": "20",
+        "userCount": 7037,
+        "gender": "M",
+        "id": 1129935,
+        "fieldTranslations": {
+          "nameTranslation": {
+            "ar": "توم بيشوف",
+            "bn": "টম বিশফ",
+            "hi": "टॉम बिशॉफ़"
+          },
+          "shortNameTranslation": {
+            "ar": "ت. بيشوف",
+            "bn": "টি. বিশফ.",
+            "hi": "टी. बिशॉफ़"
+          }
+        }
+      },
+      "statistics": {
+        "rating": 8.6,
+        "statisticsType": {
+          "sportSlug": "football",
+          "statisticsType": "player"
+        }
+      },
+      "eventId": 14065206
+    },
+    "14065235": {
+      "player": {
+        "name": "Tom Bischof",
+        "slug": "tom-bischof",
+        "shortName": "T. Bischof",
+        "position": "M",
+        "jerseyNumber": "20",
+        "userCount": 7037,
+        "gender": "M",
+        "id": 1129935,
+        "fieldTranslations": {
+          "nameTranslation": {
+            "ar": "توم بيشوف",
+            "bn": "টম বিশফ",
+            "hi": "टॉम बिशॉफ़"
+          },
+          "shortNameTranslation": {
+            "ar": "ت. بيشوف",
+            "bn": "টি. বিশফ.",
+            "hi": "टी. बिशॉफ़"
+          }
+        }
+      },
+      "statistics": {
+        "rating": 8.6,
+        "statisticsType": {
+          "sportSlug": "football",
+          "statisticsType": "player"
+        }
+      },
+      "eventId": 14065206
+    },
+    "15600443": {
+      "player": {
+        "name": "Tom Bischof",
+        "slug": "tom-bischof",
+        "shortName": "T. Bischof",
+        "position": "M",
+        "jerseyNumber": "20",
+        "userCount": 7037,
+        "gender": "M",
+        "id": 1129935,
+        "fieldTranslations": {
+          "nameTranslation": {
+            "ar": "توم بيشوف",
+            "bn": "টম বিশফ",
+            "hi": "टॉम बिशॉफ़"
+          },
+          "shortNameTranslation": {
+            "ar": "ت. بيشوف",
+            "bn": "টি. বিশফ.",
+            "hi": "टी. बिशॉफ़"
+          }
+        }
+      },
+      "statistics": {
+        "rating": 8.6,
+        "statisticsType": {
+          "sportSlug": "football",
+          "statisticsType": "player"
+        }
+      },
+      "eventId": 14065206
+    },
+    "15632084": {
+      "player": {
+        "name": "Tom Bischof",
+        "slug": "tom-bischof",
+        "shortName": "T. Bischof",
+        "position": "M",
+        "jerseyNumber": "20",
+        "userCount": 7037,
+        "gender": "M",
+        "id": 1129935,
+        "fieldTranslations": {
+          "nameTranslation": {
+            "ar": "توم بيشوف",
+            "bn": "টম বিশফ",
+            "hi": "टॉम बिशॉफ़"
+          },
+          "shortNameTranslation": {
+            "ar": "ت. بيشوف",
+            "bn": "টি. বিশফ.",
+            "hi": "टी. बिशॉफ़"
+          }
+        }
+      },
+      "statistics": {
+        "rating": 8.6,
+        "statisticsType": {
+          "sportSlug": "football",
+          "statisticsType": "player"
+        }
+      },
+      "eventId": 14065206
+    },
+    "15632088": {
+      "player": {
+        "name": "Tom Bischof",
+        "slug": "tom-bischof",
+        "shortName": "T. Bischof",
+        "position": "M",
+        "jerseyNumber": "20",
+        "userCount": 7037,
+        "gender": "M",
+        "id": 1129935,
+        "fieldTranslations": {
+          "nameTranslation": {
+            "ar": "توم بيشوف",
+            "bn": "টম বিশফ",
+            "hi": "टॉम बिशॉफ़"
+          },
+          "shortNameTranslation": {
+            "ar": "ت. بيشوف",
+            "bn": "টি. বিশফ.",
+            "hi": "टी. बिशॉफ़"
+          }
+        }
+      },
+      "statistics": {
+        "rating": 8.6,
+        "statisticsType": {
+          "sportSlug": "football",
+          "statisticsType": "player"
+        }
+      },
+      "eventId": 14065206
+    }
+  }
+}
+
+=================================
+API ENDPOINT: https://api.sofascore.com/api/v1/team/2829/team-statistics/seasons
+=================================
+{
+  "uniqueTournamentSeasons": "Array(7) [ { uniqueTournament, seasons, allTimeSeasonId } ]",
+  "typesMap": {
+    "7": {
+      "12": "Array(1)",
+      "13": "Array(1)",
+      "14": "Array(1)",
+      "15": "Array(1)",
+      "603": "Array(1)",
+      "1664": "Array(1)",
+      "1825": "Array(1)",
+      "2764": "Array(1)",
+      "3402": "Array(1)",
+      "4788": "Array(1)",
+      "6359": "Array(1)",
+      "8226": "Array(1)",
+      "10390": "Array(1)",
+      "11773": "Array(1)",
+      "13415": "Array(1)",
+      "17351": "Array(1)",
+      "23766": "Array(1)",
+      "29267": "Array(1)",
+      "36886": "Array(1)",
+      "41897": "Array(1)",
+      "52162": "Array(1)",
+      "61644": "Array(1)",
+      "76953": "Array(1)"
+    },
+    "8": {
+      "10495": "Array(1)",
+      "11906": "Array(1)",
+      "13662": "Array(1)",
+      "18020": "Array(1)",
+      "24127": "Array(1)",
+      "32501": "Array(1)",
+      "37223": "Array(1)",
+      "42409": "Array(1)",
+      "52376": "Array(1)",
+      "61643": "Array(1)",
+      "77559": "Array(1)"
+    },
+    "213": {
+      "13871": "Array(1)",
+      "26219": "Array(1)",
+      "35083": "Array(1)",
+      "39458": "Array(1)",
+      "42898": "Array(1)",
+      "56121": "Array(1)",
+      "66001": "Array(1)",
+      "78978": "Array(1)"
+    },
+    "329": {
+      "66885": "Array(1)",
+      "82988": "Array(1)"
+    },
+    "357": {
+      "48107": "Array(1)",
+      "69619": "Array(1)"
+    },
+    "465": {
+      "13327": "Array(1)",
+      "17168": "Array(1)",
+      "41910": "Array(1)",
+      "60623": "Array(1)"
+    },
+    "1794": {
+      "13160": "Array(1)"
+    }
+  }
+}
+
+=================================
+API ENDPOINT: https://api.sofascore.com/api/v1/team/2829/unique-tournament/7/season/76953/statistics/overall
+=================================
+{
+  "statistics": {
+    "goalsScored": 29,
+    "goalsConceded": 14,
+    "ownGoals": 0,
+    "assists": 22,
+    "shots": 212,
+    "penaltyGoals": 4,
+    "penaltiesTaken": 5,
+    "freeKickGoals": 0,
+    "freeKickShots": 4,
+    "goalsFromInsideTheBox": 26,
+    "goalsFromOutsideTheBox": 2,
+    "shotsFromInsideTheBox": 145,
+    "shotsFromOutsideTheBox": 67,
+    "headedGoals": 3,
+    "leftFootGoals": 3,
+    "rightFootGoals": 22,
+    "bigChances": 48,
+    "bigChancesCreated": 35,
+    "bigChancesMissed": 28,
+    "shotsOnTarget": 83,
+    "shotsOffTarget": 69,
+    "blockedScoringAttempt": 60,
+    "successfulDribbles": 123,
+    "dribbleAttempts": 239,
+    "corners": 70,
+    "hitWoodwork": 7,
+    "fastBreaks": 27,
+    "fastBreakGoals": 5,
+    "fastBreakShots": 22,
+    "averageBallPossession": 55.916666666667,
+    "totalPasses": 6404,
+    "accuratePasses": 5667,
+    "accuratePassesPercentage": 88.491567770144,
+    "totalOwnHalfPasses": 2890,
+    "accurateOwnHalfPasses": 2675,
+    "accurateOwnHalfPassesPercentage": 92.560553633218,
+    "totalOppositionHalfPasses": 3514,
+    "accurateOppositionHalfPasses": 2992,
+    "accurateOppositionHalfPassesPercentage": 85.145133750711,
+    "totalLongBalls": 384,
+    "accurateLongBalls": 228,
+    "accurateLongBallsPercentage": 59.375,
+    "totalCrosses": 143,
+    "accurateCrosses": 38,
+    "accurateCrossesPercentage": 26.573426573427,
+    "cleanSheets": 4,
+    "tackles": 183,
+    "interceptions": 110,
+    "saves": 61,
+    "errorsLeadingToGoal": 4,
+    "errorsLeadingToShot": 16,
+    "penaltiesCommited": 2,
+    "penaltyGoalsConceded": 2,
+    "clearances": 248,
+    "clearancesOffLine": 1,
+    "lastManTackles": 3,
+    "totalDuels": 1090,
+    "duelsWon": 545,
+    "duelsWonPercentage": 50,
+    "totalGroundDuels": 876,
+    "groundDuelsWon": 437,
+    "groundDuelsWonPercentage": 49.885844748858,
+    "totalAerialDuels": 214,
+    "aerialDuelsWon": 108,
+    "aerialDuelsWonPercentage": 50.467289719626,
+    "possessionLost": 1246,
+    "offsides": 13,
+    "fouls": 127,
+    "yellowCards": 25,
+    "yellowRedCards": 1,
+    "redCards": 3,
+    "avgRating": 7,
+    "accurateFinalThirdPassesAgainst": 1147,
+    "accurateOppositionHalfPassesAgainst": 2239,
+    "accurateOwnHalfPassesAgainst": 1984,
+    "accuratePassesAgainst": 4223,
+    "bigChancesAgainst": 31,
+    "bigChancesCreatedAgainst": 19,
+    "bigChancesMissedAgainst": 19,
+    "clearancesAgainst": 211,
+    "cornersAgainst": 65,
+    "crossesSuccessfulAgainst": 36,
+    "crossesTotalAgainst": 177,
+    "dribbleAttemptsTotalAgainst": 199,
+    "dribbleAttemptsWonAgainst": 111,
+    "errorsLeadingToGoalAgainst": 3,
+    "errorsLeadingToShotAgainst": 11,
+    "hitWoodworkAgainst": 4,
+    "interceptionsAgainst": 98,
+    "keyPassesAgainst": 131,
+    "longBallsSuccessfulAgainst": 179,
+    "longBallsTotalAgainst": 428,
+    "offsidesAgainst": 14,
+    "redCardsAgainst": 1,
+    "shotsAgainst": 180,
+    "shotsBlockedAgainst": 49,
+    "shotsFromInsideTheBoxAgainst": 112,
+    "shotsFromOutsideTheBoxAgainst": 68,
+    "shotsOffTargetAgainst": 56,
+    "shotsOnTargetAgainst": 75,
+    "blockedScoringAttemptAgainst": 49,
+    "tacklesAgainst": 207,
+    "totalFinalThirdPassesAgainst": 1532,
+    "oppositionHalfPassesTotalAgainst": 2788,
+    "ownHalfPassesTotalAgainst": 2211,
+    "totalPassesAgainst": 4999,
+    "yellowCardsAgainst": 19,
+    "throwIns": 138,
+    "goalKicks": 77,
+    "ballRecovery": 591,
+    "freeKicks": 132,
+    "kilometersCovered": 1328.71699,
+    "numberOfSprints": 1347,
+    "id": 52518,
+    "matches": 12,
+    "awardedMatches": 0,
+    "statisticsType": {
+      "sportSlug": "football",
+      "statisticsType": "team"
+    }
+  }
+}
+
+=================================
+API ENDPOINT: https://api.sofascore.com/api/v1/team/2672/team-statistics/seasons
+=================================
+{
+  "uniqueTournamentSeasons": "Array(6) [ { uniqueTournament, seasons, allTimeSeasonId } ]",
+  "typesMap": {
+    "7": {
+      "12": "Array(1)",
+      "13": "Array(1)",
+      "14": "Array(1)",
+      "15": "Array(1)",
+      "1664": "Array(1)",
+      "1825": "Array(1)",
+      "2764": "Array(1)",
+      "3402": "Array(1)",
+      "4788": "Array(1)",
+      "6359": "Array(1)",
+      "8226": "Array(1)",
+      "10390": "Array(1)",
+      "11773": "Array(1)",
+      "13415": "Array(1)",
+      "17351": "Array(1)",
+      "23766": "Array(1)",
+      "29267": "Array(1)",
+      "36886": "Array(1)",
+      "41897": "Array(1)",
+      "52162": "Array(1)",
+      "61644": "Array(1)",
+      "76953": "Array(1)"
+    },
+    "35": {
+      "10419": "Array(1)",
+      "11818": "Array(1)",
+      "13477": "Array(1)",
+      "17597": "Array(1)",
+      "23538": "Array(1)",
+      "28210": "Array(1)",
+      "37166": "Array(1)",
+      "42268": "Array(1)",
+      "52608": "Array(1)",
+      "63516": "Array(1)",
+      "77333": "Array(1)"
+    },
+    "217": {
+      "13373": "Array(1)",
+      "17297": "Array(1)",
+      "23877": "Array(1)",
+      "29194": "Array(1)",
+      "37289": "Array(1)",
+      "41962": "Array(1)",
+      "52284": "Array(1)",
+      "61132": "Array(1)",
+      "76910": "Array(1)"
+    },
+    "357": {
+      "35183": "Array(1)",
+      "69619": "Array(1)"
+    },
+    "465": {
+      "29463": "Array(1)"
+    },
+    "799": {
+      "13322": "Array(1)",
+      "17264": "Array(1)",
+      "23602": "Array(1)",
+      "29295": "Array(1)",
+      "36760": "Array(1)",
+      "41820": "Array(1)",
+      "52051": "Array(1)",
+      "76139": "Array(1)"
+    }
+  }
+}
+
+=================================
+API ENDPOINT: https://api.sofascore.com/api/v1/team/2672/unique-tournament/7/season/76953/statistics/overall
+=================================
+{
+  "statistics": {
+    "goalsScored": 32,
+    "goalsConceded": 10,
+    "ownGoals": 1,
+    "assists": 23,
+    "shots": 189,
+    "penaltyGoals": 3,
+    "penaltiesTaken": 4,
+    "freeKickGoals": 0,
+    "freeKickShots": 3,
+    "goalsFromInsideTheBox": 29,
+    "goalsFromOutsideTheBox": 2,
+    "shotsFromInsideTheBox": 133,
+    "shotsFromOutsideTheBox": 56,
+    "headedGoals": 1,
+    "leftFootGoals": 9,
+    "rightFootGoals": 21,
+    "bigChances": 56,
+    "bigChancesCreated": 40,
+    "bigChancesMissed": 34,
+    "shotsOnTarget": 82,
+    "shotsOffTarget": 68,
+    "blockedScoringAttempt": 39,
+    "successfulDribbles": 104,
+    "dribbleAttempts": 189,
+    "corners": 50,
+    "hitWoodwork": 13,
+    "fastBreaks": 13,
+    "fastBreakGoals": 2,
+    "fastBreakShots": 11,
+    "averageBallPossession": 60.7,
+    "totalPasses": 6521,
+    "accuratePasses": 5885,
+    "accuratePassesPercentage": 90.24689464806,
+    "totalOwnHalfPasses": 2649,
+    "accurateOwnHalfPasses": 2498,
+    "accurateOwnHalfPassesPercentage": 94.299735749339,
+    "totalOppositionHalfPasses": 3872,
+    "accurateOppositionHalfPasses": 3387,
+    "accurateOppositionHalfPassesPercentage": 87.474173553719,
+    "totalLongBalls": 338,
+    "accurateLongBalls": 226,
+    "accurateLongBallsPercentage": 66.863905325444,
+    "totalCrosses": 109,
+    "accurateCrosses": 17,
+    "accurateCrossesPercentage": 15.596330275229,
+    "cleanSheets": 2,
+    "tackles": 146,
+    "interceptions": 84,
+    "saves": 35,
+    "errorsLeadingToGoal": 4,
+    "errorsLeadingToShot": 4,
+    "penaltiesCommited": 0,
+    "penaltyGoalsConceded": 0,
+    "clearances": 148,
+    "clearancesOffLine": 0,
+    "lastManTackles": 2,
+    "totalDuels": 810,
+    "duelsWon": 402,
+    "duelsWonPercentage": 49.62962962963,
+    "totalGroundDuels": 648,
+    "groundDuelsWon": 325,
+    "groundDuelsWonPercentage": 50.154320987654,
+    "totalAerialDuels": 162,
+    "aerialDuelsWon": 77,
+    "aerialDuelsWonPercentage": 47.530864197531,
+    "possessionLost": 1019,
+    "offsides": 14,
+    "fouls": 106,
+    "yellowCards": 18,
+    "yellowRedCards": 1,
+    "redCards": 2,
+    "avgRating": 7.1040268456376,
+    "accurateFinalThirdPassesAgainst": 713,
+    "accurateOppositionHalfPassesAgainst": 1376,
+    "accurateOwnHalfPassesAgainst": 2029,
+    "accuratePassesAgainst": 3405,
+    "bigChancesAgainst": 24,
+    "bigChancesCreatedAgainst": 19,
+    "bigChancesMissedAgainst": 18,
+    "clearancesAgainst": 194,
+    "cornersAgainst": 34,
+    "crossesSuccessfulAgainst": 38,
+    "crossesTotalAgainst": 142,
+    "dribbleAttemptsTotalAgainst": 147,
+    "dribbleAttemptsWonAgainst": 77,
+    "errorsLeadingToGoalAgainst": 3,
+    "errorsLeadingToShotAgainst": 8,
+    "hitWoodworkAgainst": 0,
+    "interceptionsAgainst": 110,
+    "keyPassesAgainst": 85,
+    "longBallsSuccessfulAgainst": 217,
+    "longBallsTotalAgainst": 454,
+    "offsidesAgainst": 14,
+    "redCardsAgainst": 1,
+    "shotsAgainst": 105,
+    "shotsBlockedAgainst": 17,
+    "shotsFromInsideTheBoxAgainst": 67,
+    "shotsFromOutsideTheBoxAgainst": 38,
+    "shotsOffTargetAgainst": 46,
+    "shotsOnTargetAgainst": 43,
+    "blockedScoringAttemptAgainst": 16,
+    "tacklesAgainst": 147,
+    "totalFinalThirdPassesAgainst": 975,
+    "oppositionHalfPassesTotalAgainst": 1793,
+    "ownHalfPassesTotalAgainst": 2242,
+    "totalPassesAgainst": 4035,
+    "yellowCardsAgainst": 12,
+    "throwIns": 153,
+    "goalKicks": 61,
+    "ballRecovery": 487,
+    "freeKicks": 76,
+    "kilometersCovered": 1183.0884,
+    "numberOfSprints": 1109,
+    "id": 52625,
+    "matches": 10,
+    "awardedMatches": 0,
+    "statisticsType": {
+      "sportSlug": "football",
+      "statisticsType": "team"
+    }
+  }
+}
+
+=================================
+API ENDPOINT: https://api.sofascore.com/api/v1/event/15632084/graph/win-probability
+=================================
+Status: 404
+
+=================================
+API ENDPOINT: https://api.sofascore.com/api/v1/event/15632084/highlights
+=================================
+Status: 404
+
+=================================
+API ENDPOINT: https://api.sofascore.com/api/v1/event/15632084/official-tweets
+=================================
+{
+  "tweets": "Array(1) [ { id, account, text, media, createdAtTimestamp, externalUrl } ]"
+}
+
+=================================
+API ENDPOINT: https://api.sofascore.com/api/v1/event/15632084/lineups
+=================================
+{
+  "confirmed": false,
+  "home": {
+    "players": "Array(11) [ { avgRating, player, teamId, shirtNumber, jerseyNumber, position, substitute } ]",
+    "supportStaff": "Array(0)",
+    "formation": "4-4-2",
+    "playerColor": {
+      "primary": "ffffff",
+      "number": "000000",
+      "outline": "ffffff",
+      "fancyNumber": "222226"
+    },
+    "goalkeeperColor": {
+      "primary": "535353",
+      "number": "ffffff",
+      "outline": "535353",
+      "fancyNumber": "ffffff"
+    },
+    "missingPlayers": "Array(4) [ { player, type, reason, description, externalType, expectedEndDate } ]"
+  },
+  "away": {
+    "players": "Array(11) [ { avgRating, player, teamId, shirtNumber, jerseyNumber, position, substitute } ]",
+    "supportStaff": "Array(0)",
+    "formation": "4-2-3-1",
+    "playerColor": {
+      "primary": "ffffff",
+      "number": "405159",
+      "outline": "ffffff",
+      "fancyNumber": "222226"
+    },
+    "goalkeeperColor": {
+      "primary": "69d68d",
+      "number": "000000",
+      "outline": "69d68d",
+      "fancyNumber": "222226"
+    },
+    "missingPlayers": "Array(4) [ { player, type, reason, externalType } ]"
+  },
+  "statisticalVersion": 3
+}
+
+=================================
+API ENDPOINT: https://api.sofascore.com/api/v1/tournament/23/season/76953/standings/total
+=================================
+Status: 404
+
+=================================
+API ENDPOINT: https://api.sofascore.com/api/v1/event/15632084/comments
+=================================
+Status: 404
+
+=================================
+API ENDPOINT: https://api.sofascore.com/api/v1/unique-tournament/7/season/76953/cuptrees
+=================================
+{
+  "cupTrees": "Array(1) [ { id, name, tournament, currentRound, rounds, type, finalMatchCupBlock, showSingleParticipantByeBlocks, hideRoundsWithoutParticipants } ]"
+}
+
+=================================
+API ENDPOINT: https://api.sofascore.com/api/v1/team/2829/unique-tournament/7/season/76953/top-players/overall
+=================================
+{
+  "topPlayers": {
+    "rating": "Array(30) [ { statistics, playedEnough, player, team } ]",
+    "goals": "Array(9) [ { statistics, playedEnough, player, team } ]",
+    "expectedGoals": "Array(19) [ { statistics, playedEnough, player, team } ]",
+    "assists": "Array(12) [ { statistics, playedEnough, player, team } ]",
+    "expectedAssists": "Array(29) [ { statistics, playedEnough, player, team } ]",
+    "goalsAssistsSum": "Array(13) [ { statistics, playedEnough, player, team } ]",
+    "kilometersCovered": "Array(25) [ { statistics, playedEnough, player, team } ]",
+    "numberOfSprints": "Array(23) [ { statistics, playedEnough, player, team } ]",
+    "topSpeed": "Array(30) [ { statistics, playedEnough, player, team } ]",
+    "penaltyGoals": "Array(2) [ { statistics, playedEnough, player, team } ]",
+    "freeKickGoal": "Array(3) [ { statistics, playedEnough, player, team } ]",
+    "scoringFrequency": "Array(9) [ { statistics, playedEnough, player, team } ]",
+    "totalShots": "Array(19) [ { statistics, playedEnough, player, team } ]",
+    "shotsOnTarget": "Array(12) [ { statistics, playedEnough, player, team } ]",
+    "bigChancesMissed": "Array(7) [ { statistics, playedEnough, player, team } ]",
+    "bigChancesCreated": "Array(13) [ { statistics, playedEnough, player, team } ]",
+    "accuratePasses": "Array(29) [ { statistics, playedEnough, player, team } ]",
+    "keyPasses": "Array(22) [ { statistics, playedEnough, player, team } ]",
+    "accurateLongBalls": "Array(22) [ { statistics, playedEnough, player, team } ]",
+    "successfulDribbles": "Array(17) [ { statistics, playedEnough, player, team } ]",
+    "penaltyWon": "Array(3) [ { statistics, playedEnough, player, team } ]",
+    "tackles": "Array(23) [ { statistics, playedEnough, player, team } ]",
+    "interceptions": "Array(20) [ { statistics, playedEnough, player, team } ]",
+    "clearances": "Array(23) [ { statistics, playedEnough, player, team } ]",
+    "possessionLost": "Array(29) [ { statistics, playedEnough, player, team } ]",
+    "yellowCards": "Array(15) [ { statistics, playedEnough, player, team } ]",
+    "redCards": "Array(3) [ { statistics, playedEnough, player, team } ]"
+  },
+  "statisticsType": {
+    "sportSlug": "football",
+    "statisticsType": "player"
+  }
+}
+
+=================================
+API ENDPOINT: https://api.sofascore.com/api/v1/team/2672/unique-tournament/7/season/76953/top-players/overall
+=================================
+{
+  "topPlayers": {
+    "rating": "Array(24) [ { statistics, playedEnough, player, team } ]",
+    "goals": "Array(10) [ { statistics, playedEnough, player, team } ]",
+    "expectedGoals": "Array(18) [ { statistics, playedEnough, player, team } ]",
+    "assists": "Array(10) [ { statistics, playedEnough, player, team } ]",
+    "expectedAssists": "Array(24) [ { statistics, playedEnough, player, team } ]",
+    "goalsAssistsSum": "Array(13) [ { statistics, playedEnough, player, team } ]",
+    "kilometersCovered": "Array(21) [ { statistics, playedEnough, player, team } ]",
+    "numberOfSprints": "Array(19) [ { statistics, playedEnough, player, team } ]",
+    "topSpeed": "Array(24) [ { statistics, playedEnough, player, team } ]",
+    "penaltyGoals": "Array(1) [ { statistics, playedEnough, player, team } ]",
+    "freeKickGoal": "Array(2) [ { statistics, playedEnough, player, team } ]",
+    "scoringFrequency": "Array(10) [ { statistics, playedEnough, player, team } ]",
+    "totalShots": "Array(18) [ { statistics, playedEnough, player, team } ]",
+    "shotsOnTarget": "Array(14) [ { statistics, playedEnough, player, team } ]",
+    "bigChancesMissed": "Array(13) [ { statistics, playedEnough, player, team } ]",
+    "bigChancesCreated": "Array(13) [ { statistics, playedEnough, player, team } ]",
+    "accuratePasses": "Array(24) [ { statistics, playedEnough, player, team } ]",
+    "keyPasses": "Array(19) [ { statistics, playedEnough, player, team } ]",
+    "accurateLongBalls": "Array(19) [ { statistics, playedEnough, player, team } ]",
+    "successfulDribbles": "Array(16) [ { statistics, playedEnough, player, team } ]",
+    "penaltyWon": "Array(1) [ { statistics, playedEnough, player, team } ]",
+    "tackles": "Array(18) [ { statistics, playedEnough, player, team } ]",
+    "interceptions": "Array(18) [ { statistics, playedEnough, player, team } ]",
+    "clearances": "Array(19) [ { statistics, playedEnough, player, team } ]",
+    "possessionLost": "Array(23) [ { statistics, playedEnough, player, team } ]",
+    "yellowCards": "Array(9) [ { statistics, playedEnough, player, team } ]",
+    "redCards": "Array(2) [ { statistics, playedEnough, player, team } ]"
+  },
+  "statisticsType": {
+    "sportSlug": "football",
+    "statisticsType": "player"
+  }
+}
+
+=================================
+API ENDPOINT: https://api.sofascore.com/api/v1/event/15632084
+=================================
+{
+  "event": {
+    "eventState": {},
+    "tournament": {
+      "name": "UEFA Champions League, Knockout stage",
+      "slug": "uefa-champions-league-knockout-stage",
+      "category": {
+        "name": "Europe",
+        "slug": "europe",
+        "sport": {
+          "name": "Football",
+          "slug": "football",
+          "id": 1
+        },
+        "priority": 19,
+        "country": {},
+        "id": 1465,
+        "flag": "europe",
+        "fieldTranslations": {
+          "nameTranslation": {
+            "ar": "أوروبا",
+            "hi": "यूरोप",
+            "bn": "ইউরোপ",
+            "ru": "Европа"
+          },
+          "shortNameTranslation": {}
+        }
+      },
+      "uniqueTournament": {
+        "name": "UEFA Champions League",
+        "slug": "uefa-champions-league",
+        "primaryColorHex": "#062b5c",
+        "secondaryColorHex": "#086aab",
+        "category": {
+          "name": "Europe",
+          "slug": "europe",
+          "sport": {
+            "name": "Football",
+            "slug": "football",
+            "id": 1
+          },
+          "priority": 19,
+          "country": {},
+          "id": 1465,
+          "flag": "europe",
+          "fieldTranslations": {
+            "nameTranslation": {
+              "ar": "أوروبا",
+              "hi": "यूरोप",
+              "bn": "ইউরোপ",
+              "ru": "Европа"
+            },
+            "shortNameTranslation": {}
+          }
+        },
+        "userCount": 1240293,
+        "hasRounds": true,
+        "hasPerformanceGraphFeature": false,
+        "country": {},
+        "id": 7,
+        "hasEventPlayerStatistics": true,
+        "displayInverseHomeAwayTeams": false,
+        "fieldTranslations": {
+          "nameTranslation": {
+            "bn": "উয়েফা চ্যাম্পিয়ন্স লীগ",
+            "ar": "دوري أبطال أوروبا",
+            "hi": "यूईएफए चैंपियंस लीग",
+            "hr": "UEFA Liga prvaka"
+          },
+          "shortNameTranslation": {}
+        }
+      },
+      "priority": 714,
+      "isGroup": false,
+      "competitionType": 2,
+      "isLive": false,
+      "id": 23,
+      "fieldTranslations": {
+        "nameTranslation": {
+          "hi": "यूईएफए चैंपियंस लीग",
+          "ar": "دوري أبطال أوروبا",
+          "bn": "উয়েফা চ্যাম্পিয়ন্স লীগ"
+        },
+        "shortNameTranslation": {}
+      }
+    },
+    "season": {
+      "name": "UEFA Champions League 25/26",
+      "year": "25/26",
+      "editor": false,
+      "id": 76953
+    },
+    "roundInfo": {
+      "round": 27,
+      "name": "Quarterfinals",
+      "slug": "quarterfinals",
+      "cupRoundType": 4
+    },
+    "customId": "xdbsEgb",
+    "status": {
+      "code": 0,
+      "description": "Not started",
+      "type": "notstarted"
+    },
+    "venue": {
+      "venueCoordinates": {
+        "latitude": 40.453,
+        "longitude": -3.6883
+      },
+      "hidden": false,
+      "slug": "santiago-bernab-u",
+      "name": "Bernabéu",
+      "capacity": 84744,
+      "country": {
+        "alpha2": "ES",
+        "alpha3": "ESP",
+        "name": "Spain",
+        "slug": "spain"
+      },
+      "id": 754,
+      "city": {
+        "name": "Madrid"
+      },
+      "fieldTranslations": {
+        "nameTranslation": {
+          "ar": "سانتياغو برنابيو",
+          "hi": "सैंटियागो बर्नबेउ",
+          "bn": "সান্তিয়াগো বার্নাব্যু"
+        },
+        "shortNameTranslation": {}
+      },
+      "stadium": {
+        "name": "Bernabéu",
+        "capacity": 84744
+      }
+    },
+    "referee": {
+      "name": "Michael Oliver",
+      "slug": "oliver-michael",
+      "yellowCards": 2256,
+      "redCards": 50,
+      "yellowRedCards": 40,
+      "games": 645,
+      "sport": {
+        "id": 1,
+        "slug": "football",
+        "name": "Football"
+      },
+      "country": {
+        "alpha2": "EN",
+        "alpha3": "ENG",
+        "name": "England",
+        "slug": "england"
+      },
+      "id": 65702,
+      "fieldTranslations": {
+        "nameTranslation": {
+          "ar": "أوليفر، مايكل",
+          "bn": "অলিভার, মাইকেল",
+          "hi": "ओलिवर, माइकल"
+        },
+        "shortNameTranslation": {}
+      }
+    },
+    "homeTeam": {
+      "name": "Real Madrid",
+      "slug": "real-madrid",
+      "shortName": "Real Madrid",
+      "gender": "M",
+      "sport": {
+        "name": "Football",
+        "slug": "football",
+        "id": 1
+      },
+      "userCount": 7165251,
+      "manager": {
+        "name": "Álvaro Arbeloa",
+        "slug": "alvaro-arbeloa",
+        "shortName": "Á. Arbeloa",
+        "country": {
+          "alpha2": "ES",
+          "alpha3": "ESP",
+          "name": "Spain",
+          "slug": "spain"
+        },
+        "id": 798940,
+        "fieldTranslations": {
+          "nameTranslation": {
+            "ar": "ألفارو أربيلوا"
+          },
+          "shortNameTranslation": {
+            "ar": "أ. أربيلوا"
+          }
+        }
+      },
+      "venue": {
+        "venueCoordinates": {
+          "latitude": 40.453,
+          "longitude": -3.6883
+        },
+        "hidden": false,
+        "slug": "santiago-bernab-u",
+        "name": "Bernabéu",
+        "capacity": 84744,
+        "country": {
+          "alpha2": "ES",
+          "alpha3": "ESP",
+          "name": "Spain",
+          "slug": "spain"
+        },
+        "id": 754,
+        "city": {
+          "name": "Madrid"
+        },
+        "fieldTranslations": {
+          "nameTranslation": {
+            "ar": "سانتياغو برنابيو",
+            "hi": "सैंटियागो बर्नबेउ",
+            "bn": "সান্তিয়াগো বার্নাব্যু"
+          },
+          "shortNameTranslation": {}
+        },
+        "stadium": {
+          "name": "Bernabéu",
+          "capacity": 84744
+        }
+      },
+      "nameCode": "RMA",
+      "class": 4,
+      "disabled": false,
+      "national": false,
+      "type": 0,
+      "country": {
+        "alpha2": "ES",
+        "alpha3": "ESP",
+        "name": "Spain",
+        "slug": "spain"
+      },
+      "id": 2829,
+      "fullName": "Real Madrid",
+      "subTeams": "Array(0)",
+      "teamColors": {
+        "primary": "#ffffff",
+        "secondary": "#004996",
+        "text": "#004996"
+      },
+      "foundationDateTimestamp": -2140387200,
+      "fieldTranslations": {
+        "nameTranslation": {
+          "ar": "ريال مدريد",
+          "bn": "রিয়াল মাদ্রিদ",
+          "hi": "रियल मैड्रिड",
+          "ru": "Реал Мадрид"
+        },
+        "shortNameTranslation": {}
+      },
+      "timeActive": "Array(0)"
+    },
+    "awayTeam": {
+      "name": "FC Bayern München",
+      "slug": "fc-bayern-munchen",
+      "shortName": "Bayern",
+      "gender": "M",
+      "sport": {
+        "name": "Football",
+        "slug": "football",
+        "id": 1
+      },
+      "userCount": 2558536,
+      "manager": {
+        "name": "Vincent Kompany",
+        "slug": "vincent-kompany",
+        "shortName": "V. Kompany",
+        "country": {
+          "alpha2": "BE",
+          "alpha3": "BEL",
+          "name": "Belgium",
+          "slug": "belgium"
+        },
+        "id": 792129,
+        "fieldTranslations": {
+          "nameTranslation": {
+            "ar": "فينسنت كومباني",
+            "bn": "ভিনসেন্ট কোম্পানি",
+            "hi": "विन्सेंट कोम्पनी"
+          },
+          "shortNameTranslation": {
+            "ar": "ف. كومباني",
+            "bn": "ভি. কোম্পানি",
+            "hi": "वी. कोम्पनी"
+          }
+        }
+      },
+      "venue": {
+        "venueCoordinates": {
+          "latitude": 48.218808,
+          "longitude": 11.624664
+        },
+        "hidden": false,
+        "slug": "allianz-arena",
+        "name": "Allianz Arena",
+        "capacity": 75024,
+        "country": {
+          "alpha2": "DE",
+          "alpha3": "DEU",
+          "name": "Germany",
+          "slug": "germany"
+        },
+        "id": 574,
+        "city": {
+          "name": "Munich"
+        },
+        "fieldTranslations": {
+          "nameTranslation": {
+            "ar": "أليانز أرينا",
+            "hi": "एलियांज एरिना",
+            "bn": "আলিয়াঞ্জ এরিনা"
+          },
+          "shortNameTranslation": {}
+        },
+        "stadium": {
+          "name": "Allianz Arena",
+          "capacity": 75024
+        }
+      },
+      "nameCode": "FCB",
+      "class": 4,
+      "disabled": false,
+      "national": false,
+      "type": 0,
+      "country": {
+        "alpha2": "DE",
+        "alpha3": "DEU",
+        "name": "Germany",
+        "slug": "germany"
+      },
+      "id": 2672,
+      "fullName": "FC Bayern München",
+      "subTeams": "Array(0)",
+      "teamColors": {
+        "primary": "#cf142f",
+        "secondary": "#ffffff",
+        "text": "#ffffff"
+      },
+      "foundationDateTimestamp": -2204064000,
+      "fieldTranslations": {
+        "nameTranslation": {
+          "ar": "إف سي بايرن ميونيخ",
+          "ru": "Бавария Мюнхен"
+        },
+        "shortNameTranslation": {
+          "ar": "بايرن",
+          "bn": "বায়ার্ন",
+          "hi": "बायर्न"
+        }
+      },
+      "timeActive": "Array(0)"
+    },
+    "homeScore": {},
+    "awayScore": {},
+    "time": {},
+    "changes": {
+      "changeTimestamp": 0
+    },
+    "hasGlobalHighlights": false,
+    "detailId": 1,
+    "crowdsourcingDataDisplayEnabled": false,
+    "id": 15632084,
+    "defaultPeriodCount": 2,
+    "defaultPeriodLength": 45,
+    "defaultOvertimeLength": 15,
+    "slug": "real-madrid-fc-bayern-munchen",
+    "startTimestamp": 1775588400,
+    "finalResultOnly": false,
+    "feedLocked": true,
+    "cupMatchesInRound": 2,
+    "seasonStatisticsType": "overall",
+    "showTotoPromo": true,
+    "isEditor": false,
+    "eventFilters": {
+      "category": "Array(1)",
+      "level": "Array(2)",
+      "gender": "Array(1)"
+    }
+  }
+}
+
+=================================
+API ENDPOINT: https://api.sofascore.com/api/v1/sofascore-news/en/posts?page=1&per_page=12&categories=news
+=================================
+"Array(12) [ { id, slug, date, title, excerpt, imageUrl, tags } ]"
+
+=================================
+API ENDPOINT: https://api.sofascore.com/api/v1/event/15632084/votes
+=================================
+{
+  "vote": {
+    "vote1": 97389,
+    "vote2": 77921,
+    "voteX": 18180
+  },
+  "bothTeamsToScoreVote": {
+    "voteYes": 37555,
+    "voteNo": 3378
+  },
+  "firstTeamToScoreVote": {
+    "voteHome": 18484,
+    "voteNoGoal": 1083,
+    "voteAway": 15574
+  },
+  "whoShouldHaveWonVote": {
+    "vote1": 0,
+    "vote2": 0
+  }
+}
+
+=================================
+API ENDPOINT: https://api.sofascore.com/api/v1/event/15632084/ai-insights/en
+=================================
+Status: 403
+
+=================================
+API ENDPOINT: https://api.sofascore.com/api/v1/config/country-sport-priorities/country/TR
+=================================
+{
+  "countrySportPriorities": "Array(25) [ { country, sport, position, id } ]"
+}
+
+=================================
+API ENDPOINT: https://api.sofascore.com/api/v1/event/15632084/odds/1/featured
+=================================
+{
+  "featured": {
+    "default": {
+      "sourceId": 191538588,
+      "structureType": 1,
+      "marketId": 1,
+      "marketName": "Full time",
+      "isLive": false,
+      "fid": 191538588,
+      "suspended": false,
+      "id": 287453992,
+      "marketGroup": "1X2",
+      "marketPeriod": "Full-time",
+      "choices": "Array(3) [ { initialFractionalValue, fractionalValue, sourceId, name, change } ]"
+    },
+    "asian": {
+      "sourceId": 191538588,
+      "structureType": 1,
+      "marketId": 17,
+      "marketName": "Asian handicap",
+      "isLive": false,
+      "fid": 191538590,
+      "suspended": false,
+      "id": 293566217,
+      "marketGroup": "Asian Handicap",
+      "marketPeriod": "Full-time",
+      "choices": "Array(2) [ { initialFractionalValue, fractionalValue, sourceId, name, change } ]"
+    },
+    "fullTime": {
+      "sourceId": 191538588,
+      "structureType": 1,
+      "marketId": 1,
+      "marketName": "Full time",
+      "isLive": false,
+      "fid": 191538588,
+      "suspended": false,
+      "id": 287453992,
+      "marketGroup": "1X2",
+      "marketPeriod": "Full-time",
+      "choices": "Array(3) [ { initialFractionalValue, fractionalValue, sourceId, name, change } ]"
+    }
+  },
+  "hasMoreOdds": true
+}
+
+=================================
+API ENDPOINT: https://api.sofascore.com/api/v1/event/15632084/media/summary/country/TR
+=================================
+{
+  "mediaItems": "Array(2) [ { type, item } ]",
+  "itemsCount": 3
+}
+
+=================================
+API ENDPOINT: https://api.sofascore.com/api/v1/event/15632084/odds/1/all
+=================================
+{
+  "markets": "Array(18) [ { sourceId, structureType, marketId, marketName, isLive, fid, suspended, id, marketGroup, marketPeriod, choices } ]",
+  "eventId": 15632084
+}
+
+=================================
+API ENDPOINT: https://api.sofascore.com/api/v1/event/15632084/provider/1/winning-odds
+=================================
+{
+  "home": {
+    "fractionalValue": "163/100",
+    "expected": 38,
+    "actual": 17,
+    "id": 21542273
+  },
+  "away": {
+    "fractionalValue": "13/10",
+    "expected": 43,
+    "actual": 17,
+    "id": 21542274
+  }
+}
+
+=================================
+API ENDPOINT: https://api.sofascore.com/api/v1/event/15632084/managers
+=================================
+{
+  "homeManager": {
+    "name": "Álvaro Arbeloa",
+    "slug": "alvaro-arbeloa",
+    "shortName": "Á. Arbeloa",
+    "id": 798940,
+    "fieldTranslations": {
+      "nameTranslation": {
+        "ar": "ألفارو أربيلوا"
+      },
+      "shortNameTranslation": {
+        "ar": "أ. أربيلوا"
+      }
+    }
+  },
+  "awayManager": {
+    "name": "Vincent Kompany",
+    "slug": "vincent-kompany",
+    "shortName": "V. Kompany",
+    "id": 792129,
+    "fieldTranslations": {
+      "nameTranslation": {
+        "ar": "فينسنت كومباني",
+        "bn": "ভিনসেন্ট কোম্পানি",
+        "hi": "विन्सेंट कोम्पनी"
+      },
+      "shortNameTranslation": {
+        "ar": "ف. كومباني",
+        "bn": "ভি. কোম্পানি",
+        "hi": "वी. कोम्पनी"
+      }
+    }
+  }
+}
+
+=================================
+API ENDPOINT: https://api.sofascore.com/api/v1/event/15632084/graph
+=================================
+Status: 404
+
+=================================
+API ENDPOINT: https://api.sofascore.com/api/v1/odds/providers/TR/web
+=================================
+{
+  "providers": "Array(1) [ { provider, branded, weight, featuredOddsType, defaultBetSlipLink, betSlipLink, type, campaignId, fallbackProvider, id, impressionCostEncrypted } ]"
+}
+
+=================================
+API ENDPOINT: https://api.sofascore.com/api/v1/branding/providers/TR/web
+=================================
+Status: 404
+
+=================================
+API ENDPOINT: https://api.sofascore.com/api/v1/tv/channel/6873/event/15632084/votes
+=================================
+{
+  "tvChannelVotes": {
+    "tvChannel": {
+      "name": "tabii Spor",
+      "id": 6873
+    },
+    "upvote": 10,
+    "downvote": 1
+  }
+}
+
+=================================
+API ENDPOINT: https://api.sofascore.com/api/v1/tv/channel/6432/event/15632084/votes
+=================================
+{
+  "tvChannelVotes": {
+    "tvChannel": {
+      "name": "tabii",
+      "id": 6432
+    },
+    "upvote": 49,
+    "downvote": 14
+  }
+}
+
+=================================
+API ENDPOINT: https://api.sofascore.com/api/v1/event/15632084/sport-video-highlights/country/TR/extended
+=================================
+Status: 404
+
+=================================
+API ENDPOINT: https://api.sofascore.com/api/v1/team/2829/unique-tournament/7/season/76953/ranks/overall
+=================================
+Status: 404
+
+=================================
+API ENDPOINT: https://api.sofascore.com/api/v1/team/2672/unique-tournament/7/season/76953/ranks/overall
+=================================
+Status: 404
+
+=================================
+API ENDPOINT: https://api.sofascore.com/api/v1/unique-tournament/7/season/76953/top-teams/overall
+=================================
+{
+  "topTeams": {
+    "avgRating": "Array(36) [ { team, statistics } ]",
+    "goalsScored": "Array(36) [ { team, statistics } ]",
+    "goalsConceded": "Array(36) [ { team, statistics } ]",
+    "bigChances": "Array(36) [ { team, statistics } ]",
+    "bigChancesMissed": "Array(36) [ { team, statistics } ]",
+    "kilometersCovered": "Array(36) [ { team, statistics } ]",
+    "numberOfSprints": "Array(36) [ { team, statistics } ]",
+    "hitWoodwork": "Array(36) [ { team, statistics } ]",
+    "yellowCards": "Array(36) [ { team, statistics } ]",
+    "redCards": "Array(36) [ { team, statistics } ]",
+    "averageBallPossession": "Array(36) [ { team, statistics } ]",
+    "accuratePasses": "Array(36) [ { team, statistics } ]",
+    "accurateLongBalls": "Array(36) [ { team, statistics } ]",
+    "accurateCrosses": "Array(36) [ { team, statistics } ]",
+    "shots": "Array(36) [ { team, statistics } ]",
+    "shotsOnTarget": "Array(36) [ { team, statistics } ]",
+    "successfulDribbles": "Array(36) [ { team, statistics } ]",
+    "tackles": "Array(36) [ { team, statistics } ]",
+    "interceptions": "Array(36) [ { team, statistics } ]",
+    "clearances": "Array(36) [ { team, statistics } ]",
+    "corners": "Array(36) [ { team, statistics } ]",
+    "fouls": "Array(36) [ { team, statistics } ]",
+    "penaltyGoals": "Array(36) [ { team, statistics } ]",
+    "penaltyGoalsConceded": "Array(36) [ { team, statistics } ]",
+    "cleanSheets": "Array(36) [ { team, statistics } ]"
+  },
+  "statisticsType": {
+    "sportSlug": "football",
+    "statisticsType": "team"
+  }
+}
+
+=================================
+API ENDPOINT: https://api.sofascore.com/api/v1/event/newly-added-events
+=================================
+{
+  "events": "Array(88) [ { eventId, homeTeamId, awayTeamId, uniqueTournamentId } ]"
+}
+
+=================================
+API ENDPOINT: https://api.sofascore.com/api/v1/player/822519/attribute-overviews
+=================================
+{
+  "averageAttributeOverviews": "Array(1) [ { attacking, technical, tactical, defending, creativity, position, yearShift, id } ]",
+  "playerAttributeOverviews": "Array(4) [ { attacking, technical, tactical, defending, creativity, position, yearShift, id } ]"
+}
+
+=================================
+API ENDPOINT: https://api.sofascore.com/api/v1/player/1129935/attribute-overviews
+=================================
+{
+  "playerAttributeOverviews": "Array(2) [ { attacking, technical, tactical, defending, creativity, position, yearShift, id } ]",
+  "averageAttributeOverviews": "Array(1) [ { attacking, technical, tactical, defending, creativity, position, yearShift, id } ]"
+}
+
+=================================
+API ENDPOINT: https://api.sofascore.com/api/v1/odds/providers/TR/web-odds
+=================================
+{
+  "providers": "Array(1) [ { provider, branded, weight, featuredOddsType, defaultBetSlipLink, betSlipLink, type, campaignId, fallbackProvider, id, impressionCostEncrypted } ]"
+}
+
+=================================
+API ENDPOINT: https://api.sofascore.com/api/v1/odds/providers/TR/web-featured
+=================================
+{
+  "providers": "Array(0)"
+}

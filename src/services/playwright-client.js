@@ -289,8 +289,10 @@ const api = {
   // Referee & Manager endpoints
   getReferee: (refereeId) => fetchAPI(`/referee/${refereeId}`, 'refereeStats'),
   getRefereeStats: (refereeId) => fetchAPI(`/referee/${refereeId}/statistics/seasons`, 'refereeStats'),
+  getRefereeLastEvents: (refereeId, page = 0) => fetchAPI(`/referee/${refereeId}/events/last/${page}`, 'refereeStats'),
   getManager: (managerId) => fetchAPI(`/manager/${managerId}`, 'managerStats'),
   getManagerCareer: (managerId) => fetchAPI(`/manager/${managerId}/career`, 'managerStats'),
+  getManagerLastEvents: (managerId, page = 0) => fetchAPI(`/manager/${managerId}/events/last/${page}`, 'managerStats'),
 
   // Live & Scheduled
   getLiveEvents: () => fetchAPI('/sport/football/events/live', 'liveEvents'),
