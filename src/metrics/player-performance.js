@@ -102,8 +102,9 @@ function calculatePlayerMetrics(data, side) {
 
   if (!playerStats || playerStats.length === 0) return createEmptyPlayerMetrics();
 
-  const starters = playerStats.filter(p => !p.substitute);
-  const subs = playerStats.filter(p => p.substitute);
+  // isReserve:true ama substitute:false olabilir (edge case) — reserve asla starter sayılmaz
+  const starters = playerStats.filter(p => !p.substitute && !p.isReserve);
+  const subs = playerStats.filter(p => p.substitute || p.isReserve);
 
   // Substitution-aware minutes map — weights each player by actual minutes played
   const minutesMap = getPlayerMinutesMap(recentDetails, playerStats);
@@ -124,7 +125,9 @@ function calculatePlayerMetrics(data, side) {
   const starterRatings = starterRatingEntries.map(e => e.rating);
 
   // ── M067: Yedek Ortalama Rating (katılım + dakika ağırlıklı) ──
-  // SUB_PARTICIPATION_PROB: modern futbolda ortalama yedek sahaya girme olasılığı (~60%)
+  // Ortalama yedek sahaya girme olasılığı — UEFA/Premier League verilerinden türetilmiş sektör standardı.
+  // Her takım 90 dakikalık maçta ortalama 3-4 yedek kullanır, 7 yedekten yaklaşık %60'ı oynar.
+  // Dinamik hale getirmek için kendi league'ine özgü substitution data API'sinden çekilmeli (şu an yok).
   const SUB_PARTICIPATION_PROB = 0.6;
   const subWeightedRatings = subs
     .map(p => {

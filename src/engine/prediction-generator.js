@@ -5,15 +5,57 @@
  */
 
 const { poissonPMF, poissonExceed, round2 } = require('./math-utils');
+const { simulateMatch } = require('./match-simulator');
 
 /**
  * @param {object} metricsResult - calculateAllMetrics() çıktısı
  * @param {object} data - fetchAllMatchData() çıktısı
  * @returns {object} Detaylı tahmin raporu
  */
-function generatePrediction(metricsResult, data) {
+function generatePrediction(metricsResult, data, baseline, audit, rng) {
   const { home, away, shared, prediction } = metricsResult;
+  
+  // Guard: Ensure simulation uses only up to 11 starters from each lineup
+  if (data.lineups) {
+    if (data.lineups.home?.players) {
+      let sc = 0;
+      data.lineups.home.players = data.lineups.home.players.map(p => {
+        if (!p.substitute) { if (sc >= 11) return { ...p, substitute: true }; sc++; }
+        return p;
+      });
+    }
+    if (data.lineups.away?.players) {
+      let sc = 0;
+      data.lineups.away.players = data.lineups.away.players.map(p => {
+        if (!p.substitute) { if (sc >= 11) return { ...p, substitute: true }; sc++; }
+        return p;
+      });
+    }
+  }
+
   const event = data.event?.event;
+
+  // --- Behavioral Simulation (Monte Carlo) Integration ---
+  // Rapor üretilirken arka planda 1000 koşuluk bir temel simülasyon koşturulur.
+  // Bu, 26 ünite bazlı davranışsal dağılımları rapora eklememizi sağlar.
+  const homeMetricsFlat = Object.assign({}, home.attack, home.defense, home.form, home.player, home.goalkeeper, home.momentum, shared.referee, shared.h2h, shared.contextual);
+  const awayMetricsFlat = Object.assign({}, away.attack, away.defense, away.form, away.player, away.goalkeeper, away.momentum, shared.referee, shared.h2h, shared.contextual);
+  const allSimMetricIds = new Set(
+    [...Object.keys(homeMetricsFlat), ...Object.keys(awayMetricsFlat)]
+      .filter(k => /^M\d{3}[a-z]?$/i.test(k))
+  );
+  
+  const simulation = simulateMatch({
+    homeMetrics: homeMetricsFlat,
+    awayMetrics: awayMetricsFlat,
+    selectedMetrics: allSimMetricIds,
+    lineups: data.lineups,
+    weatherMetrics: data.weatherMetrics,
+    baseline,
+    audit,
+    rng,
+    runs: 1000
+  });
 
   // ── Detaylı tahmin raporu ──
   const report = {
@@ -77,8 +119,11 @@ function generatePrediction(metricsResult, data) {
       if (m062h == null && m062a == null && prediction.homeWinProbability == null) {
         return { homeScoresFirst: null, awayScoresFirst: null };
       }
-      const rawHome = (m062h ?? prediction.homeWinProbability ?? 50) * 0.6 + (prediction.homeWinProbability ?? 50) * 0.4;
-      const rawAway = (m062a ?? prediction.awayWinProbability ?? 50) * 0.6 + (prediction.awayWinProbability ?? 50) * 0.4;
+      // Geometrik ortalama: formdan gelen M062 ve simülasyondan gelen kazanma olasılığı eşit ağırlıklı
+      const hWinProb = prediction.homeWinProbability ?? 50;
+      const aWinProb = prediction.awayWinProbability ?? 50;
+      const rawHome = m062h != null ? Math.sqrt((m062h) * (hWinProb)) : hWinProb;
+      const rawAway = m062a != null ? Math.sqrt((m062a) * (aWinProb)) : aWinProb;
       const total = rawHome + rawAway;
       if (total <= 0) return { homeScoresFirst: 50, awayScoresFirst: 50 };
       return {
@@ -135,16 +180,53 @@ function generatePrediction(metricsResult, data) {
       },
     },
 
+    // Behavioral Simulation Insights (Monte Carlo)
+    simulationInsights: {
+      distribution: simulation.distribution,
+      sampleRun: simulation.sampleRun,
+      summary: {
+        runs: simulation.runs,
+        expectedGoals: simulation.distribution.avgGoals,
+        homeWinProb: simulation.distribution.homeWin,
+        drawProb: simulation.distribution.draw,
+        awayWinProb: simulation.distribution.awayWin,
+      }
+    },
+
+    // Override main probabilities with simulation distribution for 100% consistency
+    prediction: Object.assign({}, prediction, {
+      homeWinProbability: simulation.distribution.homeWin,
+      drawProbability: simulation.distribution.draw,
+      awayWinProbability: simulation.distribution.awayWin,
+      over25: simulation.distribution.over25,
+      btts: simulation.distribution.btts,
+      lambdaHome: simulation.distribution.avgGoals ? simulation.distribution.avgGoals / 2 : prediction.lambdaHome, // Approx
+    }),
+
+    // 26 Davranış Ünitesi Analizi (Sıfır-Fallback Garantili)
+    behavioralAnalysis: {
+      home: simulation.sampleRun.units.home,
+      away: simulation.sampleRun.units.away,
+    },
+
     // Öne çıkan istatistikler
     highlights: generateHighlights(home, away, shared, prediction),
 
     // Lineup Workshop Data
     lineups: {
       home: Object.assign({}, metricsResult.home.lineup || data.lineups?.home, {
-        players: injectReserves((metricsResult.home.lineup || data.lineups?.home)?.players, data.homePlayers)
+        players: injectReserves(
+          (metricsResult.home.lineup || data.lineups?.home)?.players, 
+          data.homePlayers,
+          !!metricsResult.home.lineup 
+        )
       }),
       away: Object.assign({}, metricsResult.away.lineup || data.lineups?.away, {
-        players: injectReserves((metricsResult.away.lineup || data.lineups?.away)?.players, data.awayPlayers)
+        players: injectReserves(
+          (metricsResult.away.lineup || data.lineups?.away)?.players, 
+          data.awayPlayers,
+          !!metricsResult.away.lineup
+        )
       }),
       isFallback: data.lineups?.isFallback || false,
     },
@@ -193,8 +275,12 @@ function generatePrediction(metricsResult, data) {
   return report;
 }
 
-function injectReserves(lineupPlayers, squadPlayers) {
+function injectReserves(lineupPlayers, squadPlayers, suppressInjection = false) {
   if (!lineupPlayers) lineupPlayers = [];
+  
+  // Custom lineup (Workshop) var ise ve doluysa, otomatik enjeksiyonu engelle
+  if (suppressInjection && lineupPlayers.length > 0) return lineupPlayers;
+  
   if (!squadPlayers || !squadPlayers.players) return lineupPlayers;
 
   const lineupIds = new Set(lineupPlayers.map(p => p.player?.id).filter(Boolean));
@@ -204,7 +290,7 @@ function injectReserves(lineupPlayers, squadPlayers) {
     if (!lineupIds.has(p.player?.id)) {
       reserves.push({
         player: p.player,
-        position: p.player?.position || 'Unknown',
+        position: p.player?.position || 'M',
         shirtNumber: p.player?.shirtNumber || '',
         substitute: true,
         isReserve: true
@@ -216,9 +302,17 @@ function injectReserves(lineupPlayers, squadPlayers) {
 }
 
 function generateFirstHalfPrediction(home, away) {
-  const homeHT = home.attack.M003 || 0;
-  const awayHT = away.attack.M003 || 0;
-  const totalHTGoals = homeHT + awayHT;
+  const homeHT = home.attack.M003 ?? null;
+  const awayHT = away.attack.M003 ?? null;
+
+  // Veri yoksa null döndür — 0 göstermek yanıltıcı olur
+  if (homeHT == null && awayHT == null) {
+    return { expectedHomeGoals: null, expectedAwayGoals: null, over05HT: null, over15HT: null, htResult: null };
+  }
+
+  const hHT = homeHT ?? 0;
+  const aHT = awayHT ?? 0;
+  const totalHTGoals = hHT + aHT;
 
   // Use Poisson CDF instead of linear scaling for consistent over/under probabilities.
   // P(X >= 1) = 1 - e^(-λ), P(X >= 2) = 1 - e^(-λ)(1 + λ)
@@ -227,11 +321,11 @@ function generateFirstHalfPrediction(home, away) {
     ? (1 - Math.exp(-totalHTGoals) * (1 + totalHTGoals)) * 100 : 0;
 
   return {
-    expectedHomeGoals: round2(homeHT),
-    expectedAwayGoals: round2(awayHT),
+    expectedHomeGoals: round2(hHT),
+    expectedAwayGoals: round2(aHT),
     over05HT: round2(Math.min(95, pOver05)),
     over15HT: round2(Math.min(90, pOver15)),
-    htResult: homeHT > awayHT + 0.2 ? '1' : awayHT > homeHT + 0.2 ? '2' : 'X',
+    htResult: hHT > aHT + 0.2 ? '1' : aHT > hHT + 0.2 ? '2' : 'X',
   };
 }
 

@@ -15,7 +15,7 @@ const ALL_METRIC_IDS = new Set([
   'M086','M087','M088','M089','M090','M091','M092','M093','M094','M095',
   'M096','M097','M098','M099','M100','M101','M102','M103','M104','M105',
   'M106','M107','M108',
-  'M109','M110','M111','M112','M113','M114','M115','M116','M117','M118',
+  'M109','M110','M111','M112','M113','M114','M115','M116','M117','M118','M118b',
   'M119','M120','M121','M122','M123','M124','M125','M126','M127','M128',
   'M129','M130',
   'M131','M132','M133','M134','M134b','M134c','M135','M136','M137','M138',
@@ -42,6 +42,7 @@ function getLastRunSummary(simulation, homeTeam, awayTeam) {
 function SimulationPage({ prediction, selectedMatch }) {
   const [selectedMetrics, setSelectedMetrics] = useState(() => new Set(ALL_METRIC_IDS));
   const [simulation, setSimulation] = useState(null);
+  const [engineData, setEngineData] = useState(null);
   const [multiRunResult, setMultiRunResult] = useState(null);
   const [isSimulating, setIsSimulating] = useState(false);
   const [runMode, setRunMode] = useState('single');
@@ -107,9 +108,20 @@ function SimulationPage({ prediction, selectedMatch }) {
       if (runMode === 'multi') {
         setMultiRunResult(result);
         setSimulation(result.sampleRun);
+        setEngineData(null);
       } else {
         setSimulation(result);
         setMultiRunResult(null);
+        // Pass engine data for client-side real-time simulation
+        if (result.units) {
+          setEngineData({
+            homeUnits: result.units.home,
+            awayUnits: result.units.away,
+            lineups: result.lineups || null,
+            weatherMult: result.weatherMult || {},
+            probBases: result.probBases || null,
+          });
+        }
       }
     } catch (e) {
       setError(e.message);
@@ -252,6 +264,7 @@ function SimulationPage({ prediction, selectedMatch }) {
         <div style={styles.rightPanel}>
           <SimulationViewer
             simulation={simulation}
+            engineData={engineData}
             homeTeam={selectedMatch?.homeTeam}
             awayTeam={selectedMatch?.awayTeam}
             isMultiRun={runMode === 'multi' && !!multiRunResult}
@@ -263,7 +276,7 @@ function SimulationPage({ prediction, selectedMatch }) {
       {/* Info footer */}
       <div style={styles.footer}>
         <span style={styles.footerInfo}>
-          &#8505; Secilmeyen metrikler icin lig ortalamasi kullanilir
+          &#8505; Secilmeyen metrikler o bloktan cikarilir; blok tum metriksiz kalirsa notr (1.0) deger kullanilir
         </span>
         {lastRunSummary && (
           <span style={styles.footerResult}>{lastRunSummary}</span>
@@ -291,13 +304,17 @@ const styles = {
     display: 'flex',
     flexDirection: 'column',
     height: '100%',
-    gap: 12,
-    backgroundColor: 'var(--bg-primary, #0d1117)',
-    color: 'var(--text-primary, #e6edf3)',
-    fontFamily: 'var(--font-sans, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif)',
-    padding: 16,
+    gap: 16,
+    backgroundColor: 'var(--bg-dark, #06060b)',
+    color: 'var(--text-primary, #eaeaf2)',
+    fontFamily: 'var(--font-sans, "Outfit", sans-serif)',
+    padding: 24,
     boxSizing: 'border-box',
     overflow: 'hidden',
+    backgroundImage: `
+      radial-gradient(ellipse 50% 50% at 10% 20%, rgba(0, 242, 255, 0.03), transparent),
+      radial-gradient(ellipse 50% 50% at 90% 80%, rgba(188, 19, 254, 0.03), transparent)
+    `,
   },
   placeholder: {
     display: 'flex',
@@ -305,242 +322,264 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'center',
     height: '100%',
-    gap: 16,
-    backgroundColor: 'var(--bg-primary, #0d1117)',
-    color: 'var(--text-muted, #8b949e)',
+    gap: 20,
+    color: 'var(--text-secondary, #6b6b80)',
   },
   placeholderIcon: {
-    fontSize: 48,
-    opacity: 0.4,
+    fontSize: 64,
+    opacity: 0.3,
+    filter: 'drop-shadow(0 0 20px rgba(0, 242, 255, 0.2))',
   },
   placeholderText: {
-    fontSize: 16,
+    fontSize: 18,
+    fontWeight: 500,
     opacity: 0.6,
-    letterSpacing: '0.02em',
+    letterSpacing: '0.04em',
   },
 
   /* Header */
   header: {
     display: 'flex',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     justifyContent: 'space-between',
     flexWrap: 'wrap',
-    gap: 12,
-    backgroundColor: 'var(--bg-secondary, #161b22)',
-    border: '1px solid var(--border-color, #30363d)',
-    borderRadius: 8,
-    padding: '14px 18px',
+    gap: 20,
+    background: 'var(--card-bg, rgba(16, 16, 24, 0.75))',
+    backdropFilter: 'blur(20px)',
+    border: '1px solid var(--glass-border, rgba(255, 255, 255, 0.06))',
+    borderRadius: 'var(--radius-lg, 16px)',
+    padding: '20px 24px',
+    boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
   },
   headerLeft: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 4,
+    gap: 6,
   },
   title: {
-    fontSize: 18,
-    fontWeight: 700,
-    color: 'var(--text-primary, #e6edf3)',
-    letterSpacing: '0.01em',
+    fontSize: 22,
+    fontWeight: 800,
+    color: 'var(--text-primary, #eaeaf2)',
+    letterSpacing: '-0.02em',
   },
   matchTitle: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: 600,
-    color: 'var(--accent-cyan, #00d4ff)',
+    color: 'var(--accent-cyan, #00f2ff)',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
   },
   matchSeparator: {
-    color: 'var(--text-muted, #8b949e)',
-    margin: '0 4px',
+    color: 'var(--text-tertiary, #3e3e52)',
+    fontWeight: 300,
   },
   tournament: {
-    fontSize: 11,
-    color: 'var(--text-muted, #8b949e)',
+    fontSize: 10,
+    color: 'var(--text-secondary, #6b6b80)',
     textTransform: 'uppercase',
-    letterSpacing: '0.06em',
+    letterSpacing: '0.15em',
+    fontWeight: 700,
   },
   headerControls: {
     display: 'flex',
     alignItems: 'center',
     flexWrap: 'wrap',
-    gap: 10,
+    gap: 16,
   },
 
   /* Toggle group */
   toggleGroup: {
     display: 'flex',
-    border: '1px solid var(--border-color, #30363d)',
-    borderRadius: 6,
-    overflow: 'hidden',
+    background: 'rgba(255,255,255,0.03)',
+    borderRadius: 'var(--radius-md, 12px)',
+    padding: 4,
+    border: '1px solid var(--glass-border, rgba(255, 255, 255, 0.06))',
   },
   toggleBtn: {
-    padding: '6px 14px',
+    padding: '8px 16px',
     fontSize: 12,
-    fontWeight: 500,
+    fontWeight: 600,
     background: 'transparent',
-    color: 'var(--text-muted, #8b949e)',
+    color: 'var(--text-secondary, #6b6b80)',
     border: 'none',
     cursor: 'pointer',
-    transition: 'background 0.15s, color 0.15s',
+    borderRadius: 'var(--radius-sm, 8px)',
+    transition: 'all 0.2s cubic-bezier(.4,0,.2,1)',
   },
   toggleBtnActive: {
-    background: 'var(--accent-cyan, #00d4ff)',
-    color: '#0d1117',
-    fontWeight: 700,
+    background: 'rgba(0, 242, 255, 0.1)',
+    color: 'var(--accent-cyan, #00f2ff)',
+    boxShadow: '0 0 15px rgba(0, 242, 255, 0.15)',
   },
 
   /* Run count */
   runCountGroup: {
     display: 'flex',
-    gap: 4,
+    gap: 6,
+    paddingLeft: 8,
+    borderLeft: '1px solid var(--glass-border, rgba(255, 255, 255, 0.06))',
   },
   runCountBtn: {
-    padding: '5px 10px',
+    padding: '6px 12px',
     fontSize: 11,
-    fontWeight: 500,
-    background: 'var(--bg-tertiary, #1c2128)',
-    color: 'var(--text-muted, #8b949e)',
-    border: '1px solid var(--border-color, #30363d)',
-    borderRadius: 4,
+    fontWeight: 700,
+    background: 'rgba(255,255,255,0.02)',
+    color: 'var(--text-secondary, #6b6b80)',
+    border: '1px solid var(--glass-border, rgba(255, 255, 255, 0.06))',
+    borderRadius: 'var(--radius-sm, 8px)',
     cursor: 'pointer',
-    transition: 'background 0.15s, color 0.15s, border-color 0.15s',
+    transition: 'all 0.2s ease',
+    fontFamily: 'var(--font-mono, "JetBrains Mono", monospace)',
   },
   runCountBtnActive: {
-    background: 'rgba(0, 212, 255, 0.15)',
-    color: 'var(--accent-cyan, #00d4ff)',
-    borderColor: 'var(--accent-cyan, #00d4ff)',
-    fontWeight: 700,
+    background: 'rgba(188, 19, 254, 0.1)',
+    color: 'var(--accent-purple, #bc13fe)',
+    borderColor: 'rgba(188, 19, 254, 0.3)',
+    boxShadow: '0 0 15px rgba(188, 19, 254, 0.1)',
   },
 
   /* Start button */
   startBtn: {
     display: 'flex',
     alignItems: 'center',
-    gap: 8,
-    padding: '8px 20px',
-    fontSize: 13,
-    fontWeight: 700,
-    background: 'var(--accent-cyan, #00d4ff)',
-    color: '#0d1117',
+    gap: 10,
+    padding: '12px 28px',
+    fontSize: 14,
+    fontWeight: 800,
+    background: 'var(--gradient-cyan, linear-gradient(135deg, #00f2ff, #0088ff))',
+    color: '#06060b',
     border: 'none',
-    borderRadius: 6,
+    borderRadius: 'var(--radius-md, 12px)',
     cursor: 'pointer',
-    animation: 'pulse-glow 2.5s ease-in-out infinite',
-    transition: 'opacity 0.2s, transform 0.1s',
-    letterSpacing: '0.03em',
+    animation: 'pulse-glow 3s infinite',
+    transition: 'all 0.3s cubic-bezier(.4,0,.2,1)',
+    letterSpacing: '0.02em',
+    textTransform: 'uppercase',
   },
   startBtnDisabled: {
-    opacity: 0.65,
+    background: 'var(--text-tertiary, #3e3e52)',
+    color: 'var(--text-secondary, #6b6b80)',
     cursor: 'not-allowed',
     animation: 'none',
-    background: 'var(--text-muted, #8b949e)',
+    boxShadow: 'none',
+    opacity: 0.5,
   },
   spinner: {
     display: 'inline-block',
-    width: 13,
-    height: 13,
-    border: '2px solid rgba(13,17,23,0.4)',
-    borderTopColor: '#0d1117',
+    width: 14,
+    height: 14,
+    border: '2px solid rgba(0,0,0,0.2)',
+    borderTopColor: '#000',
     borderRadius: '50%',
-    animation: 'spin 0.7s linear infinite',
-    flexShrink: 0,
+    animation: 'spin 0.8s linear infinite',
   },
 
   /* Metrics badge */
   metricsBadge: {
     fontSize: 12,
-    backgroundColor: 'var(--bg-tertiary, #1c2128)',
-    border: '1px solid var(--border-color, #30363d)',
-    borderRadius: 4,
-    padding: '4px 10px',
+    background: 'rgba(255,255,255,0.03)',
+    border: '1px solid var(--glass-border, rgba(255, 255, 255, 0.06))',
+    borderRadius: 'var(--radius-md, 12px)',
+    padding: '10px 16px',
     whiteSpace: 'nowrap',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
   },
   metricsFull: {
-    color: 'var(--accent-cyan, #00d4ff)',
-    fontWeight: 700,
+    color: 'var(--accent-cyan, #00f2ff)',
+    fontWeight: 800,
   },
   metricsPartial: {
-    color: '#f0a050',
-    fontWeight: 700,
+    color: 'var(--accent-orange, #ff8c00)',
+    fontWeight: 800,
   },
   metricsTotal: {
-    color: 'var(--text-muted, #8b949e)',
+    color: 'var(--text-secondary, #6b6b80)',
+    fontWeight: 500,
   },
 
   /* Error banner */
   errorBanner: {
     display: 'flex',
     alignItems: 'center',
-    gap: 10,
-    backgroundColor: 'rgba(248, 81, 73, 0.12)',
-    border: '1px solid rgba(248, 81, 73, 0.4)',
-    borderRadius: 6,
-    padding: '10px 14px',
-    fontSize: 13,
-    color: '#f85149',
+    gap: 12,
+    background: 'rgba(255, 61, 142, 0.08)',
+    border: '1px solid rgba(255, 61, 142, 0.2)',
+    borderRadius: 'var(--radius-md, 12px)',
+    padding: '14px 20px',
+    fontSize: 14,
+    color: 'var(--accent-pink, #ff3d8e)',
     flexShrink: 0,
+    animation: 'fadeIn 0.3s ease-out',
   },
   errorIcon: {
-    fontSize: 16,
-    flexShrink: 0,
+    fontSize: 18,
   },
   errorClose: {
     marginLeft: 'auto',
     background: 'transparent',
     border: 'none',
-    color: '#f85149',
+    color: 'inherit',
     cursor: 'pointer',
-    fontSize: 14,
-    padding: '0 4px',
-    lineHeight: 1,
-    opacity: 0.7,
-    flexShrink: 0,
+    fontSize: 18,
+    opacity: 0.6,
+    transition: 'opacity 0.2s',
   },
 
   /* Main content */
   mainContent: {
     display: 'flex',
-    gap: 12,
+    gap: 16,
     flex: 1,
     overflow: 'hidden',
     minHeight: 0,
   },
   leftPanel: {
-    width: '38%',
+    width: '32%',
     flexShrink: 0,
     overflow: 'hidden',
     display: 'flex',
-    flexDirection: 'column',
+    minWidth: 360,
+    minHeight: 0,
   },
   rightPanel: {
     flex: 1,
     overflow: 'hidden',
     display: 'flex',
     flexDirection: 'column',
+    minHeight: 0,
+    minWidth: 0,
   },
 
-  /* Loading state for metrics */
+  /* Loading state */
   loadingPanel: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
     height: '100%',
-    gap: 14,
-    backgroundColor: 'var(--bg-secondary, #161b22)',
-    border: '1px solid var(--border-color, #30363d)',
-    borderRadius: 8,
-    color: 'var(--text-muted, #8b949e)',
+    width: '100%',
+    gap: 16,
+    background: 'var(--card-bg, rgba(16, 16, 24, 0.75))',
+    border: '1px solid var(--glass-border, rgba(255, 255, 255, 0.06))',
+    borderRadius: 'var(--radius-lg, 16px)',
   },
   loadingSpinner: {
-    width: 28,
-    height: 28,
-    border: '3px solid rgba(0, 212, 255, 0.2)',
-    borderTopColor: 'var(--accent-cyan, #00d4ff)',
+    width: 32,
+    height: 32,
+    border: '3px solid rgba(0, 242, 255, 0.1)',
+    borderTopColor: 'var(--accent-cyan, #00f2ff)',
     borderRadius: '50%',
-    animation: 'spin 0.8s linear infinite',
+    animation: 'spin 1s cubic-bezier(.4,0,.2,1) infinite',
+    boxShadow: '0 0 15px rgba(0, 242, 255, 0.2)',
   },
   loadingText: {
-    fontSize: 13,
-    opacity: 0.7,
+    fontSize: 14,
+    color: 'var(--text-secondary, #6b6b80)',
+    fontWeight: 500,
+    letterSpacing: '0.02em',
   },
 
   /* Footer */
@@ -549,22 +588,27 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'space-between',
     flexWrap: 'wrap',
-    gap: 8,
-    backgroundColor: 'var(--bg-secondary, #161b22)',
-    border: '1px solid var(--border-color, #30363d)',
-    borderRadius: 6,
-    padding: '8px 14px',
-    fontSize: 11,
+    gap: 12,
+    background: 'rgba(255,255,255,0.02)',
+    border: '1px solid var(--glass-border, rgba(255, 255, 255, 0.06))',
+    borderRadius: 'var(--radius-md, 12px)',
+    padding: '10px 20px',
+    fontSize: 12,
     flexShrink: 0,
   },
   footerInfo: {
-    color: 'var(--text-muted, #8b949e)',
-    opacity: 0.8,
+    color: 'var(--text-secondary, #6b6b80)',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
   },
   footerResult: {
-    color: 'var(--accent-cyan, #00d4ff)',
-    fontWeight: 600,
-    letterSpacing: '0.02em',
+    color: 'var(--accent-cyan, #00f2ff)',
+    fontWeight: 700,
+    background: 'rgba(0, 242, 255, 0.05)',
+    padding: '4px 12px',
+    borderRadius: 20,
+    border: '1px solid rgba(0, 242, 255, 0.1)',
   },
 };
 

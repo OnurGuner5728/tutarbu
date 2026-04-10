@@ -56,11 +56,20 @@ function calculateAllMetrics(data) {
   const homeMomentum = calculateMomentumMetrics(data, 'home');
   const awayMomentum = calculateMomentumMetrics(data, 'away');
 
-  // Bölüm J: Türetilmiş + Tahmin (M156-M168)
+  // Bölüm J: Tüm metrikleri düzleştir (Dinamik Üniteler İçin)
+  const homeFlat = { ...homeAttack, ...homeDefense, ...homeForm, ...homePlayer, ...homeGK, ...homeMomentum };
+  const awayFlat = { ...awayAttack, ...awayDefense, ...awayForm, ...awayPlayer, ...awayGK, ...awayMomentum };
+  const sharedFlat = { ...referee, ...h2h, ...contextual };
+  
+  const allMetricIds = new Set([
+    ...Object.keys(homeFlat), ...Object.keys(awayFlat), ...Object.keys(sharedFlat)
+  ].filter(k => /^M[0-9]{3}[a-z]?$/i.test(k)));
+
   // Dinamik lig ortalaması — standings verisinden hesaplanır
   const leagueAvgGoals = computeLeagueAvgGoals(data.standingsTotal);
   const homeFormation = data.lineups?.home?.formation || null;
   const awayFormation = data.lineups?.away?.formation || null;
+
   const advanced = calculateAdvancedMetrics({
     homeAttack, awayAttack, homeDefense, awayDefense,
     homeForm, awayForm, homePlayer, awayPlayer,
@@ -70,6 +79,8 @@ function calculateAllMetrics(data) {
     homeFormation, awayFormation,
     homeMatchCount: data.homeLastEvents?.length || 0,
     awayMatchCount: data.awayLastEvents?.length || 0,
+    // Add flattened data for unit calculations
+    homeFlat, awayFlat, sharedFlat, allMetricIds
   });
 
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
@@ -83,7 +94,7 @@ function calculateAllMetrics(data) {
     homeMomentum, awayMomentum, advanced,
   });
 
-  return {
+  const result = {
     home: {
       attack: homeAttack,
       defense: homeDefense,
@@ -118,6 +129,12 @@ function calculateAllMetrics(data) {
       timestamp: new Date().toISOString(),
     }
   };
+
+  // Phase 1 Observation: Metric Audit
+  const { getMetricAuditSummary } = require('./audit-helper');
+  result.metricAudit = getMetricAuditSummary(data, result);
+
+  return result;
 }
 
 function countMetrics(groups) {

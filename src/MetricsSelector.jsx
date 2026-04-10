@@ -1,16 +1,16 @@
 import React, { useState, useMemo } from 'react';
 
 const CATEGORY_COLORS = {
-  attack: '#ff6b6b',
-  defense: '#4ecdc4',
-  form: '#45b7d1',
-  player: '#96ceb4',
-  goalkeeper: '#ffeaa7',
-  referee: '#dda0dd',
-  h2h: '#f7dc6f',
-  contextual: '#a29bfe',
-  momentum: '#fd79a8',
-  derived: '#81ecec',
+  attack: 'var(--accent-orange, #ff8c00)',
+  defense: 'var(--accent-cyan, #00f2ff)',
+  form: 'var(--accent-green, #00ff88)',
+  player: 'var(--accent-purple, #bc13fe)',
+  goalkeeper: 'var(--accent-cyan, #00f2ff)',
+  referee: '#ffeb3b',
+  h2h: 'var(--accent-pink, #ff3d8e)',
+  contextual: 'var(--text-secondary, #6b6b80)',
+  momentum: 'var(--accent-orange, #ff8c00)',
+  derived: 'var(--accent-cyan, #00f2ff)',
 };
 
 const CATEGORY_LABELS = {
@@ -40,10 +40,10 @@ const CATEGORY_ICONS = {
 };
 
 const WEIGHT_COLORS = {
-  critical: '#ff4757',
-  high: '#ffa502',
-  medium: '#eccc68',
-  low: '#a4b0be',
+  critical: 'var(--accent-pink, #ff3d8e)',
+  high: 'var(--accent-orange, #ff8c00)',
+  medium: 'var(--accent-cyan, #00f2ff)',
+  low: 'var(--text-secondary, #6b6b80)',
 };
 
 const SIMULATION_ROLES = {
@@ -108,35 +108,32 @@ function ValueBar({ value, leagueAvg, color }) {
 function ToggleSwitch({ checked, onChange }) {
   return (
     <button
-      onClick={onChange}
+      onClick={(e) => { e.stopPropagation(); onChange(); }}
       style={{
-        position: 'relative',
-        display: 'inline-flex',
-        alignItems: 'center',
-        width: 48,
-        height: 26,
-        borderRadius: 13,
+        width: 36,
+        height: 18,
+        borderRadius: 10,
+        background: checked ? 'var(--gradient-cyan)' : 'rgba(255,255,255,0.08)',
         border: 'none',
+        position: 'relative',
         cursor: 'pointer',
-        background: checked ? '#00d4ff' : 'rgba(255,255,255,0.12)',
-        transition: 'background 0.2s ease',
-        flexShrink: 0,
-        outline: 'none',
+        transition: 'all 0.3s cubic-bezier(.4,0,.2,1)',
         padding: 0,
+        boxShadow: checked ? '0 0 10px rgba(0, 242, 255, 0.3)' : 'inset 0 2px 4px rgba(0,0,0,0.2)',
+        flexShrink: 0,
       }}
-      title={checked ? 'Devre dışı bırak' : 'Etkinleştir'}
     >
-      <span
+      <div
         style={{
-          position: 'absolute',
-          width: 20,
-          height: 20,
+          width: 14,
+          height: 14,
           borderRadius: '50%',
           background: '#fff',
-          top: 3,
-          left: checked ? 25 : 3,
-          transition: 'left 0.2s ease',
-          boxShadow: '0 1px 4px rgba(0,0,0,0.4)',
+          position: 'absolute',
+          top: 2,
+          left: checked ? 20 : 2,
+          transition: 'all 0.3s cubic-bezier(.4,0,.2,1)',
+          boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
         }}
       />
     </button>
@@ -153,63 +150,70 @@ function MetricCard({ metric, isSelected, onToggle, categoryColor }) {
     <div
       style={{
         background: isSelected
-          ? 'rgba(255,255,255,0.04)'
-          : 'rgba(255,255,255,0.015)',
-        border: `1px solid ${isSelected ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.05)'}`,
-        borderLeft: `3px solid ${isSelected ? categoryColor : 'rgba(255,255,255,0.1)'}`,
-        borderRadius: 10,
-        padding: '12px 14px',
-        marginBottom: 8,
-        opacity: isSelected ? 1 : 0.55,
-        transition: 'opacity 0.2s, border-color 0.2s, background 0.2s',
-        cursor: 'default',
+          ? 'rgba(255,255,255,0.03)'
+          : 'rgba(255,255,255,0.01)',
+        border: `1px solid ${isSelected ? 'var(--glass-border-active)' : 'var(--glass-border)'}`,
+        borderLeft: `4px solid ${isSelected ? categoryColor : 'rgba(255,255,255,0.05)'}`,
+        borderRadius: 12,
+        padding: '12px 16px',
+        marginBottom: 10,
+        opacity: isSelected ? 1 : 0.6,
+        transition: 'all 0.3s cubic-bezier(.4,0,.2,1)',
+        cursor: 'pointer',
+        position: 'relative',
+        overflow: 'hidden',
       }}
+      onClick={() => onToggle(metric.id)}
     >
+      {/* Background Glow when selected */}
+      {isSelected && (
+        <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: 60, background: `linear-gradient(90deg, ${categoryColor}08, transparent)`, pointerEvents: 'none' }} />
+      )}
+
       {/* Row 1: dot + ID + name + toggle */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-        {/* Weight dot */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
         <div
           style={{
-            width: 10,
-            height: 10,
+            width: 8,
+            height: 8,
             borderRadius: '50%',
             background: weightColor,
             flexShrink: 0,
-            boxShadow: `0 0 6px ${weightColor}`,
+            boxShadow: `0 0 10px ${weightColor}`,
           }}
           title={`Ağırlık: ${metric.weight}`}
         />
-        {/* ID badge */}
         <span
           style={{
-            fontFamily: 'monospace',
-            fontSize: 11,
-            color: '#8899aa',
-            background: 'rgba(255,255,255,0.07)',
-            padding: '1px 6px',
+            fontFamily: 'var(--font-mono)',
+            fontSize: 10,
+            color: 'var(--text-secondary)',
+            background: 'rgba(255,255,255,0.04)',
+            padding: '2px 6px',
             borderRadius: 4,
             flexShrink: 0,
+            fontWeight: 700,
+            border: '1px solid rgba(255,255,255,0.03)',
           }}
         >
           {metric.id}
         </span>
-        {/* Metric name */}
         <span
           style={{
             flex: 1,
-            color: isSelected ? '#e2e8f0' : '#8899aa',
+            color: isSelected ? 'var(--text-primary)' : 'var(--text-secondary)',
             fontSize: 13,
-            fontWeight: 600,
+            fontWeight: 700,
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             whiteSpace: 'nowrap',
+            letterSpacing: '-0.01em',
           }}
           title={metric.name}
         >
           {metric.name}
         </span>
-        {/* Toggle */}
-        <ToggleSwitch checked={isSelected} onChange={() => onToggle(metric.id)} />
+        <ToggleSwitch checked={isSelected} onChange={(e) => { e.stopPropagation(); onToggle(metric.id); }} />
       </div>
 
       {/* Row 2: description */}
@@ -217,12 +221,16 @@ function MetricCard({ metric, isSelected, onToggle, categoryColor }) {
         <div
           style={{
             fontSize: 11,
-            color: '#6677aa',
-            marginBottom: 8,
+            color: 'var(--text-secondary)',
+            marginBottom: 10,
             paddingLeft: 20,
             overflow: 'hidden',
             textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
+            display: '-webkit-box',
+            WebkitLineClamp: 1,
+            WebkitBoxOrient: 'vertical',
+            lineHeight: '1.4',
+            fontStyle: 'italic',
           }}
           title={metric.description}
         >
@@ -232,79 +240,54 @@ function MetricCard({ metric, isSelected, onToggle, categoryColor }) {
 
       {/* Row 3: value bar + stats */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, paddingLeft: 20, flexWrap: 'wrap' }}>
-        {/* Value bar */}
         <ValueBar value={metric.value} leagueAvg={metric.leagueAvg} color={categoryColor} />
 
-        {/* Value: shared metrics show single value; per-team metrics show Ev/Dep */}
-        <span style={{ fontSize: 12, fontWeight: 700, display: 'flex', gap: 8 }}>
+        <div style={{ fontSize: 12, fontWeight: 900, display: 'flex', gap: 10, fontFamily: 'var(--font-mono)' }}>
           {metric.homeValue != null && metric.homeValue === metric.awayValue ? (
-            <span style={{ color: isSelected ? '#e2e8f0' : '#8899aa' }}>
+            <span style={{ color: isSelected ? 'var(--accent-cyan)' : 'var(--text-tertiary)' }}>
               {formatValue(metric.homeValue, metric.unit)}
             </span>
           ) : (
             <>
               {metric.homeValue != null ? (
                 <span>
-                  <span style={{ color: '#8899aa', fontWeight: 400 }}>Ev: </span>
-                  <span style={{ color: isSelected ? '#e2e8f0' : '#8899aa' }}>{formatValue(metric.homeValue, metric.unit)}</span>
+                  <span style={{ color: 'var(--text-tertiary)', fontWeight: 400, fontSize: 9 }}>EV: </span>
+                  <span style={{ color: isSelected ? 'var(--accent-cyan)' : 'var(--text-tertiary)' }}>{formatValue(metric.homeValue, metric.unit)}</span>
                 </span>
               ) : null}
               {metric.awayValue != null ? (
                 <span>
-                  <span style={{ color: '#8899aa', fontWeight: 400 }}>Dep: </span>
-                  <span style={{ color: isSelected ? '#a0c4ff' : '#8899aa' }}>{formatValue(metric.awayValue, metric.unit)}</span>
+                  <span style={{ color: 'var(--text-tertiary)', fontWeight: 400, fontSize: 9 }}>DEP: </span>
+                  <span style={{ color: isSelected ? 'var(--accent-purple)' : 'var(--text-tertiary)' }}>{formatValue(metric.awayValue, metric.unit)}</span>
                 </span>
               ) : null}
-              {metric.homeValue == null && metric.awayValue == null && (
-                <span style={{ color: '#f0a500', fontStyle: 'italic' }}>Veri yok</span>
-              )}
             </>
           )}
-        </span>
+        </div>
 
-        {/* League avg */}
         {formattedLeagueAvg !== null && (
-          <span style={{ fontSize: 11, color: '#8899aa' }}>
-            Lig Ort.: <span style={{ color: '#aabbcc' }}>{formattedLeagueAvg}</span>
-          </span>
-        )}
-
-        {/* Weight pill */}
-        <span
-          style={{
-            fontSize: 10,
-            padding: '1px 7px',
-            borderRadius: 10,
-            background: `${weightColor}22`,
-            color: weightColor,
-            border: `1px solid ${weightColor}44`,
-            flexShrink: 0,
-          }}
-        >
-          {metric.weight || 'low'}
-        </span>
-
-        {/* Disabled notice */}
-        {!isSelected && (
-          <span style={{ fontSize: 10, color: '#556688', fontStyle: 'italic', marginLeft: 'auto' }}>
-            Lig Ort. kullanılıyor
+          <span style={{ fontSize: 10, color: 'var(--text-tertiary)', fontWeight: 700 }}>
+            LİG-O: <span style={{ color: 'var(--text-secondary)' }}>{formattedLeagueAvg}</span>
           </span>
         )}
       </div>
 
       {/* Row 4: simulation role pills */}
-      {roles.length > 0 && (
-        <div style={{ display: 'flex', gap: 5, marginTop: 8, paddingLeft: 20, flexWrap: 'wrap' }}>
+      {roles.length > 0 && isSelected && (
+        <div style={{ display: 'flex', gap: 6, marginTop: 10, paddingLeft: 20, flexWrap: 'wrap' }}>
           {roles.map((role) => (
             <span
               key={role}
               style={{
-                fontSize: 10,
-                padding: '1px 7px',
-                borderRadius: 10,
-                background: 'rgba(124,58,237,0.18)',
-                color: '#a78bfa',
-                border: '1px solid rgba(124,58,237,0.3)',
+                fontSize: 9,
+                padding: '2px 8px',
+                borderRadius: 20,
+                background: 'rgba(0, 242, 255, 0.05)',
+                color: 'var(--accent-cyan)',
+                border: '1px solid rgba(0, 242, 255, 0.1)',
+                fontWeight: 800,
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
               }}
             >
               {role}
@@ -378,105 +361,113 @@ export default function MetricsSelector({ metricsData, selectedMetrics, onToggle
 
   const styles = {
     container: {
-      background: 'var(--glass-bg, rgba(15,20,40,0.95))',
-      border: '1px solid var(--glass-border, rgba(160,196,255,0.12))',
-      borderRadius: 12,
+      background: 'var(--card-bg)',
+      border: '1px solid var(--glass-border)',
+      borderRadius: 'var(--radius-lg)',
       height: '100%',
       display: 'flex',
       flexDirection: 'column',
       overflow: 'hidden',
-      fontFamily: "'Inter', 'Segoe UI', system-ui, sans-serif",
-      color: '#e2e8f0',
+      fontFamily: 'var(--font-sans)',
+      color: 'var(--text-primary)',
+      backdropFilter: 'blur(20px)',
+      boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
     },
     header: {
-      padding: '14px 16px 10px',
-      borderBottom: '1px solid rgba(160,196,255,0.08)',
+      padding: '20px 24px',
+      borderBottom: '1px solid var(--glass-border)',
+      background: 'rgba(0,0,0,0.2)',
       flexShrink: 0,
     },
     headerTop: {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',
-      marginBottom: 10,
+      marginBottom: 16,
       gap: 12,
     },
     title: {
-      fontSize: 15,
-      fontWeight: 700,
-      color: '#e2e8f0',
+      fontSize: 16,
+      fontWeight: 800,
+      color: 'var(--text-primary)',
       display: 'flex',
       alignItems: 'center',
-      gap: 8,
+      gap: 10,
+      textTransform: 'uppercase',
+      letterSpacing: '0.02em',
     },
     badge: {
       fontSize: 11,
-      padding: '2px 8px',
-      borderRadius: 10,
-      background: 'rgba(0,212,255,0.15)',
-      color: '#00d4ff',
-      border: '1px solid rgba(0,212,255,0.25)',
-      fontWeight: 700,
+      padding: '4px 12px',
+      borderRadius: 20,
+      background: 'rgba(0,242,255,0.05)',
+      color: 'var(--accent-cyan)',
+      border: '1px solid rgba(0,242,255,0.15)',
+      fontWeight: 800,
     },
     globalBtns: {
       display: 'flex',
-      gap: 8,
+      gap: 10,
       alignItems: 'center',
     },
     btnPrimary: {
       fontSize: 11,
-      padding: '5px 11px',
-      borderRadius: 7,
-      border: '1px solid rgba(0,212,255,0.35)',
-      background: 'rgba(0,212,255,0.1)',
-      color: '#00d4ff',
+      padding: '6px 14px',
+      borderRadius: 8,
+      border: '1px solid var(--glass-border)',
+      background: 'var(--gradient-cyan)',
+      color: '#000',
       cursor: 'pointer',
-      fontWeight: 600,
-      transition: 'background 0.15s',
+      fontWeight: 800,
+      transition: 'all 0.2s cubic-bezier(.4,0,.2,1)',
+      boxShadow: '0 4px 12px rgba(0,242,255,0.15)',
     },
     btnSecondary: {
       fontSize: 11,
-      padding: '5px 11px',
-      borderRadius: 7,
-      border: '1px solid rgba(255,100,100,0.3)',
-      background: 'rgba(255,100,100,0.08)',
-      color: '#ff8080',
+      padding: '6px 14px',
+      borderRadius: 8,
+      border: '1px solid var(--glass-border)',
+      background: 'rgba(255,255,255,0.03)',
+      color: 'var(--text-secondary)',
       cursor: 'pointer',
-      fontWeight: 600,
-      transition: 'background 0.15s',
+      fontWeight: 700,
+      transition: 'all 0.2s',
     },
     searchBox: {
       width: '100%',
-      background: 'rgba(255,255,255,0.05)',
-      border: '1px solid rgba(160,196,255,0.15)',
-      borderRadius: 8,
-      padding: '8px 12px',
-      color: '#e2e8f0',
-      fontSize: 13,
+      background: 'rgba(0,0,0,0.3)',
+      border: '1px solid var(--glass-border)',
+      borderRadius: 10,
+      padding: '10px 16px',
+      color: 'var(--text-primary)',
+      fontSize: 14,
       outline: 'none',
       boxSizing: 'border-box',
+      transition: 'border-color 0.2s',
     },
     tabsContainer: {
       display: 'flex',
       overflowX: 'auto',
-      gap: 4,
-      padding: '10px 16px 0',
+      gap: 2,
+      padding: '12px 16px 10px',
       flexShrink: 0,
-      scrollbarWidth: 'none',
+      scrollbarWidth: 'thin',
+      scrollbarColor: 'rgba(0, 242, 255, 0.35) rgba(255,255,255,0.05)',
     },
     categoryHeader: {
-      padding: '10px 16px',
-      borderBottom: '1px solid rgba(160,196,255,0.08)',
+      padding: '16px 20px',
+      borderBottom: '1px solid var(--glass-border)',
       display: 'flex',
       alignItems: 'center',
-      gap: 10,
+      gap: 12,
       flexShrink: 0,
+      background: 'rgba(255,255,255,0.01)',
     },
     metricsList: {
       flex: 1,
       overflowY: 'auto',
-      padding: '12px 16px',
-      scrollbarWidth: 'thin',
-      scrollbarColor: 'rgba(160,196,255,0.15) transparent',
+      padding: '16px',
+      scrollbarWidth: 'none',
     },
     emptyState: {
       display: 'flex',
@@ -526,7 +517,7 @@ export default function MetricsSelector({ metricsData, selectedMetrics, onToggle
 
       {/* Category Tabs */}
       {!search.trim() && (
-        <div style={styles.tabsContainer}>
+        <div className="metricsTabsScroll" style={styles.tabsContainer}>
           {categories.map((cat) => {
             const color = CATEGORY_COLORS[cat];
             const isActive = activeCategory === cat;
@@ -691,6 +682,23 @@ export default function MetricsSelector({ metricsData, selectedMetrics, onToggle
           ))}
         </div>
       </div>
+
+      <style>{`
+        .metricsTabsScroll::-webkit-scrollbar { height: 10px; }
+        .metricsTabsScroll::-webkit-scrollbar-track {
+          background: rgba(255,255,255,0.04);
+          border-radius: 999px;
+          border: 1px solid rgba(255,255,255,0.06);
+        }
+        .metricsTabsScroll::-webkit-scrollbar-thumb {
+          background: linear-gradient(135deg, rgba(0,242,255,0.55), rgba(0,136,255,0.35));
+          border-radius: 999px;
+          border: 1px solid rgba(0,242,255,0.25);
+        }
+        .metricsTabsScroll::-webkit-scrollbar-thumb:hover {
+          background: linear-gradient(135deg, rgba(0,242,255,0.75), rgba(0,136,255,0.45));
+        }
+      `}</style>
     </div>
   );
 }

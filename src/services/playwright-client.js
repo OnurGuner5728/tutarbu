@@ -17,7 +17,7 @@ const cache = new Map();
 
 const CACHE_TTL = {
   standings: 3600,
-  teamPlayers: 3600,
+  teamPlayers: 0, // Set to 0 to always fetch fresh squad data from user-specified API
   playerStats: 1800,
   teamLastEvents: 600,
   eventDetail: 300,

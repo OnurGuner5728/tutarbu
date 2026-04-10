@@ -120,11 +120,17 @@ export default function App() {
       setPrediction(data);
 
       if (!isWorkshop && data.lineups) {
+        // Sadece orijinal İLK 11'i kaydet (isReserve olmayan, substitute olmayan)
+        // Yedek ve reserve oyuncuların swaplandığında 'player-modified' görsel bileşeni çalışsın
         const homeIds = new Set(
-          (data.lineups.home?.players ?? []).map(p => p?.player?.id).filter(Boolean)
+          (data.lineups.home?.players ?? [])
+            .filter(p => !p.substitute && !p.isReserve)
+            .map(p => p?.player?.id).filter(Boolean)
         );
         const awayIds = new Set(
-          (data.lineups.away?.players ?? []).map(p => p?.player?.id).filter(Boolean)
+          (data.lineups.away?.players ?? [])
+            .filter(p => !p.substitute && !p.isReserve)
+            .map(p => p?.player?.id).filter(Boolean)
         );
         setOriginalLineupIds({ home: homeIds, away: awayIds });
       }
@@ -764,28 +770,37 @@ export default function App() {
                           swapMode={swapMode}
                           onSwapMode={setSwapMode}
                           originalIds={originalLineupIds[workshopSide]}
-                          onSwap={(playerOut, playerIn, side) => {
-                            const base =
-                              modifiedLineup[side] !== null
-                                ? modifiedLineup[side]
-                                : prediction.lineups[side]?.players ?? [];
-                            const currentPlayers = [...base];
-                            const outIdx = currentPlayers.findIndex(
-                              p => p?.player?.id === playerOut?.player?.id
-                            );
-                            const inIdx = currentPlayers.findIndex(
-                              p => p?.player?.id === playerIn?.player?.id
-                            );
-                            if (outIdx !== -1 && inIdx !== -1) {
-                              const newPlayers = currentPlayers.map((p, i) => {
-                                if (i === outIdx) return { ...p, substitute: true };
-                                if (i === inIdx) return { ...p, substitute: false };
-                                return p;
-                              });
-                              setModifiedLineup(prev => ({ ...prev, [side]: newPlayers }));
-                            }
-                            setSwapMode(null);
-                          }}
+                            onSwap={(playerA, playerB, side) => {
+                              const base =
+                                modifiedLineup[side] !== null
+                                  ? modifiedLineup[side]
+                                  : prediction.lineups[side]?.players ?? [];
+                              const currentPlayers = [...base];
+                              
+                              const idxA = currentPlayers.findIndex(p => p?.player?.id === playerA?.player?.id);
+                              const idxB = currentPlayers.findIndex(p => p?.player?.id === playerB?.player?.id);
+                              
+                              if (idxA !== -1 && idxB !== -1) {
+                                const pA = { ...currentPlayers[idxA] };
+                                const pB = { ...currentPlayers[idxB] };
+                                
+                                // Swap their role statuses (starter vs sub vs reserve)
+                                const tempSub = pA.substitute;
+                                const tempRes = pA.isReserve;
+                                
+                                pA.substitute = pB.substitute;
+                                pA.isReserve = pB.isReserve;
+                                
+                                pB.substitute = tempSub;
+                                pB.isReserve = tempRes;
+                                
+                                currentPlayers[idxA] = pA;
+                                currentPlayers[idxB] = pB;
+                                
+                                setModifiedLineup(prev => ({ ...prev, [side]: currentPlayers }));
+                              }
+                              setSwapMode(null);
+                            }}
                         />
                       ) : (
                         <p className="empty-lineup">
@@ -1045,99 +1060,74 @@ function ProbBar({ label, val, color }) {
 
 function LineupColumn({ title, players, icon, side, swapMode, onSwapMode, onSwap, originalIds }) {
   const safePlayers = Array.isArray(players) ? players : [];
-  const starters = safePlayers.filter(p => p?.player && !p.substitute).slice(0, 11);
-  const subs = safePlayers.filter(p => p?.player && p.substitute && !p.isReserve).slice(0, 15);
-  const reserves = safePlayers.filter(p => p?.player && p.substitute && p.isReserve);
+  // Sort players: Starters first (CAP at 11), then Subs (including excess starters), then Reserves
+  const allStarters = safePlayers.filter(p => !p.substitute);
+  const starters = allStarters.slice(0, 11);
+  const excessStarters = allStarters.slice(11);
+  
+  const subs = [
+    ...excessStarters,
+    ...safePlayers.filter(p => p.substitute && !p.isReserve)
+  ];
+  const reserves = safePlayers.filter(p => p.substitute && p.isReserve);
+
+  const handlePlayerClick = (p) => {
+    if (!swapMode) {
+      // First player selected
+      onSwapMode({ playerOut: p });
+    } else {
+      if (swapMode.playerOut?.player?.id === p.player?.id) {
+        // Deselect
+        onSwapMode(null);
+      } else {
+        // Second player selected - Trigger Swap
+        onSwap(swapMode.playerOut, p, side);
+      }
+    }
+  };
+
+  const renderPlayer = (p, type) => {
+    const isSelected = swapMode?.playerOut?.player?.id === p.player?.id;
+    const isModified = originalIds ? !originalIds.has(p.player?.id) : false;
+    
+    return (
+      <div
+        key={p.player?.id}
+        className={`player-card ${type}${isSelected ? ' selected-out' : ''}${isModified ? ' player-modified' : ''}`}
+        onClick={() => handlePlayerClick(p)}
+        role="button"
+        tabIndex={0}
+        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') handlePlayerClick(p); }}
+      >
+        <span className="p-pos">{p.player?.position || '?'}</span>
+        <span className="p-name">{p.player?.shortName || p.player?.name}</span>
+        {isSelected ? (
+          <span className="swap-icon selected">&#x2715;</span>
+        ) : (
+          <span className="swap-icon">&#8644;</span>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="workshop-col">
       <div className="col-header">{icon} {title}</div>
       <div className="squad-section">
-        <div className="squad-label">İlk 11</div>
+        <div className="squad-label">İlk 11 ({starters.length})</div>
         <div className="player-list-mini">
-          {starters.map(p => {
-            const isModified = originalIds ? !originalIds.has(p.player.id) : false;
-            return (
-              <div
-                key={p.player.id}
-                className={`player-card starter${swapMode?.playerOut?.player?.id === p.player.id ? ' selected-out' : ''}${isModified ? ' player-modified' : ''}`}
-                onClick={() => {
-                  if (swapMode?.playerOut?.player?.id === p.player.id) {
-                    onSwapMode(null);
-                  } else if (!swapMode) {
-                    onSwapMode({ playerOut: p });
-                  }
-                }}
-                title={swapMode?.playerOut?.player?.id === p.player.id ? 'Cancel swap' : 'Click to swap'}
-                tabIndex={0}
-                role="button"
-                onKeyDown={e => e.key === 'Enter' || e.key === ' ' ? e.currentTarget.click() : null}
-              >
-                <span className="p-pos">{p.player.position || '?'}</span>
-                <span className="p-name">{p.player.shortName || p.player.name}</span>
-                {swapMode?.playerOut?.player?.id !== p.player.id
-                  ? <span className="swap-icon">&#8644;</span>
-                  : <span className="swap-icon selected">&#x2715;</span>
-                }
-              </div>
-            );
-          })}
+          {starters.map(p => renderPlayer(p, 'starter'))}
         </div>
 
-        {swapMode && (
-          <>
-            <div className="squad-label" style={{ marginTop: '12px', color: 'var(--accent-cyan)' }}>
-              {swapMode.playerOut?.player
-                ? `> ${swapMode.playerOut.player.shortName || swapMode.playerOut.player.name} yerine sec:`
-                : '> Oyuncu sec:'}
-            </div>
-            <div className="player-list-mini">
-              {[...subs, ...reserves].map(p => (
-                <div
-                  key={p.player.id}
-                  className={`player-card sub swap-target ${p.isReserve ? 'reserve' : ''}`}
-                  onClick={() => onSwap(swapMode.playerOut, p, side)}
-                  role="button"
-                  tabIndex={0}
-                  aria-label={`Bring in ${p.player.shortName || p.player.name}`}
-                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') onSwap(swapMode.playerOut, p, side); }}
-                >
-                  <span className="p-pos">{p.player.position || '?'}</span>
-                  <span className="p-name">{p.player.shortName || p.player.name}</span>
-                  <span className="swap-icon">+</span>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
-
-        {!swapMode && subs.length > 0 && (
-          <>
-            <div className="squad-label" style={{ marginTop: '12px' }}>Yedekler</div>
-            <div className="player-list-mini">
-              {subs.map(p => (
-                <div key={p.player.id} className="player-card sub">
-                  <span className="p-pos">{p.player.position || '?'}</span>
-                  <span className="p-name">{p.player.shortName || p.player.name}</span>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
+        <div className="squad-label" style={{ marginTop: '16px' }}>Yedek Kulübesi ({subs.length})</div>
+        <div className="player-list-mini">
+          {subs.map(p => renderPlayer(p, 'sub'))}
+        </div>
         
-        {!swapMode && reserves.length > 0 && (
-          <>
-            <div className="squad-label" style={{ marginTop: '12px', color: 'var(--text-tertiary)' }}>Kadro Dışı</div>
-            <div className="player-list-mini">
-              {reserves.map(p => (
-                <div key={p.player.id} className="player-card sub reserve">
-                  <span className="p-pos">{p.player.position || '?'}</span>
-                  <span className="p-name">{p.player.shortName || p.player.name}</span>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
+        <div className="squad-label" style={{ marginTop: '16px', color: 'var(--text-tertiary)' }}>Kadro Dışı ({reserves.length})</div>
+        <div className="player-list-mini">
+          {reserves.map(p => renderPlayer(p, 'sub reserve'))}
+        </div>
       </div>
     </div>
   );

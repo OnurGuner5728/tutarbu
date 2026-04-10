@@ -10,8 +10,9 @@ function calculateGoalkeeperMetrics(data, side) {
   const recentDetails = (isHome ? data.homeRecentMatchDetails : data.awayRecentMatchDetails) || [];
   const lastEvents = (isHome ? data.homeLastEvents : data.awayLastEvents) || [];
 
-  // Kaleci bul
-  const gk = playerStats?.find(p => p.position === 'G' || p.position === 'GK');
+  // Starter kaleci: substitute ve reserve olmamalı
+  const gk = playerStats?.find(p => (p.position === 'G' || p.position === 'GK') && !p.substitute && !p.isReserve)
+    ?? playerStats?.find(p => p.position === 'G' || p.position === 'GK');
   if (!gk) return createEmptyGKMetrics();
 
   const gkStats = gk.seasonStats?.statistics || {};

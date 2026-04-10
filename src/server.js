@@ -3,6 +3,20 @@ const cors = require('cors');
 const { fetchAllMatchData } = require('./services/data-fetcher');
 const { calculateAllMetrics } = require('./engine/metric-calculator');
 const { generatePrediction } = require('./engine/prediction-generator');
+const { getDynamicBaseline } = require('./engine/dynamic-baseline');
+
+function createRNG(seed) {
+  if (seed == null) return Math.random;
+  let s = Number(seed);
+  if (isNaN(s)) {
+    // String seed to numeric
+    s = seed.split('').reduce((a, b) => { a = ((a << 5) - a) + b.charCodeAt(0); return a & a; }, 0);
+  }
+  return function() {
+    s = (s * 16807) % 2147483647;
+    return (s - 1) / 2147483646;
+  };
+}
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -50,7 +64,7 @@ app.use(rateLimitMiddleware);
 
 // Match data cache (5 dakika TTL, max 100 girdi)
 const matchDataCache = new Map();
-const MATCH_CACHE_TTL = 5 * 60 * 1000;
+const MATCH_CACHE_TTL = 0; // Disabled to prevent stale workshop data
 const MAX_CACHE_SIZE = 100;
 
 function getCachedMatchData(eventId) {
@@ -159,8 +173,29 @@ app.post('/api/predict/:eventId', async (req, res) => {
     // 3. Initial Metrics
     const metrics = calculateAllMetrics(data);
 
-    // 4. Generate Report
-    const prediction = generatePrediction(metrics, data);
+    // 4. Baseline & RNG
+    const baseline = getDynamicBaseline(data);
+    const rng = createRNG(req.query.seed);
+
+    // 5. Generate Report
+    const prediction = generatePrediction(metrics, data, baseline, metrics.metricAudit, rng);
+
+    // Phase 1 Observation: Debug Payload
+    if (req.query.debug === '1') {
+      prediction._debug = {
+        providerAudit: {
+          total: (data._apiLog || []).length,
+          failed: (data._apiLog || []).filter(l => !l.success).length,
+          providers: (data._apiLog || []).map(l => ({
+            provider: l.endpoint,
+            status: l.status || (l.success ? 'fulfilled' : 'rejected'),
+            elapsedMs: l.elapsedMs || 0,
+            isCritical: l.isCritical || false
+          }))
+        },
+        metricAudit: metrics.metricAudit
+      };
+    }
 
     res.json(prediction);
   } catch (err) {
@@ -203,17 +238,75 @@ app.post('/api/workshop/:eventId', async (req, res) => {
     // CRITICAL: Cache nesnesini doğrudan mutate etme — deep copy al.
     // Workshop her çağrıda farklı bir lineup denemesi yapar; cache temiz kalmalı.
     const data = structuredClone(cachedData);
+
     if (modifiedLineup) {
-      if (modifiedLineup.home && data.lineups?.home) {
-        data.lineups.home.players = modifiedLineup.home;
-      }
-      if (modifiedLineup.away && data.lineups?.away) {
-        data.lineups.away.players = modifiedLineup.away;
+      const { fetchPlayerStatsForPlayers } = require('./services/data-fetcher');
+
+      for (const side of ['home', 'away']) {
+        if (!modifiedLineup[side]) continue;
+
+        const newPlayers = modifiedLineup[side];
+        const statsKey = side === 'home' ? 'homePlayerStats' : 'awayPlayerStats';
+
+        // 1. Lineup'ı güncelle
+        if (data.lineups?.[side]) {
+          data.lineups[side].players = newPlayers;
+        }
+
+        // 2. Yeni lineup'daki her oyuncunun substitute/isReserve bayrağını playerStats'a yansıt
+        //    Bu olmadan calculatePlayerMetrics orijinal bayraklarla çalışır → yanlış gruplar
+        const flagMap = new Map(newPlayers.map(p => [
+          p.player?.id,
+          { substitute: p.substitute || false, isReserve: p.isReserve || false },
+        ]));
+
+        data[statsKey] = (data[statsKey] || []).map(ps => {
+          const flags = flagMap.get(ps.playerId);
+          if (!flags) return ps;
+          return { ...ps, substitute: flags.substitute, isReserve: flags.isReserve };
+        });
+
+        // 3. Yeni lineup'da istatistiği olmayan oyuncuları bul (rezerv kadrodan eklenenler)
+        const existingIds = new Set((data[statsKey] || []).map(ps => ps.playerId));
+        const missingPlayers = newPlayers.filter(
+          p => p.player?.id && !existingIds.has(p.player.id)
+        );
+
+        if (missingPlayers.length > 0) {
+          console.log(`[Workshop] ${side}: ${missingPlayers.length} yeni oyuncu için istatistik fetch ediliyor...`);
+          const newStats = await fetchPlayerStatsForPlayers(
+            missingPlayers,
+            data.tournamentId,
+            data.seasonId
+          );
+          // Yeni oyuncuları mevcut stats listesine ekle
+          data[statsKey] = [...(data[statsKey] || []), ...newStats];
+        }
       }
     }
 
     const metrics = calculateAllMetrics(data);
-    const prediction = generatePrediction(metrics, data);
+    const baseline = getDynamicBaseline(data);
+    const rng = createRNG(req.query.seed);
+    const prediction = generatePrediction(metrics, data, baseline, metrics.metricAudit, rng);
+
+    // Phase 1 Observation: Debug Payload
+    if (req.query.debug === '1') {
+      prediction._debug = {
+        providerAudit: {
+          total: (data._apiLog || []).length,
+          failed: (data._apiLog || []).filter(l => !l.success).length,
+          providers: (data._apiLog || []).map(l => ({
+            provider: l.endpoint,
+            status: l.status || (l.success ? 'fulfilled' : 'rejected'),
+            elapsedMs: l.elapsedMs || 0,
+            isCritical: l.isCritical || false
+          }))
+        },
+        metricAudit: metrics.metricAudit
+      };
+    }
+
     res.json(prediction);
   } catch (err) {
     console.error(`[API ERROR] workshop/${eventId}: ${err.message}`);
@@ -240,13 +333,14 @@ app.get('/api/metrics/:eventId', async (req, res) => {
     const metrics = calculateAllMetrics(cachedData);
 
     // Flatten each side's nested metric groups into a single { M001: value, ... } map
+    // Regex M\d{3}[a-z]? ile M118b, M025b, M025c, M134b, M134c gibi alt-metrikler de dahil edilir.
     function flattenSide(side) {
       const result = {};
       const groups = Object.values(side);
       for (const group of groups) {
         if (group && typeof group === 'object') {
           for (const [key, val] of Object.entries(group)) {
-            if (/^M\d{3}$/.test(key)) result[key] = val;
+            if (/^M\d{3}[a-z]?$/i.test(key)) result[key] = val;
           }
         }
       }
@@ -321,7 +415,7 @@ app.post('/api/simulate/:eventId', async (req, res) => {
       for (const group of groups) {
         if (group && typeof group === 'object') {
           for (const [key, val] of Object.entries(group)) {
-            if (/^M\d{3}$/.test(key)) result[key] = val;
+            if (/^M\d{3}[a-z]?$/i.test(key)) result[key] = val;
           }
         }
       }
@@ -333,13 +427,16 @@ app.post('/api/simulate/:eventId', async (req, res) => {
     for (const group of sharedGroups) {
       if (group && typeof group === 'object') {
         for (const [key, val] of Object.entries(group)) {
-          if (/^M\d{3}$/.test(key)) sharedFlat[key] = val;
+          if (/^M\d{3}[a-z]?$/i.test(key)) sharedFlat[key] = val;
         }
       }
     }
 
     const homeMetrics = Object.assign(flattenSide(metrics.home), sharedFlat);
     const awayMetrics = Object.assign(flattenSide(metrics.away), sharedFlat);
+
+    const baseline = getDynamicBaseline(cachedData);
+    const rng = createRNG(req.body.seed || req.query.seed);
 
     const result = simulateMatch({
       homeMetrics,
@@ -348,7 +445,40 @@ app.post('/api/simulate/:eventId', async (req, res) => {
       runs,
       lineups: cachedData.lineups,
       weatherMetrics: cachedData.weatherMetrics,
+      baseline,
+      audit: metrics.metricAudit,
+      rng
     });
+
+    // Attach engine data for client-side real-time simulation (single run only)
+    if (runs === 1) {
+      const { computeWeatherMultipliers } = require('./services/weather-service');
+      const { computeProbBases } = require('./engine/match-simulator');
+      result.lineups = cachedData.lineups;
+      result.weatherMult = computeWeatherMultipliers(cachedData.weatherMetrics || {});
+      const sel = new Set(selectedMetrics);
+      result.probBases = {
+        home: computeProbBases(homeMetrics, sel, result.units?.home || {}, baseline, metrics.metricAudit),
+        away: computeProbBases(awayMetrics, sel, result.units?.away || {}, baseline, metrics.metricAudit),
+      };
+    }
+
+    // Phase 1 Observation: Debug Payload
+    if (req.query.debug === '1') {
+      result._debug = {
+        providerAudit: {
+          total: (cachedData._apiLog || []).length,
+          failed: (cachedData._apiLog || []).filter(l => !l.success).length,
+          providers: (cachedData._apiLog || []).map(l => ({
+            provider: l.endpoint,
+            status: l.status || (l.success ? 'fulfilled' : 'rejected'),
+            elapsedMs: l.elapsedMs || 0,
+            isCritical: l.isCritical || false
+          }))
+        },
+        metricAudit: metrics.metricAudit
+      };
+    }
 
     res.json(result);
   } catch (err) {

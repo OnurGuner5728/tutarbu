@@ -4,243 +4,112 @@
  */
 
 const { poissonPMF, weightedAvg, clamp, round2 } = require('../engine/math-utils');
+const { calculateUnitImpact, SIM_BLOCKS } = require('../engine/match-simulator');
 
 function calculateAdvancedMetrics(allMetrics) {
   const { homeAttack, awayAttack, homeDefense, awayDefense, homeForm, awayForm,
     homePlayer, awayPlayer, homeGK, awayGK, referee, h2h, contextual,
     homeMomentum, awayMomentum, leagueAvgGoals: _leagueAvgGoals,
-    homeFormation, awayFormation, homeMatchCount, awayMatchCount } = allMetrics;
-  const leagueAvgGoals = _leagueAvgGoals ?? null;
+    homeFormation, awayFormation, homeMatchCount, awayMatchCount,
+    homeFlat, awayFlat, sharedFlat, allMetricIds } = allMetrics;
+  
+  const leagueAvgGoals = _leagueAvgGoals ?? 1.3;
 
-  // ── M156: Genel Hücum Gücü Skoru ──
-  const M156_home = weightedAvg([
-    [homeAttack.M001 != null ? clamp(homeAttack.M001 * 25, 0, 100) : null, 15],   // Gol/Maç (4.0=100)
-    [homeAttack.M002 != null ? clamp(homeAttack.M002 * 25, 0, 100) : null, 10],   // Loc Gol/Maç
-    [homeAttack.M011, 8],                                                         // Şut Dönüşüm % (0-100)
-    [homeAttack.M015 != null ? clamp(homeAttack.M015 * 30, 0, 100) : null, 12],   // xG/Maç (3.3=100)
-    [homeAttack.M016 != null ? clamp(homeAttack.M016 * 50, 0, 100) : null, 10],   // xG Verimliliği (2.0=100)
-    [homeAttack.M017 != null ? clamp(homeAttack.M017 * 20, 0, 100) : null, 8],    // Büyük Şans/Maç (5=100)
-    [homeAttack.M018, 7],                                                         // Büyük Şans Dönüşüm %
-    [homeAttack.M021 != null ? clamp(homeAttack.M021 * 25, 0, 100) : null, 10],   // xG Created/Maç
-    [homeAttack.M022 != null ? clamp(homeAttack.M022 * 10, 0, 100) : null, 5],    // Korner/Maç (10=100)
-    [homeAttack.M025, 5],                                                         // Topla Oynama (0-100)
-    [homeAttack.M013 != null ? clamp(homeAttack.M013 * 5, 0, 100) : null, 5],     // Şut/Maç (20=100)
-    [homeAttack.M014 != null ? clamp(homeAttack.M014 * 10, 0, 100) : null, 5],    // İsabetli Şut/Maç (10=100)
-  ]);
-  const M156_away = weightedAvg([
-    [awayAttack.M001 != null ? clamp(awayAttack.M001 * 25, 0, 100) : null, 15],
-    [awayAttack.M002 != null ? clamp(awayAttack.M002 * 25, 0, 100) : null, 10],
-    [awayAttack.M011, 8],
-    [awayAttack.M015 != null ? clamp(awayAttack.M015 * 30, 0, 100) : null, 12],
-    [awayAttack.M016 != null ? clamp(awayAttack.M016 * 50, 0, 100) : null, 10],
-    [awayAttack.M017 != null ? clamp(awayAttack.M017 * 20, 0, 100) : null, 8],
-    [awayAttack.M018, 7],
-    [awayAttack.M021 != null ? clamp(awayAttack.M021 * 25, 0, 100) : null, 10],
-    [awayAttack.M022 != null ? clamp(awayAttack.M022 * 10, 0, 100) : null, 5],
-    [awayAttack.M025, 5],
-    [awayAttack.M013 != null ? clamp(awayAttack.M013 * 5, 0, 100) : null, 5],
-    [awayAttack.M014 != null ? clamp(awayAttack.M014 * 10, 0, 100) : null, 5],
-  ]);
+  // 1. Calculate the 26 Behavioral Units for both teams
+  const homeUnits = {};
+  const awayUnits = {};
+  for (const blockId in SIM_BLOCKS) {
+    homeUnits[blockId] = calculateUnitImpact(blockId, { ...homeFlat, ...sharedFlat }, allMetricIds);
+    awayUnits[blockId] = calculateUnitImpact(blockId, { ...awayFlat, ...sharedFlat }, allMetricIds);
+  }
 
-  // ── M157: Genel Defans Gücü Skoru ──
-  // Null-safe: arithmetic on null bypasses weightedAvg's skip logic, so guard explicitly.
-  const M157_home = weightedAvg([
-    [homeDefense.M026 != null ? clamp(100 - homeDefense.M026 * 30, 0, 100) : null, 15], // Düşük yenilen gol = yüksek skor
-    [homeDefense.M028, 12], [homeDefense.M034, 8], [homeDefense.M035, 10],
-    [homeDefense.M036, 5], [homeDefense.M033 != null ? clamp(100 - (homeDefense.M033 / 1.35) * 50, 0, 100) : null, 10],
-    [homeDefense.M043, 10],
-    [homeDefense.M042 != null ? 100 - homeDefense.M042 : null, 8],
-    [homeDefense.M044 != null ? 100 - homeDefense.M044 / 90 * 100 : null, 7],
-    [homeDefense.M037, 5],
-    [homePlayer.M083, 8], // M083: Savunma nitelikleri (0-100, oyuncu attr. defending ort.)
-  ]);
-  const M157_away = weightedAvg([
-    [awayDefense.M026 != null ? clamp(100 - awayDefense.M026 * 30, 0, 100) : null, 15],
-    [awayDefense.M028, 12], [awayDefense.M034, 8], [awayDefense.M035, 10],
-    [awayDefense.M036, 5], [awayDefense.M033 != null ? clamp(100 - (awayDefense.M033 / 1.35) * 50, 0, 100) : null, 10],
-    [awayDefense.M043, 10],
-    [awayDefense.M042 != null ? 100 - awayDefense.M042 : null, 8],
-    [awayDefense.M044 != null ? 100 - awayDefense.M044 / 90 * 100 : null, 7],
-    [awayDefense.M037, 5],
-    [awayPlayer.M083, 8], // M083: Savunma nitelikleri (0-100, oyuncu attr. defending ort.)
-  ]);
+  // 2. Derive Lambda (Attack/Defense Power)
+  // Eşit ağırlıklı geometrik ortalama yardımcıları — keyfi ağırlık katsayısı yok
+  const geo2 = (a, b) => Math.sqrt(Math.max(a, 0.01) * Math.max(b, 0.01));
+  const geo3 = (a, b, c) => Math.cbrt(Math.max(a, 0.01) * Math.max(b, 0.01) * Math.max(c, 0.01));
 
-  // ── M158: Genel Form Skoru ──
-  const M158_home = weightedAvg([
-    [homeForm.M046, 25], [homeForm.M047, 20], [homeForm.M048, 10],
-    [homeForm.M055, 15], [homeForm.M062, 10], [homeForm.M063, 10],
-    [homeForm.M064, 5], [homeForm.M065, 5],
-  ]);
-  const M158_away = weightedAvg([
-    [awayForm.M046, 25], [awayForm.M047, 20], [awayForm.M048, 10],
-    [awayForm.M055, 15], [awayForm.M062, 10], [awayForm.M063, 10],
-    [awayForm.M064, 5], [awayForm.M065, 5],
-  ]);
+  const getPower = (side, units) => {
+    // Hücum: üç birim eşit ağırlıklı geometrik ortalama
+    const atk = geo3(units.BITIRICILIK, units.YARATICILIK, units.SUT_URETIMI)
+              * geo2(units.FORM_KISA, units.FORM_UZUN)
+              * geo2(units.TOPLA_OYNAMA, units.BAGLANTI_OYUNU);
 
-  // ── M159: Oyuncu Kalitesi Skoru ──
-  // Null-safe: arithmetic on null bypasses weightedAvg's skip logic, so guard explicitly.
-  const M159_home = weightedAvg([
-    [homePlayer.M066 != null ? (homePlayer.M066 / 10) * 100 : null, 20], [homePlayer.M069, 10],
-    [homePlayer.M070 != null ? homePlayer.M070 * 20 : null, 10],
-    [homePlayer.M071 != null ? (homePlayer.M071 / 10) * 100 : null, 10],
-    [homePlayer.M082, 10], [homePlayer.M084, 10],
-    [homePlayer.M077 != null ? Math.max(0, 100 - (homePlayer.M077 / 5.0) * 100) : null, 15],
-    [homePlayer.M078 != null ? Math.max(0, 100 - (homePlayer.M078 / 5.0) * 100) : null, 15],
-  ]);
-  const M159_away = weightedAvg([
-    [awayPlayer.M066 != null ? (awayPlayer.M066 / 10) * 100 : null, 20], [awayPlayer.M069, 10],
-    [awayPlayer.M070 != null ? awayPlayer.M070 * 20 : null, 10],
-    [awayPlayer.M071 != null ? (awayPlayer.M071 / 10) * 100 : null, 10],
-    [awayPlayer.M082, 10], [awayPlayer.M084, 10],
-    [awayPlayer.M077 != null ? Math.max(0, 100 - (awayPlayer.M077 / 5.0) * 100) : null, 15],
-    [awayPlayer.M078 != null ? Math.max(0, 100 - (awayPlayer.M078 / 5.0) * 100) : null, 15],
-  ]);
+    // Savunma: üç birim eşit ağırlıklı geometrik ortalama
+    const def = geo3(units.SAVUNMA_DIRENCI, units.SAVUNMA_AKSIYONU, units.GK_REFLEKS)
+              * geo2(units.DISIPLIN, units.GK_ALAN_HAKIMIYETI)
+              / Math.max(units.TURNUVA_BASKISI, 0.1); // Yüksek baskı → savunma azalır — saf ters orantı, keyfi sabit yok
 
-  // ── M160: Kaleci Gücü Skoru ──
-  const M160_home = weightedAvg([
-    [homeGK.M096, 25], [homeGK.M098 != null ? homeGK.M098 * 100 : null, 15],
-    [homeGK.M102 != null ? homeGK.M102 * 13 : null, 20], [homeGK.M099, 10],
-    [homeGK.M100, 10], [homeGK.M101, 10], [homeGK.M105 != null ? 100 - homeGK.M105 * 20 : null, 10],
-  ]);
-  const M160_away = weightedAvg([
-    [awayGK.M096, 25], [awayGK.M098 != null ? awayGK.M098 * 100 : null, 15],
-    [awayGK.M102 != null ? awayGK.M102 * 13 : null, 20], [awayGK.M099, 10],
-    [awayGK.M100, 10], [awayGK.M101, 10], [awayGK.M105 != null ? 100 - awayGK.M105 * 20 : null, 10],
-  ]);
-
-  // ── M161: Hakem Etkisi Skoru ──
-  const M161 = referee.M109 != null ? weightedAvg([
-    [referee.M112, 25], [referee.M114, 20],
-    [referee.M111 != null ? referee.M111 * 50 : null, 15],
-    [referee.M117 != null ? referee.M117 * 15 : null, 15],
-    [referee.M113 != null ? referee.M113 * 15 : null, 15],
-    [referee.M118 != null ? referee.M118 * 50 : null, 10],
-  ]) : null;
-
-  // ── M162: H2H Avantajı Skoru ──
-  const totalH2H = (h2h.M119 ?? 0) + (h2h.M120 ?? 0) + (h2h.M121 ?? 0);
-  const M162 = totalH2H > 0 ? weightedAvg([
-    [h2h.M122, 30], [h2h.M127, 20],
-    [h2h.M119 != null ? (h2h.M119 / totalH2H) * 100 : null, 25],
-    [h2h.M126 != null ? 50 + h2h.M126 * 5 : null, 15],
-    [h2h.M128 != null ? 50 + h2h.M128 * 10 : null, 10],
-  ]) : null;
-
-  // ── M163: Bağlamsal Avantaj Skoru ──
-  const M163 = weightedAvg([
-    [contextual.M131, 20], [contextual.M135, 10],
-    [contextual.M138 != null ? contextual.M138 * 100 : null, 10],
-    [contextual.M139, 10], [contextual.M140, 15],
-    [contextual.M141 != null ? contextual.M141 * 100 : null, 5],
-    [contextual.M142 != null ? 100 - contextual.M142 * 100 : null, 10],
-    [contextual.M144, 10],
-    [contextual.M145 != null ? contextual.M145 * 100 : null, 10],
-  ]);
-
-  // ── M164: Momentum Skoru ──
-  // Note: arithmetic on null produces 0/100 in JS which bypasses weightedAvg's null-skip.
-  // Wrap expressions so null inputs yield null (skipped by weightedAvg).
-  const M164_home = weightedAvg([
-    [homeMomentum.M146, 20],
-    [homeMomentum.M147 != null ? 100 - homeMomentum.M147 : null, 15],
-    [homeMomentum.M149, 15], [homeMomentum.M150, 15],
-    [homeMomentum.M152, 10], [homeMomentum.M154, 10],
-    [homeMomentum.M155 != null ? homeMomentum.M155 * 20 : null, 15],
-  ]);
-  const M164_away = weightedAvg([
-    [awayMomentum.M146, 20],
-    [awayMomentum.M147 != null ? 100 - awayMomentum.M147 : null, 15],
-    [awayMomentum.M149, 15], [awayMomentum.M150, 15],
-    [awayMomentum.M152, 10], [awayMomentum.M154, 10],
-    [awayMomentum.M155 != null ? awayMomentum.M155 * 20 : null, 15],
-  ]);
-
-  // ── M165: Mutlaka Gol Atma İndeksi ──
-  const M165_home = homeForm.M062 == null ? null : clamp(
-    (homeForm.M051 != null && homeForm.M051 > 3 ? 1.2 : 1.0) *
-    (homeAttack.M016 != null && homeAttack.M016 > 1 ? 1.1 : 0.9) *
-    (homeForm.M062 / 100) * 100,
-    0, 100);
-  const M165_away = awayForm.M062 == null ? null : clamp(
-    (awayForm.M051 != null && awayForm.M051 > 3 ? 1.2 : 1.0) *
-    (awayAttack.M016 != null && awayAttack.M016 > 1 ? 1.1 : 0.9) *
-    (awayForm.M062 / 100) * 100,
-    0, 100);
-
-  // ── M166: Toplam Takım Güç Skoru ──
-  const weights = {
-    attack: 0.20, defense: 0.18, form: 0.15, player: 0.12,
-    gk: 0.08, referee: 0.05, h2h: 0.07, context: 0.05, momentum: 0.10,
+    return { atk: clamp(atk, 0.4, 2.5), def: clamp(def, 0.4, 2.5) };
   };
 
-  const M166_home = weightedAvg([
-    [M156_home, weights.attack * 100],
-    [M157_home, weights.defense * 100],
-    [M158_home, weights.form * 100],
-    [M159_home, weights.player * 100],
-    [M160_home, weights.gk * 100],
-    [M161, weights.referee * 100],
-    [M162, weights.h2h * 100],
-    [M163, weights.context * 100],
-    [M164_home, weights.momentum * 100],
-  ]);
+  const hP = getPower('home', homeUnits);
+  const aP = getPower('away', awayUnits);
 
-  const M166_away = weightedAvg([
-    [M156_away, weights.attack * 100],
-    [M157_away, weights.defense * 100],
-    [M158_away, weights.form * 100],
-    [M159_away, weights.player * 100],
-    [M160_away, weights.gk * 100],
-    [M161 != null ? 100 - M161 : null, weights.referee * 100],
-    [M162 != null ? 100 - M162 : null, weights.h2h * 100],
-    [M163 != null ? 100 - M163 : null, weights.context * 100],
-    [M164_away, weights.momentum * 100],
-  ]);
+  // Home Advantage (Enhanced)
+  const homeAdv = 1.05 + (homeUnits.BAGLANTI_OYUNU * 0.05) + (homeUnits.MAC_BASLANGICI * 0.05);
 
-  // ── M167: Poisson Lambda Hesaplama ──
-  // Ev sahibi avantajı: Lig verisinden hesaplanmalı.
-  const homeAdvantage = (() => {
-    if (leagueAvgGoals == null) return 1.15; // Global default
-    const homeGoalsStandings = standingsTotal?.standings?.[0]?.rows?.reduce((s, r) => s + (r.scoresFor || r.goalsFor || 0), 0) || 0;
-    const matchesStandings = standingsTotal?.standings?.[0]?.rows?.reduce((s, r) => s + (r.played || 0), 0) || 1;
-    const leagueGoalRate = homeGoalsStandings / matchesStandings;
+  const lambda_home = (hP.atk / aP.def) * (leagueAvgGoals || 1.3) * homeAdv;
+  const lambda_away = (aP.atk / hP.def) * (leagueAvgGoals || 1.3) * (1 / homeAdv);
 
-    // Basit bir model: Ev sahibi golleri / Toplam goller oranı üzerinden 1.0-1.3 arası bir çarpan.
-    // Veri kısıtlıysa 1.15 dön.
-    return clamp(leagueGoalRate > 0 ? 1.15 : 1.15, 1.0, 1.3);
-  })();
+  const M167_home = round2(clamp(lambda_home, 0.1, 8.0));
+  const M167_away = round2(clamp(lambda_away, 0.1, 8.0));
 
-  const awayDefenseRate = awayDefense.M026 ?? null;
-  const homeDefenseRate = homeDefense.M026 ?? null;
+  // Legacy M156-M160 scores (UI uyumluluğu için korunur — birimler 0-1 aralığında olduğundan
+  // *50 ile 0-50 skala aralığına taşınır; bu ölçekleme keyfidir, yalnızca UI gösterimi içindir)
+  const M156_home = homeUnits.BITIRICILIK * 50; // *50: 0-1 birim → 0-50 UI skalası
+  const M156_away = awayUnits.BITIRICILIK * 50;
+  const M157_home = homeUnits.SAVUNMA_DIRENCI * 50;
+  const M157_away = awayUnits.SAVUNMA_DIRENCI * 50;
+  const M158_home = homeUnits.FORM_KISA * 50;
+  const M158_away = awayUnits.FORM_KISA * 50;
+  const M159_home = homeUnits.KADRO_DERINLIGI * 50;
+  const M159_away = awayUnits.KADRO_DERINLIGI * 50;
+  const M160_home = homeUnits.GK_REFLEKS * 50;
+  const M160_away = awayUnits.GK_REFLEKS * 50;
 
-  const homeGoalsPerMatch = (homeAttack.M001 != null) ? homeAttack.M001 : null;
-  const awayGoalsPerMatch = (awayAttack.M001 != null) ? awayAttack.M001 : null;
+  // ── M161: Hakem Etkisi Skoru ── (*50: 0-1 birim → 0-50 UI skalası)
+  const M161 = homeUnits.HAKEM_DINAMIKLERI * 50;
 
-  const formFactor_home = M158_home != null ? M158_home / 50 : 1;
-  const formFactor_away = M158_away != null ? M158_away / 50 : 1;
+  // ── M162: H2H Avantajı Skoru ── (*50: 0-1 birim → 0-50 UI skalası)
+  const M162 = homeUnits.H2H_DOMINASYON * 50;
 
-  // Defans Çarpanı: Takımın gol yeme hızı / Lig ortalaması
-  const defenseMultiplier_home = (leagueAvgGoals != null && leagueAvgGoals > 0 && awayDefenseRate != null)
-    ? (awayDefenseRate / leagueAvgGoals)
-    : 1.0;
+  // ── M163: Bağlamsal Avantaj Skoru ── (*50: 0-1 birim → 0-50 UI skalası)
+  const M163 = homeUnits.TURNUVA_BASKISI * 50;
 
-  const defenseMultiplier_away = (leagueAvgGoals != null && leagueAvgGoals > 0 && homeDefenseRate != null)
-    ? (homeDefenseRate / leagueAvgGoals)
-    : 1.0;
+  // ── M164: Momentum Skoru ── (*50: 0-1 birim → 0-50 UI skalası)
+  const M164_home = homeUnits.MOMENTUM_AKIŞI * 50;
+  const M164_away = awayUnits.MOMENTUM_AKIŞI * 50;
 
-  const lambda_home = (homeGoalsPerMatch == null || awayDefenseRate == null)
-    ? null
-    : homeGoalsPerMatch * defenseMultiplier_home * formFactor_home * homeAdvantage;
+  // ── M165: Mutlaka Gol Atma İndeksi ── (*50: 0-1 birim → 0-50 UI skalası)
+  const M165_home = homeUnits.GOL_IHTIYACI * 50;
+  const M165_away = awayUnits.GOL_IHTIYACI * 50;
 
-  const lambda_away = (awayGoalsPerMatch == null || homeDefenseRate == null)
-    ? null
-    : awayGoalsPerMatch * defenseMultiplier_away * formFactor_away * (1 / homeAdvantage);
-
-  const M167_home = lambda_home != null ? Math.max(0, lambda_home) : null;
-  const M167_away = lambda_away != null ? Math.max(0, lambda_away) : null;
+  // ── M166: Toplam Takım Güç Skoru ──
+  // 7 birim eşit ağırlıklı geometrik ortalama — keyfi ağırlık katsayısı yok
+  const geo7 = (...vals) => Math.pow(
+    vals.reduce((prod, v) => prod * Math.max(v, 0.01), 1),
+    1 / vals.length
+  );
+  const M166_home = geo7(
+    homeUnits.BITIRICILIK,
+    homeUnits.SAVUNMA_DIRENCI,
+    homeUnits.FORM_KISA,
+    homeUnits.GK_REFLEKS,
+    homeUnits.MOMENTUM_AKIŞI,
+    homeUnits.YARATICILIK,
+    homeUnits.TAKTIKSEL_UYUM
+  ) * 50;
+  const M166_away = geo7(
+    awayUnits.BITIRICILIK,
+    awayUnits.SAVUNMA_DIRENCI,
+    awayUnits.FORM_KISA,
+    awayUnits.GK_REFLEKS,
+    awayUnits.MOMENTUM_AKIŞI,
+    awayUnits.YARATICILIK,
+    awayUnits.TAKTIKSEL_UYUM
+  ) * 50;
 
   // ── M168: Kazanma Olasılığı (Poisson) ──
-  // maxGoals=15: lambda'ya üst sınır yok; lambda≤8 ile P(X>15) < 0.1%
   const maxGoals = 15;
   let homeWinProb = null, drawProb = null, awayWinProb = null;
   const scoreProbs = [];

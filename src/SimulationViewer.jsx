@@ -1,891 +1,696 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import BehavioralGrid from './components/BehavioralGrid';
+import { createEngine } from './engine/simulatorEngine';
 
+// ── Event display config ─────────────────────────────────────────────────────
 const EVENT_ICONS = {
-  goal: '⚽',
-  shot: '👟',
+  goal:           '⚽',
   shot_on_target: '🎯',
-  yellow_card: '🟡',
-  red_card: '🔴',
-  corner: '🚩',
-  substitution: '🔄',
-  injury: '🏥',
-  penalty: '🏳️',
-  halftime: '⏸',
-  fulltime: '⏸',
+  shot_off_target: '↗',
+  shot_blocked:   '🧱',
+  yellow_card:    '🟡',
+  red_card:       '🔴',
+  corner:         '🚩',
+  substitution:   '🔄',
+  penalty:        '⬜',
+  penalty_missed: '❌',
+  halftime:       '⏸',
+  fulltime:       '🏁',
+};
+
+const EVENT_LABELS = {
+  goal:           'GOOOL!',
+  shot_on_target: 'İSABETLİ ŞUT',
+  shot_off_target: 'İSABETSİZ ŞUT',
+  shot_blocked:   'BLOKLANAN ŞUT',
+  yellow_card:    'SARI KART',
+  red_card:       'KIRMIZI KART',
+  corner:         'KORNER',
+  substitution:   'OYUNCU DEĞİŞİKLİĞİ',
+  penalty:        'PENALTİ',
+  penalty_missed: 'KAÇAN PENALTİ',
+  halftime:       'DEVRE ARASI',
+  fulltime:       'MAÇ SONU',
 };
 
 const EVENT_COLORS = {
-  goal: '#ffd700',
-  shot: '#4a9eff',
-  shot_on_target: '#00e5ff',
-  yellow_card: '#ffeb3b',
-  red_card: '#f44336',
-  corner: '#66bb6a',
-  substitution: '#ce93d8',
-  injury: '#ffa726',
-  penalty: '#e0e0e0',
-  halftime: '#9e9e9e',
-  fulltime: '#9e9e9e',
+  goal:           'var(--accent-orange, #ff8c00)',
+  shot_on_target: 'var(--accent-cyan, #00f2ff)',
+  shot_off_target: 'rgba(255,255,255,0.55)',
+  shot_blocked:   'var(--text-secondary, #6b6b80)',
+  yellow_card:    '#ffeb3b',
+  red_card:       '#f44336',
+  corner:         'var(--accent-green, #00ff88)',
+  substitution:   'var(--accent-purple, #bc13fe)',
+  penalty:        '#ffffff',
+  penalty_missed: '#f44336',
+  halftime:       '#9e9e9e',
+  fulltime:       '#9e9e9e',
 };
 
-function getBallPosition(events, currentMinute) {
-  const recent = [...events]
-    .filter(e => e.minute <= currentMinute)
-    .slice(-1)[0];
-
+// ── Ball position for horizontal field ──────────────────────────────────────
+function getBallPos(events, minute) {
+  const recent = [...events].filter(e => e.minute <= minute).slice(-1)[0];
   if (!recent) return { x: 50, y: 50 };
-
   const isHome = recent.team === 'home';
-
   switch (recent.type) {
     case 'goal':
-      return isHome ? { x: 50, y: 8 } : { x: 50, y: 92 };
-    case 'shot':
+      return isHome ? { x: 93, y: 50 } : { x: 7, y: 50 };
     case 'shot_on_target':
+    case 'shot_off_target':
+    case 'shot_blocked':
     case 'penalty':
-      return isHome ? { x: 50, y: 18 } : { x: 50, y: 82 };
+    case 'penalty_missed':
+      return isHome ? { x: 83, y: 45 + Math.random() * 10 } : { x: 17, y: 45 + Math.random() * 10 };
     case 'corner':
-      if (isHome) return { x: Math.random() > 0.5 ? 3 : 97, y: 5 };
-      return { x: Math.random() > 0.5 ? 3 : 97, y: 95 };
+      return isHome
+        ? { x: 97, y: Math.random() > 0.5 ? 8 : 92 }
+        : { x: 3, y: Math.random() > 0.5 ? 8 : 92 };
     default:
       return { x: 50, y: 50 };
   }
 }
 
-function StatBar({ value, max, color, align = 'left' }) {
-  const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0;
+// ── Football pitch ───────────────────────────────────────────────────────────
+function HorizontalField({ ballPos, goalFlash, visibleEvents, homeTeam, awayTeam }) {
   return (
     <div style={{
-      width: 60,
-      height: 6,
-      background: 'rgba(255,255,255,0.1)',
-      borderRadius: 3,
+      width: '100%',
+      position: 'relative',
+      background: 'linear-gradient(180deg, #1a4d1a 0%, #1e5e1e 50%, #1a4d1a 100%)',
+      aspectRatio: '16/7',
+      borderRadius: 14,
+      border: '2px solid rgba(255,255,255,0.1)',
       overflow: 'hidden',
-      display: 'flex',
-      alignItems: 'center',
+      boxShadow: 'inset 0 0 100px rgba(0,0,0,0.3)',
     }}>
+      {/* Grass stripes */}
+      {[...Array(12)].map((_, i) => (
+        <div key={i} style={{
+          position: 'absolute', left: `${(i * 100) / 12}%`, top: 0, bottom: 0,
+          width: `${100 / 12}%`,
+          background: i % 2 === 0 ? 'rgba(0,0,0,0.07)' : 'transparent',
+        }} />
+      ))}
+
+      {/* Outer border */}
+      <div style={{ position: 'absolute', top: 10, left: 10, right: 10, bottom: 10, border: '2px solid rgba(255,255,255,0.28)', borderRadius: 3 }} />
+      {/* Center line */}
+      <div style={{ position: 'absolute', left: '50%', top: 10, bottom: 10, width: 2, background: 'rgba(255,255,255,0.28)' }} />
+      {/* Center circle */}
+      <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: '18%', aspectRatio: '1', borderRadius: '50%', border: '2px solid rgba(255,255,255,0.28)' }} />
+      {/* Center dot */}
+      <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: 5, height: 5, borderRadius: '50%', background: 'rgba(255,255,255,0.4)' }} />
+
+      {/* Home penalty box (right) */}
+      <div style={{ position: 'absolute', right: 10, top: '22%', bottom: '22%', width: '16%', border: '2px solid rgba(255,255,255,0.28)' }} />
+      <div style={{ position: 'absolute', right: 10, top: '35%', bottom: '35%', width: '5%', border: '2px solid rgba(255,255,255,0.28)' }} />
+      <div style={{ position: 'absolute', right: 4, top: '41%', bottom: '41%', width: '1.5%', background: 'rgba(255,255,255,0.08)', border: '2px solid rgba(255,255,255,0.35)', borderRight: 'none' }} />
+
+      {/* Away penalty box (left) */}
+      <div style={{ position: 'absolute', left: 10, top: '22%', bottom: '22%', width: '16%', border: '2px solid rgba(255,255,255,0.28)' }} />
+      <div style={{ position: 'absolute', left: 10, top: '35%', bottom: '35%', width: '5%', border: '2px solid rgba(255,255,255,0.28)' }} />
+      <div style={{ position: 'absolute', left: 4, top: '41%', bottom: '41%', width: '1.5%', background: 'rgba(255,255,255,0.08)', border: '2px solid rgba(255,255,255,0.35)', borderLeft: 'none' }} />
+
+      {/* Corner arcs */}
+      <div style={{ position: 'absolute', left: 10, top: 10, width: 16, height: 16, borderLeft: '2px solid rgba(255,255,255,0.28)', borderTop: '2px solid rgba(255,255,255,0.28)', borderRadius: '100% 0 0 0' }} />
+      <div style={{ position: 'absolute', right: 10, top: 10, width: 16, height: 16, borderRight: '2px solid rgba(255,255,255,0.28)', borderTop: '2px solid rgba(255,255,255,0.28)', borderRadius: '0 100% 0 0' }} />
+      <div style={{ position: 'absolute', right: 10, bottom: 10, width: 16, height: 16, borderRight: '2px solid rgba(255,255,255,0.28)', borderBottom: '2px solid rgba(255,255,255,0.28)', borderRadius: '0 0 100% 0' }} />
+      <div style={{ position: 'absolute', left: 10, bottom: 10, width: 16, height: 16, borderLeft: '2px solid rgba(255,255,255,0.28)', borderBottom: '2px solid rgba(255,255,255,0.28)', borderRadius: '0 0 0 100%' }} />
+
+      {/* Ball trail */}
+      {visibleEvents.slice(-5).map((ev, i) => {
+        const pos = getBallPos([ev], ev.minute);
+        const color = EVENT_COLORS[ev.type] || '#fff';
+        return (
+          <div key={i} style={{
+            position: 'absolute', left: `${pos.x}%`, top: `${pos.y}%`,
+            width: 6 + i * 2, height: 6 + i * 2, borderRadius: '50%',
+            background: color, transform: 'translate(-50%,-50%)',
+            opacity: 0.04 + i * 0.05, filter: 'blur(3px)', pointerEvents: 'none',
+          }} />
+        );
+      })}
+
+      {/* Ball */}
       <div style={{
-        width: `${pct}%`,
-        height: '100%',
-        background: color,
-        borderRadius: 3,
-        marginLeft: align === 'right' ? 'auto' : 0,
-        transition: 'width 0.4s ease',
+        position: 'absolute', left: `${ballPos.x}%`, top: `${ballPos.y}%`,
+        width: 15, height: 15, borderRadius: '50%',
+        background: goalFlash ? 'var(--accent-orange)' : '#fff',
+        transform: 'translate(-50%,-50%)',
+        transition: 'all 0.5s cubic-bezier(.3,0,.2,1), background 0.3s',
+        boxShadow: goalFlash
+          ? '0 0 28px 8px rgba(255,140,0,0.8), 0 0 8px 2px #fff'
+          : '0 3px 10px rgba(0,0,0,0.4), 0 0 7px rgba(255,255,255,0.5)',
+        zIndex: 10,
       }} />
+
+      {/* Team attack direction labels */}
+      <div style={{ position: 'absolute', bottom: 12, left: '53%', color: 'var(--accent-cyan)', fontSize: 9, fontWeight: 900, background: 'rgba(0,242,255,0.08)', padding: '2px 7px', borderRadius: 4, textTransform: 'uppercase', letterSpacing: 1, opacity: 0.55 }}>HÜCUM →</div>
+      <div style={{ position: 'absolute', bottom: 12, right: '53%', color: 'var(--accent-purple)', fontSize: 9, fontWeight: 900, background: 'rgba(188,19,254,0.08)', padding: '2px 7px', borderRadius: 4, textTransform: 'uppercase', letterSpacing: 1, opacity: 0.55 }}>← HÜCUM</div>
     </div>
   );
 }
 
-function MultiRunView({ multiRunResult, homeTeam, awayTeam }) {
-  if (!multiRunResult) return null;
-
-  const { distribution, runs } = multiRunResult;
-  if (!distribution) return null;
-
-  // distribution fields are already percentages (0–100)
-  const homeWinPct = distribution.homeWin ?? 0;
-  const drawPct = distribution.draw ?? 0;
-  const awayWinPct = distribution.awayWin ?? 0;
-  const over25Pct = distribution.over25 ?? 0;
-  const bttsPct = distribution.btts ?? 0;
-  const avgGoals = distribution.avgGoals?.toFixed(2) ?? '—';
-
-  const topScores = Object.entries(distribution.scoreFrequency || {})
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 10);
-
-  const resultBars = [
-    { label: homeTeam + ' Galibi', pct: homeWinPct, color: '#4a9eff' },
-    { label: 'Beraberlik', pct: drawPct, color: '#9e9e9e' },
-    { label: awayTeam + ' Galibi', pct: awayWinPct, color: '#ff6b6b' },
+// ── Stats bar ─────────────────────────────────────────────────────────────────
+function StatsStrip({ stats, homeTeam, awayTeam }) {
+  const rows = [
+    { label: 'Şut',         hv: stats.home.shots,         av: stats.away.shots },
+    { label: 'İsabetli',    hv: stats.home.shotsOnTarget,  av: stats.away.shotsOnTarget },
+    { label: 'Gol',         hv: stats.home.goals,          av: stats.away.goals },
+    { label: 'Korner',      hv: stats.home.corners,        av: stats.away.corners },
+    { label: 'Sarı Kart',   hv: stats.home.yellowCards,    av: stats.away.yellowCards },
+    { label: 'Kırmızı',     hv: stats.home.redCards,       av: stats.away.redCards },
   ];
 
   return (
-    <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 24 }}>
-      {/* Result distribution */}
-      <div>
-        <div style={{ color: '#aaa', fontSize: 12, marginBottom: 10, textTransform: 'uppercase', letterSpacing: 1 }}>
-          Sonuç Dağılımı ({runs} simülasyon)
+    <div style={{ padding: '12px 16px', background: 'rgba(0,0,0,0.22)', borderTop: '1px solid var(--glass-border)' }}>
+      {/* Possession bar */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+        <div style={{ textAlign: 'right', minWidth: 36 }}>
+          <div style={{ color: 'var(--accent-cyan)', fontSize: 14, fontWeight: 900 }}>%{stats.homePoss}</div>
+          <div style={{ color: 'var(--text-tertiary)', fontSize: 8, fontWeight: 800 }}>TOP</div>
         </div>
-        {resultBars.map(bar => (
-          <div key={bar.label} style={{ marginBottom: 10 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-              <span style={{ color: '#ccc', fontSize: 13 }}>{bar.label}</span>
-              <span style={{ color: bar.color, fontWeight: 700, fontSize: 14 }}>{bar.pct}%</span>
-            </div>
-            <div style={{ background: 'rgba(255,255,255,0.1)', borderRadius: 4, height: 10, overflow: 'hidden' }}>
-              <div style={{
-                width: `${bar.pct}%`,
-                height: '100%',
-                background: bar.color,
-                borderRadius: 4,
-                transition: 'width 0.6s ease',
-              }} />
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Score frequency */}
-      <div>
-        <div style={{ color: '#aaa', fontSize: 12, marginBottom: 10, textTransform: 'uppercase', letterSpacing: 1 }}>
-          En Sık Sonuçlar
+        <div style={{ flex: 1, display: 'flex', height: 8, borderRadius: 5, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.06)' }}>
+          <div style={{ width: `${stats.homePoss}%`, background: 'var(--gradient-cyan)', transition: 'width 0.6s ease' }} />
+          <div style={{ flex: 1, background: 'var(--accent-purple)', opacity: 0.9 }} />
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-          {topScores.map(([score, count]) => (
-            <div key={score} style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              background: 'rgba(255,255,255,0.05)',
-              borderRadius: 6,
-              padding: '5px 10px',
-            }}>
-              <span style={{ color: '#e0e0e0', fontWeight: 600 }}>{score}</span>
-              <span style={{ color: '#aaa', fontSize: 12 }}>%{typeof count === 'number' ? count.toFixed(1) : count}</span>
-            </div>
-          ))}
+        <div style={{ textAlign: 'left', minWidth: 36 }}>
+          <div style={{ color: 'var(--accent-purple)', fontSize: 14, fontWeight: 900 }}>%{stats.awayPoss}</div>
+          <div style={{ color: 'var(--text-tertiary)', fontSize: 8, fontWeight: 800 }}>TOP</div>
         </div>
       </div>
 
-      {/* Over/Under & BTTS */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-        <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 8, padding: 12 }}>
-          <div style={{ color: '#aaa', fontSize: 11, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>
-            Üst/Alt 2.5
-          </div>
-          <div style={{ color: '#4a9eff', fontSize: 16, fontWeight: 700 }}>Üst: {over25Pct}%</div>
-          <div style={{ color: '#ff6b6b', fontSize: 16, fontWeight: 700 }}>Alt: {100 - over25Pct}%</div>
-        </div>
-        <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 8, padding: 12 }}>
-          <div style={{ color: '#aaa', fontSize: 11, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>
-            KG Var/Yok
-          </div>
-          <div style={{ color: '#66bb6a', fontSize: 16, fontWeight: 700 }}>Var: {bttsPct}%</div>
-          <div style={{ color: '#ff6b6b', fontSize: 16, fontWeight: 700 }}>Yok: {100 - bttsPct}%</div>
-        </div>
-      </div>
-
-      {/* Avg goals */}
-      <div style={{
-        background: 'rgba(255,215,0,0.08)',
-        border: '1px solid rgba(255,215,0,0.2)',
-        borderRadius: 8,
-        padding: '10px 16px',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-      }}>
-        <span style={{ color: '#aaa', fontSize: 13 }}>Ortalama Gol</span>
-        <span style={{ color: '#ffd700', fontSize: 22, fontWeight: 700 }}>{avgGoals}</span>
+      {/* Stat rows */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10 }}>
+        {rows.map(({ label, hv, av }) => {
+          const max = Math.max(hv, av, 1);
+          return (
+            <div key={label}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+                <span style={{ color: 'var(--accent-cyan)', fontSize: 13, fontWeight: 900 }}>{hv}</span>
+                <span style={{ color: 'var(--text-tertiary)', fontSize: 9, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 0.5 }}>{label}</span>
+                <span style={{ color: 'var(--accent-purple)', fontSize: 13, fontWeight: 900 }}>{av}</span>
+              </div>
+              <div style={{ display: 'flex', gap: 3 }}>
+                <div style={{ flex: 1, height: 4, background: 'rgba(255,255,255,0.05)', borderRadius: 2, overflow: 'hidden' }}>
+                  <div style={{ width: `${(hv / max) * 100}%`, height: '100%', background: 'var(--accent-cyan)', float: 'right', borderRadius: 2 }} />
+                </div>
+                <div style={{ flex: 1, height: 4, background: 'rgba(255,255,255,0.05)', borderRadius: 2, overflow: 'hidden' }}>
+                  <div style={{ width: `${(av / max) * 100}%`, height: '100%', background: 'var(--accent-purple)', borderRadius: 2 }} />
+                </div>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
 }
 
-export default function SimulationViewer({ simulation, homeTeam, awayTeam, isMultiRun, multiRunResult }) {
+// ── Event log ─────────────────────────────────────────────────────────────────
+function EventLog({ visibleEvents, eventLogRef }) {
+  return (
+    <div ref={eventLogRef} style={{ width: '100%', height: '100%', overflowY: 'auto', background: 'transparent', scrollbarWidth: 'none' }}>
+      <div style={{ padding: '10px 14px', color: 'var(--accent-orange)', fontSize: 10, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 2, borderBottom: '1px solid var(--glass-border)', background: 'rgba(255,140,0,0.03)', position: 'sticky', top: 0, zIndex: 1 }}>
+        CANLI ANLATIM
+      </div>
+
+      {visibleEvents.length === 0 && (
+        <div style={{ padding: '40px 14px', color: 'var(--text-tertiary)', fontSize: 12, textAlign: 'center', fontStyle: 'italic' }}>
+          <div style={{ fontSize: 22, marginBottom: 8 }}>⚽</div>
+          Başlama vuruşu bekleniyor...
+        </div>
+      )}
+
+      <div style={{ display: 'flex', flexDirection: 'column' }}>
+        {visibleEvents.map((ev, i) => {
+          const isGoal = ev.type === 'goal';
+          const isHome = ev.team === 'home';
+          const isCard = ev.type === 'yellow_card' || ev.type === 'red_card';
+          const isSub = ev.type === 'substitution';
+          const color = EVENT_COLORS[ev.type] || 'var(--text-secondary)';
+          const label = EVENT_LABELS[ev.type] || ev.type?.replace(/_/g, ' ').toUpperCase();
+
+          return (
+            <div key={i} style={{
+              display: 'flex', alignItems: 'flex-start', gap: 8,
+              padding: '8px 10px',
+              background: isGoal ? 'rgba(255,140,0,0.08)' : (i % 2 === 0 ? 'rgba(255,255,255,0.01)' : 'transparent'),
+              borderLeft: `3px solid ${isGoal ? 'var(--accent-orange)' : (ev.team === 'home' ? 'var(--accent-cyan)' : ev.team === 'away' ? 'var(--accent-purple)' : 'rgba(255,255,255,0.1)')}`,
+              borderBottom: '1px solid rgba(255,255,255,0.02)',
+              animation: 'fadeIn 0.3s ease-out',
+            }}>
+              <span style={{ fontSize: 10, background: 'rgba(255,255,255,0.05)', borderRadius: 5, padding: '3px 6px', color: '#fff', flexShrink: 0, fontWeight: 900, fontFamily: 'var(--font-mono)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                {ev.minute}'
+              </span>
+              <span style={{ fontSize: 16, marginTop: -1, filter: isGoal ? 'drop-shadow(0 0 6px var(--accent-orange))' : 'none', flexShrink: 0 }}>
+                {EVENT_ICONS[ev.type] || '•'}
+              </span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 5, marginBottom: 1, flexWrap: 'wrap' }}>
+                  <span style={{ color, fontSize: 10, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 0.3 }}>
+                    {label}
+                    {ev.subtype === 'penalty' && ' (P)'}
+                    {ev.subtype === 'second_yellow' && ' (2×🟡)'}
+                  </span>
+                  {ev.team && (
+                    <span style={{ fontSize: 8, color: 'var(--text-tertiary)', fontWeight: 800 }}>
+                      {isHome ? 'EV' : 'DEP'}
+                    </span>
+                  )}
+                </div>
+                {ev.player && !isSub && (
+                  <div style={{ color: 'var(--text-primary)', fontSize: 11, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ev.player}</div>
+                )}
+                {isSub && (
+                  <div style={{ fontSize: 10 }}>
+                    <span style={{ color: 'var(--accent-green)', fontWeight: 700 }}>▲ {ev.playerIn}</span>
+                    {ev.playerOut && <span style={{ color: 'var(--text-tertiary)', marginLeft: 4 }}>▼ {ev.playerOut}</span>}
+                  </div>
+                )}
+                {ev.type === 'halftime' && (
+                  <div style={{ color: 'var(--text-secondary)', fontSize: 10 }}>
+                    {ev.homeGoals} – {ev.awayGoals}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ── Multi-run results ─────────────────────────────────────────────────────────
+function MultiRunView({ multiRunResult, homeTeam, awayTeam }) {
+  if (!multiRunResult?.distribution) return null;
+  const { distribution, runs } = multiRunResult;
+  const topScores = Object.entries(distribution.scoreFrequency || {}).sort((a, b) => b[1] - a[1]).slice(0, 10);
+
+  return (
+    <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
+        {/* Win probabilities */}
+        <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 14, padding: 20, border: '1px solid var(--glass-border)' }}>
+          <div style={{ color: 'var(--accent-cyan)', fontSize: 10, fontWeight: 900, marginBottom: 20, textTransform: 'uppercase', letterSpacing: 2 }}>KAZANMA OLASILIKLARI ({runs} KOŞU)</div>
+          {[
+            { label: homeTeam, pct: distribution.homeWin ?? 0, color: 'var(--accent-cyan)' },
+            { label: 'Beraberlik', pct: distribution.draw ?? 0, color: 'var(--text-secondary)' },
+            { label: awayTeam, pct: distribution.awayWin ?? 0, color: 'var(--accent-purple)' },
+          ].map(bar => (
+            <div key={bar.label} style={{ marginBottom: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 12, fontWeight: 700 }}>
+                <span style={{ color: 'var(--text-secondary)' }}>{bar.label}</span>
+                <span style={{ color: bar.color }}>{bar.pct}%</span>
+              </div>
+              <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 5, height: 7, overflow: 'hidden' }}>
+                <div style={{ width: `${bar.pct}%`, height: '100%', background: bar.color }} />
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Market probabilities */}
+        <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 14, padding: 20, border: '1px solid var(--glass-border)' }}>
+          <div style={{ color: 'var(--accent-cyan)', fontSize: 10, fontWeight: 900, marginBottom: 16, textTransform: 'uppercase', letterSpacing: 2 }}>PAZAR OLASILIKLARI</div>
+          <div style={{ color: 'var(--accent-orange)', fontSize: 30, fontWeight: 950, marginBottom: 16 }}>⌀ {(distribution.avgGoals ?? 0).toFixed(2)} <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>gol</span></div>
+          {[
+            { label: '2.5 Üst', pct: distribution.over25 ?? 0 },
+            { label: '1.5 Üst', pct: distribution.over15 ?? 0 },
+            { label: 'KG Var', pct: distribution.btts ?? 0 },
+          ].map(row => (
+            <div key={row.label} style={{ marginBottom: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: 12 }}>
+                <span style={{ color: 'var(--text-secondary)' }}>{row.label}</span>
+                <span style={{ color: 'var(--text-primary)', fontWeight: 800 }}>{row.pct}%</span>
+              </div>
+              <div style={{ height: 4, background: 'rgba(255,255,255,0.05)', borderRadius: 2 }}>
+                <div style={{ width: `${row.pct}%`, height: '100%', background: 'var(--accent-green)', borderRadius: 2 }} />
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Top scores */}
+        <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 14, padding: 20, border: '1px solid var(--glass-border)' }}>
+          <div style={{ color: 'var(--accent-cyan)', fontSize: 10, fontWeight: 900, marginBottom: 16, textTransform: 'uppercase', letterSpacing: 2 }}>EN ÇOK GÖRÜLEN SKORLAR</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            {topScores.map(([score, count]) => (
+              <div key={score} style={{ display: 'flex', justifyContent: 'space-between', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--glass-border)', borderRadius: 7, padding: '8px 10px', fontSize: 12 }}>
+                <span style={{ color: 'var(--text-primary)', fontWeight: 800, fontFamily: 'var(--font-mono)' }}>{score}</span>
+                <span style={{ color: 'var(--accent-cyan)', fontWeight: 600 }}>%{typeof count === 'number' ? count.toFixed(1) : count}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Main SimulationViewer ─────────────────────────────────────────────────────
+export default function SimulationViewer({ simulation, engineData, homeTeam, awayTeam, isMultiRun, multiRunResult, onMinuteChange }) {
   const [currentMinute, setCurrentMinute] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [speed, setSpeed] = useState(2);
   const [goalFlash, setGoalFlash] = useState(false);
+
+  // Client-side simulation state
+  const [allEvents, setAllEvents] = useState([]);
+  const [currentBehavioralState, setCurrentBehavioralState] = useState(null);
+  const [currentPoss, setCurrentPoss] = useState({ home: 50, away: 50 });
+  const [liveGoals, setLiveGoals] = useState({ home: 0, away: 0 });
+  const [liveStats, setLiveStats] = useState({
+    home: { shots: 0, shotsOnTarget: 0, corners: 0, yellowCards: 0, redCards: 0, goals: 0 },
+    away: { shots: 0, shotsOnTarget: 0, corners: 0, yellowCards: 0, redCards: 0, goals: 0 },
+  });
+
+  const engineRef = useRef(null);
   const intervalRef = useRef(null);
   const eventLogRef = useRef(null);
-  const prevSimRef = useRef(null);
+  const prevEngineDataRef = useRef(null);
+  const lastGoalRef = useRef(null);
 
-  // Reset when simulation changes
+  // ── Build or rebuild client-side engine when engineData changes ──────────────
   useEffect(() => {
-    if (simulation !== prevSimRef.current) {
-      prevSimRef.current = simulation;
-      setCurrentMinute(0);
-      setIsPlaying(false);
-      setGoalFlash(false);
-    }
-  }, [simulation]);
+    if (!engineData || engineData === prevEngineDataRef.current) return;
+    prevEngineDataRef.current = engineData;
 
-  // Playback loop
+    // Reset all state
+    engineRef.current = createEngine(engineData);
+    setCurrentMinute(0);
+    setAllEvents([]);
+    setCurrentBehavioralState(null);
+    setCurrentPoss({ home: 50, away: 50 });
+    setLiveGoals({ home: 0, away: 0 });
+    setLiveStats({
+      home: { shots: 0, shotsOnTarget: 0, corners: 0, yellowCards: 0, redCards: 0, goals: 0 },
+      away: { shots: 0, shotsOnTarget: 0, corners: 0, yellowCards: 0, redCards: 0, goals: 0 },
+    });
+    setIsPlaying(false);
+    setGoalFlash(false);
+    if (onMinuteChange) onMinuteChange(0);
+  }, [engineData, onMinuteChange]);
+
+  // ── Playback timer ───────────────────────────────────────────────────────────
   useEffect(() => {
     clearInterval(intervalRef.current);
-    if (isPlaying && simulation) {
-      intervalRef.current = setInterval(() => {
-        setCurrentMinute(m => {
-          if (m >= 95) {
-            setIsPlaying(false);
-            return 95;
-          }
-          return m + 1;
-        });
-      }, 1000 / speed);
-    }
+    if (!isPlaying || !engineRef.current) return;
+
+    intervalRef.current = setInterval(() => {
+      const engine = engineRef.current;
+      if (!engine || engine.isDone()) {
+        setIsPlaying(false);
+        return;
+      }
+
+      const tick = engine.step();
+      if (!tick) { setIsPlaying(false); return; }
+
+      setCurrentMinute(tick.minute);
+      setAllEvents(prev => [...prev, ...tick.events]);
+      setCurrentBehavioralState(tick.behavioralState);
+      setCurrentPoss(tick.possession);
+      setLiveGoals({ ...tick.goals });
+
+      // Recompute stats from cumulative events (simpler & consistent)
+      setLiveStats(prev => {
+        const home = { ...prev.home };
+        const away = { ...prev.away };
+        for (const ev of tick.events) {
+          const s = ev.team === 'home' ? home : away;
+          if (!s) continue;
+          if (ev.type === 'shot_off_target' || ev.type === 'shot_blocked') s.shots++;
+          else if (ev.type === 'shot_on_target') { s.shots++; s.shotsOnTarget++; }
+          else if (ev.type === 'goal') { s.shots++; s.shotsOnTarget++; s.goals++; }
+          else if (ev.type === 'corner') s.corners++;
+          else if (ev.type === 'yellow_card') s.yellowCards++;
+          else if (ev.type === 'red_card') s.redCards++;
+        }
+        return { home, away };
+      });
+
+      if (onMinuteChange) onMinuteChange(tick.minute);
+
+      // Goal flash
+      const hasGoal = tick.events.some(e => e.type === 'goal');
+      if (hasGoal) {
+        setGoalFlash(true);
+        setTimeout(() => setGoalFlash(false), 1200);
+      }
+    }, 1000 / speed);
+
     return () => clearInterval(intervalRef.current);
-  }, [isPlaying, speed, simulation]);
+  }, [isPlaying, speed, onMinuteChange]);
 
-  // Goal flash effect
-  const visibleEvents = useMemo(() => {
-    if (!simulation?.events) return [];
-    return simulation.events.filter(e => e.minute <= currentMinute);
-  }, [simulation, currentMinute]);
-
-  const lastGoal = useMemo(() => {
-    return [...visibleEvents].reverse().find(e => e.type === 'goal');
-  }, [visibleEvents]);
-
-  const prevGoalRef = useRef(null);
+  // ── Auto-scroll event log ────────────────────────────────────────────────────
   useEffect(() => {
-    if (lastGoal && lastGoal !== prevGoalRef.current) {
-      prevGoalRef.current = lastGoal;
-      setGoalFlash(true);
-      setTimeout(() => setGoalFlash(false), 1200);
-    }
-  }, [lastGoal]);
+    if (eventLogRef.current) eventLogRef.current.scrollTop = eventLogRef.current.scrollHeight;
+  }, [allEvents.length]);
 
-  // Auto-scroll event log
-  useEffect(() => {
-    if (eventLogRef.current) {
-      eventLogRef.current.scrollTop = eventLogRef.current.scrollHeight;
-    }
-  }, [visibleEvents.length]);
+  // ── Ball position ────────────────────────────────────────────────────────────
+  const ballPos = useMemo(() => getBallPos(allEvents, currentMinute), [allEvents, currentMinute]);
 
-  // Stats
-  const stats = useMemo(() => {
-    const base = { shots: 0, shotsOnTarget: 0, goals: 0, yellowCards: 0, redCards: 0, corners: 0 };
-    const home = { ...base };
-    const away = { ...base };
-    for (const e of visibleEvents) {
-      const s = e.team === 'home' ? home : away;
-      if (e.type === 'shot') s.shots++;
-      if (e.type === 'shot_on_target') { s.shots++; s.shotsOnTarget++; }
-      if (e.type === 'goal') { s.goals++; s.shots++; s.shotsOnTarget++; }
-      if (e.type === 'yellow_card') s.yellowCards++;
-      if (e.type === 'red_card') s.redCards++;
-      if (e.type === 'corner') s.corners++;
-    }
-    // Possession estimate
-    const totalShots = home.shots + away.shots || 2;
-    const homePoss = Math.round(((home.shots + 1) / (totalShots + 2)) * 100);
-    return { home, away, homePoss, awayPoss: 100 - homePoss };
-  }, [visibleEvents]);
+  // ── Stats for StatsStrip ─────────────────────────────────────────────────────
+  const stats = useMemo(() => ({
+    home: { ...liveStats.home, goals: liveGoals.home },
+    away: { ...liveStats.away, goals: liveGoals.away },
+    homePoss: currentPoss.home,
+    awayPoss: currentPoss.away,
+  }), [liveStats, liveGoals, currentPoss]);
 
-  // Score
-  const homeGoals = stats.home.goals;
-  const awayGoals = stats.away.goals;
-
-  // Ball position
-  const ballPos = useMemo(() => {
-    if (!simulation?.events) return { x: 50, y: 50 };
-    return getBallPosition(simulation.events, currentMinute);
-  }, [simulation, currentMinute]);
-
-  const handleProgressClick = (e) => {
-    if (!simulation) return;
+  // ── Handle seek (rerun engine from start to target minute) ───────────────────
+  const handleProgressClick = useCallback((e) => {
+    if (!engineData) return;
     const rect = e.currentTarget.getBoundingClientRect();
-    const ratio = (e.clientX - rect.left) / rect.width;
-    setCurrentMinute(Math.round(ratio * 95));
-  };
+    const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    const targetMinute = Math.round(ratio * 95);
+
+    // Rebuild engine and fast-forward
+    const newEngine = createEngine(engineData);
+    engineRef.current = newEngine;
+
+    const events = [];
+    let bstate = null;
+    let poss = { home: 50, away: 50 };
+    let goals = { home: 0, away: 0 };
+    const stats = {
+      home: { shots: 0, shotsOnTarget: 0, corners: 0, yellowCards: 0, redCards: 0, goals: 0 },
+      away: { shots: 0, shotsOnTarget: 0, corners: 0, yellowCards: 0, redCards: 0, goals: 0 },
+    };
+
+    while (!newEngine.isDone() && newEngine.getMinute() < targetMinute) {
+      const tick = newEngine.step();
+      if (!tick) break;
+      events.push(...tick.events);
+      bstate = tick.behavioralState;
+      poss = tick.possession;
+      goals = { ...tick.goals };
+      for (const ev of tick.events) {
+        const s = ev.team === 'home' ? stats.home : (ev.team === 'away' ? stats.away : null);
+        if (!s) continue;
+        if (ev.type === 'shot_off_target' || ev.type === 'shot_blocked') s.shots++;
+        else if (ev.type === 'shot_on_target') { s.shots++; s.shotsOnTarget++; }
+        else if (ev.type === 'goal') { s.shots++; s.shotsOnTarget++; s.goals++; }
+        else if (ev.type === 'corner') s.corners++;
+        else if (ev.type === 'yellow_card') s.yellowCards++;
+        else if (ev.type === 'red_card') s.redCards++;
+      }
+    }
+
+    setCurrentMinute(targetMinute);
+    setAllEvents(events);
+    setCurrentBehavioralState(bstate);
+    setCurrentPoss(poss);
+    setLiveGoals(goals);
+    setLiveStats(stats);
+    setIsPlaying(false);
+    if (onMinuteChange) onMinuteChange(targetMinute);
+  }, [engineData, onMinuteChange]);
 
   const handleReset = () => {
-    setIsPlaying(false);
+    if (engineData) {
+      engineRef.current = createEngine(engineData);
+    }
     setCurrentMinute(0);
+    setAllEvents([]);
+    setCurrentBehavioralState(null);
+    setCurrentPoss({ home: 50, away: 50 });
+    setLiveGoals({ home: 0, away: 0 });
+    setLiveStats({
+      home: { shots: 0, shotsOnTarget: 0, corners: 0, yellowCards: 0, redCards: 0, goals: 0 },
+      away: { shots: 0, shotsOnTarget: 0, corners: 0, yellowCards: 0, redCards: 0, goals: 0 },
+    });
+    setIsPlaying(false);
+    setGoalFlash(false);
   };
 
-  // ── STYLES ──────────────────────────────────────────────────────────────────
-
-  const containerStyle = {
-    background: 'var(--glass-bg, rgba(255,255,255,0.05))',
-    border: '1px solid rgba(255,255,255,0.1)',
-    borderRadius: 12,
-    overflow: 'hidden',
-    display: 'flex',
-    flexDirection: 'column',
-    fontFamily: 'inherit',
-    color: '#e0e0e0',
-  };
-
-  const scoreHeaderStyle = {
-    background: goalFlash
-      ? 'linear-gradient(135deg, rgba(255,215,0,0.3), rgba(255,165,0,0.2))'
-      : 'rgba(0,0,0,0.3)',
-    borderBottom: '1px solid rgba(255,255,255,0.1)',
-    padding: '14px 20px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    transition: 'background 0.3s ease',
-    animation: goalFlash ? 'goalPulse 0.6s ease 2' : 'none',
-  };
-
-  const teamNameStyle = {
-    fontSize: 16,
-    fontWeight: 700,
-    color: '#e0e0e0',
-    minWidth: 100,
-    letterSpacing: 0.5,
-  };
-
-  const scoreBadgeStyle = {
-    fontSize: 32,
-    fontWeight: 900,
-    color: goalFlash ? '#ffd700' : '#ffffff',
-    margin: '0 6px',
-    transition: 'color 0.3s',
-    textShadow: goalFlash ? '0 0 20px #ffd700' : 'none',
-    minWidth: 40,
-    textAlign: 'center',
-  };
-
-  const playBtnStyle = {
-    background: 'linear-gradient(135deg, #00e5ff, #4a9eff)',
-    border: 'none',
-    borderRadius: 8,
-    color: '#000',
-    fontWeight: 700,
-    fontSize: 18,
-    width: 40,
-    height: 36,
-    cursor: 'pointer',
-    boxShadow: '0 0 12px rgba(0,229,255,0.5)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    transition: 'box-shadow 0.2s',
-  };
-
-  const resetBtnStyle = {
-    background: 'rgba(255,255,255,0.1)',
-    border: '1px solid rgba(255,255,255,0.2)',
-    borderRadius: 8,
-    color: '#ccc',
-    fontWeight: 700,
-    fontSize: 16,
-    width: 36,
-    height: 36,
-    cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-  };
-
-  const speedSelectStyle = {
-    background: 'rgba(0,0,0,0.5)',
-    border: '1px solid rgba(255,255,255,0.2)',
-    borderRadius: 6,
-    color: '#ccc',
-    fontSize: 12,
-    padding: '2px 6px',
-    cursor: 'pointer',
-    height: 28,
-  };
-
-  const panelsStyle = {
-    display: 'flex',
-    flex: 1,
-    minHeight: 0,
-    overflow: 'hidden',
-  };
-
-  const eventLogStyle = {
-    width: 210,
-    height: '100%',
-    borderRight: '1px solid rgba(255,255,255,0.08)',
-    overflowY: 'auto',
-    padding: '8px 0',
-    flexShrink: 0,
-    scrollbarWidth: 'thin',
-    scrollbarColor: 'rgba(255,255,255,0.2) transparent',
-    boxSizing: 'border-box',
-  };
-
-  const centerPanelStyle = {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: '16px 12px',
-    gap: 12,
-    minWidth: 0,
-  };
-
-  const statsPanelStyle = {
-    width: 200,
-    borderLeft: '1px solid rgba(255,255,255,0.08)',
-    padding: '14px 12px',
-    flexShrink: 0,
-    overflowY: 'auto',
-  };
-
-  // ── RENDER ──────────────────────────────────────────────────────────────────
-
+  // ── Multi-run view ────────────────────────────────────────────────────────────
   if (isMultiRun && multiRunResult) {
     return (
-      <div style={containerStyle}>
-        <div style={{ ...scoreHeaderStyle, justifyContent: 'center', gap: 20 }}>
-          <span style={{ ...teamNameStyle, textAlign: 'right' }}>{homeTeam}</span>
-          <span style={{ color: '#aaa', fontSize: 14, fontWeight: 600 }}>vs</span>
-          <span style={{ ...teamNameStyle }}>{awayTeam}</span>
+      <div style={{ background: 'var(--card-bg)', border: '1px solid var(--glass-border)', borderRadius: 16, overflow: 'hidden', fontFamily: 'inherit', color: 'var(--text-primary)' }}>
+        <div style={{ background: 'rgba(0,0,0,0.3)', borderBottom: '1px solid rgba(255,255,255,0.1)', padding: '12px 20px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 20 }}>
+          <span style={{ fontSize: 18, fontWeight: 700 }}>{homeTeam}</span>
+          <div style={{ background: 'rgba(255,255,255,0.1)', padding: '3px 10px', borderRadius: 16, fontSize: 11, fontWeight: 800, color: '#00e5ff' }}>VS</div>
+          <span style={{ fontSize: 18, fontWeight: 700 }}>{awayTeam}</span>
         </div>
-        <MultiRunView multiRunResult={multiRunResult} homeTeam={homeTeam} awayTeam={awayTeam} />
+        <div style={{ overflowY: 'auto' }}>
+          <MultiRunView multiRunResult={multiRunResult} homeTeam={homeTeam} awayTeam={awayTeam} />
+        </div>
       </div>
     );
   }
 
-  if (!simulation) {
+  if (!engineData) {
     return (
-      <div style={{ ...containerStyle, alignItems: 'center', justifyContent: 'center', minHeight: 320, gap: 12 }}>
-        <div style={{ fontSize: 48 }}>⚽</div>
-        <div style={{ color: '#aaa', fontSize: 16 }}>Simülasyon başlatın</div>
-        <div style={{ color: '#666', fontSize: 13 }}>Tahmin motorundan simülasyon çalıştırın</div>
+      <div style={{ background: 'var(--glass-bg, rgba(255,255,255,0.05))', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 320, gap: 12, fontFamily: 'inherit', color: 'var(--text-secondary)' }}>
+        <div style={{ fontSize: 46 }}>⚽</div>
+        <div style={{ fontSize: 15 }}>Simülasyon başlatın</div>
       </div>
     );
   }
 
-  const statRows = [
-    { label: 'Şut', homeVal: stats.home.shots, awayVal: stats.away.shots },
-    { label: 'İsabetli', homeVal: stats.home.shotsOnTarget, awayVal: stats.away.shotsOnTarget },
-    { label: 'Gol', homeVal: stats.home.goals, awayVal: stats.away.goals },
-    { label: 'Sarı Kart', homeVal: stats.home.yellowCards, awayVal: stats.away.yellowCards },
-    { label: 'Kırmızı', homeVal: stats.home.redCards, awayVal: stats.away.redCards },
-    { label: 'Korner', homeVal: stats.home.corners, awayVal: stats.away.corners },
-  ];
-
-  const goalEvents = visibleEvents.filter(e => e.type === 'goal');
-  const cardEvents = visibleEvents.filter(e => e.type === 'yellow_card' || e.type === 'red_card');
+  const isDone = currentMinute >= 95;
 
   return (
-    <div style={containerStyle}>
-      {/* Score header */}
-      <div style={scoreHeaderStyle}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16, flex: 1 }}>
-          <span style={{ ...teamNameStyle, textAlign: 'right', flex: 1 }}>{homeTeam}</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
-            <span style={scoreBadgeStyle}>{homeGoals}</span>
-            <span style={{ color: '#666', fontSize: 24, fontWeight: 300 }}>-</span>
-            <span style={scoreBadgeStyle}>{awayGoals}</span>
+    <div className="simViewerRoot" style={{ background: 'var(--card-bg)', border: '1px solid var(--glass-border)', borderRadius: 16, overflow: 'hidden', display: 'flex', flexDirection: 'column', fontFamily: 'inherit', color: 'var(--text-primary)', height: '100%', minHeight: 0 }}>
+
+      {/* ── Scoreboard ──────────────────────────────────────────────────────── */}
+      <div style={{
+        background: goalFlash ? 'rgba(255,140,0,0.15)' : 'rgba(0,0,0,0.3)',
+        borderBottom: '1px solid var(--glass-border)',
+        padding: '14px 20px',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        transition: 'background 0.4s ease',
+        animation: goalFlash ? 'goalPulse 0.4s ease infinite' : 'none',
+        flexShrink: 0,
+      }}>
+        {/* Teams & Score */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 24, flex: 1, justifyContent: 'center' }}>
+          <div style={{ display: 'flex', flex: 1, justifyContent: 'flex-end', alignItems: 'center', gap: 12 }}>
+            <span style={{ fontSize: 18, fontWeight: 800, color: 'var(--accent-cyan)' }}>{homeTeam}</span>
+            <div style={{ width: 38, height: 38, borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>🏠</div>
           </div>
-          <span style={{ ...teamNameStyle, flex: 1 }}>{awayTeam}</span>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'rgba(255,255,255,0.03)', padding: '3px 16px', borderRadius: 10, border: '1px solid var(--glass-border)' }}>
+            <span style={{ fontSize: 40, fontWeight: 950, color: goalFlash ? 'var(--accent-orange)' : '#fff', minWidth: 40, textAlign: 'center', transition: 'color 0.3s', fontFamily: 'var(--font-mono)' }}>{liveGoals.home}</span>
+            <span style={{ color: 'var(--text-tertiary)', fontSize: 28, fontWeight: 300 }}>:</span>
+            <span style={{ fontSize: 40, fontWeight: 950, color: goalFlash ? 'var(--accent-orange)' : '#fff', minWidth: 40, textAlign: 'center', transition: 'color 0.3s', fontFamily: 'var(--font-mono)' }}>{liveGoals.away}</span>
+          </div>
+
+          <div style={{ display: 'flex', flex: 1, justifyContent: 'flex-start', alignItems: 'center', gap: 12 }}>
+            <div style={{ width: 38, height: 38, borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>✈️</div>
+            <span style={{ fontSize: 18, fontWeight: 800, color: 'var(--accent-purple)' }}>{awayTeam}</span>
+          </div>
         </div>
 
-        {/* Controls */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ color: '#aaa', fontSize: 13, minWidth: 30 }}>{currentMinute}'</span>
-          <select
-            value={speed}
-            onChange={e => setSpeed(Number(e.target.value))}
-            style={speedSelectStyle}
-          >
+        {/* Playback controls */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginLeft: 24, paddingLeft: 24, borderLeft: '1px solid var(--glass-border)' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1 }}>
+            <span style={{ color: isDone ? 'var(--accent-orange)' : 'var(--accent-cyan)', fontSize: 17, fontWeight: 900, fontFamily: 'var(--font-mono)' }}>
+              {isDone ? 'MAÇ SONU' : `${currentMinute}'`}
+            </span>
+            <span style={{ color: 'var(--text-tertiary)', fontSize: 8, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1 }}>DAKİKA</span>
+          </div>
+
+          <select value={speed} onChange={e => setSpeed(Number(e.target.value))}
+            style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid var(--glass-border)', borderRadius: 7, color: 'var(--text-primary)', fontSize: 11, fontWeight: 700, padding: '4px 6px', cursor: 'pointer' }}>
             <option value={0.5}>0.5x</option>
-            <option value={1}>1x</option>
-            <option value={2}>2x</option>
-            <option value={5}>5x</option>
+            <option value={1}>1.0x</option>
+            <option value={2}>2.0x</option>
+            <option value={5}>5.0x</option>
           </select>
-          <button
-            style={playBtnStyle}
-            onClick={() => setIsPlaying(p => !p)}
-            title={isPlaying ? 'Duraklat' : 'Oynat'}
-          >
+
+          <button onClick={() => { if (!isDone) setIsPlaying(p => !p); }} style={{
+            background: isPlaying ? 'rgba(255,140,0,0.15)' : 'var(--gradient-cyan)',
+            border: 'none', borderRadius: 9, color: isPlaying ? 'var(--accent-orange)' : '#000',
+            fontWeight: 800, fontSize: 15, width: 40, height: 38, cursor: isDone ? 'default' : 'pointer',
+            opacity: isDone ? 0.5 : 1,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
             {isPlaying ? '⏸' : '▶'}
           </button>
-          <button style={resetBtnStyle} onClick={handleReset} title="Sıfırla">↺</button>
+
+          <button onClick={handleReset} style={{
+            background: 'rgba(255,255,255,0.05)', border: '1px solid var(--glass-border)',
+            borderRadius: 9, color: 'var(--text-secondary)', fontSize: 18, width: 38, height: 38,
+            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }} title="Yeniden Başlat">↺</button>
         </div>
       </div>
 
-      {/* Progress bar */}
-      <div
-        style={{
-          height: 6,
-          background: 'rgba(255,255,255,0.08)',
-          cursor: 'pointer',
-          position: 'relative',
-        }}
-        onClick={handleProgressClick}
-        title="Dakikaya atla"
-      >
+      {/* ── Progress bar ─────────────────────────────────────────────────────── */}
+      <div style={{ height: 5, background: 'rgba(255,255,255,0.03)', cursor: 'pointer', position: 'relative', flexShrink: 0 }} onClick={handleProgressClick}>
+        <div style={{ height: '100%', width: `${(currentMinute / 95) * 100}%`, background: 'var(--gradient-cyan)', transition: 'width 0.2s linear', boxShadow: '0 0 8px rgba(0,242,255,0.3)' }} />
         <div style={{
-          height: '100%',
-          width: `${(currentMinute / 95) * 100}%`,
-          background: 'linear-gradient(90deg, #4a9eff, #00e5ff)',
-          transition: 'width 0.3s ease',
-          borderRadius: '0 2px 2px 0',
-        }} />
-        <div style={{
-          position: 'absolute',
-          top: '50%',
-          left: `${(currentMinute / 95) * 100}%`,
-          transform: 'translate(-50%, -50%)',
-          width: 12,
-          height: 12,
-          borderRadius: '50%',
-          background: '#00e5ff',
-          boxShadow: '0 0 6px rgba(0,229,255,0.8)',
-          transition: 'left 0.3s ease',
+          position: 'absolute', top: '50%', left: `${(currentMinute / 95) * 100}%`,
+          transform: 'translate(-50%,-50%)',
+          width: 12, height: 12, borderRadius: '50%', background: '#fff',
+          boxShadow: '0 0 8px rgba(255,255,255,0.8)', transition: 'left 0.2s linear', zIndex: 5,
         }} />
       </div>
 
-      {/* Panels */}
-      <div style={{ ...panelsStyle, height: 420, minHeight: 0 }}>
+      {/* ── Main content ─────────────────────────────────────────────────────── */}
+      <div className="simViewerMain" style={{ display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden' }}>
 
-        {/* Event log */}
-        <div ref={eventLogRef} style={eventLogStyle}>
-          <div style={{ padding: '4px 10px 8px', color: '#aaa', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, borderBottom: '1px solid rgba(255,255,255,0.06)', marginBottom: 4 }}>
-            Maç Olayları
+        {/* Left: Field + Stats */}
+        <div className="simViewerLeft" style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, borderRight: '1px solid var(--glass-border)', minHeight: 0 }}>
+          <div className="simViewerFieldWrap" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'radial-gradient(ellipse at center, rgba(0,242,255,0.02) 0%, transparent 80%)', flexShrink: 0 }}>
+            <div style={{ width: '100%' }}>
+              <HorizontalField ballPos={ballPos} goalFlash={goalFlash} visibleEvents={allEvents} homeTeam={homeTeam} awayTeam={awayTeam} />
+            </div>
           </div>
-          {visibleEvents.length === 0 && (
-            <div style={{ padding: '20px 10px', color: '#555', fontSize: 13, textAlign: 'center' }}>
-              Henüz olay yok
-            </div>
-          )}
-          {visibleEvents.map((ev, i) => {
-            const isGoal = ev.type === 'goal';
-            const isHome = ev.team === 'home';
-            const color = EVENT_COLORS[ev.type] || '#aaa';
-            return (
-              <div
-                key={i}
-                style={{
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: 6,
-                  padding: '5px 10px',
-                  background: isGoal ? 'rgba(255,215,0,0.08)' : 'transparent',
-                  borderLeft: isGoal ? '2px solid #ffd700' : '2px solid transparent',
-                  transition: 'background 0.3s',
-                }}
-              >
-                <span style={{
-                  fontSize: 10,
-                  background: 'rgba(255,255,255,0.1)',
-                  borderRadius: 4,
-                  padding: '1px 5px',
-                  color: '#ccc',
-                  flexShrink: 0,
-                  minWidth: 28,
-                  textAlign: 'center',
-                  marginTop: 1,
-                }}>
-                  {ev.minute}'
-                </span>
-                <span style={{ fontSize: 14, flexShrink: 0 }}>{EVENT_ICONS[ev.type] || '•'}</span>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 1 }}>
-                    <span style={{
-                      fontSize: 9,
-                      background: isHome ? 'rgba(74,158,255,0.25)' : 'rgba(255,107,107,0.25)',
-                      color: isHome ? '#4a9eff' : '#ff6b6b',
-                      borderRadius: 3,
-                      padding: '1px 4px',
-                      fontWeight: 700,
-                      letterSpacing: 0.5,
-                    }}>
-                      {isHome ? 'EV' : 'DEP'}
-                    </span>
-                    <span style={{ color, fontSize: 11, fontWeight: 600 }}>
-                      {ev.type === 'goal' ? 'GOL' : ev.type?.replace(/_/g, ' ')}
-                    </span>
-                  </div>
-                  {ev.player && (
-                    <div style={{ color: '#bbb', fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {ev.player}
-                    </div>
-                  )}
-                  {ev.type === 'goal' && ev.assist && (
-                    <div style={{ color: '#888', fontSize: 10 }}>
-                      Asist: {ev.assist}
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Center pitch */}
-        <div style={centerPanelStyle}>
-          <div style={{ width: '100%', maxWidth: 220, position: 'relative' }}>
-            {/* Pitch */}
-            <div style={{
-              background: '#2d6a2d',
-              width: '100%',
-              aspectRatio: '68/105',
-              position: 'relative',
-              borderRadius: 4,
-              border: '1px solid rgba(255,255,255,0.15)',
-              overflow: 'hidden',
-            }}>
-              {/* Grass stripes */}
-              {[...Array(7)].map((_, i) => (
-                <div key={i} style={{
-                  position: 'absolute',
-                  top: `${i * 14.28}%`,
-                  left: 0, right: 0,
-                  height: '14.28%',
-                  background: i % 2 === 0 ? 'rgba(0,0,0,0.06)' : 'transparent',
-                }} />
-              ))}
-
-              {/* Outer border line */}
-              <div style={{
-                position: 'absolute',
-                top: 4, left: 4, right: 4, bottom: 4,
-                border: '1px solid rgba(255,255,255,0.45)',
-                borderRadius: 2,
-              }} />
-
-              {/* Center line */}
-              <div style={{
-                position: 'absolute',
-                top: '50%',
-                left: '5%',
-                right: '5%',
-                height: 1,
-                background: 'rgba(255,255,255,0.5)',
-              }} />
-
-              {/* Center circle */}
-              <div style={{
-                position: 'absolute',
-                top: '50%',
-                left: '50%',
-                transform: 'translate(-50%,-50%)',
-                width: '24%',
-                aspectRatio: '1',
-                borderRadius: '50%',
-                border: '1px solid rgba(255,255,255,0.5)',
-              }} />
-
-              {/* Center dot */}
-              <div style={{
-                position: 'absolute',
-                top: '50%',
-                left: '50%',
-                transform: 'translate(-50%,-50%)',
-                width: 4,
-                height: 4,
-                borderRadius: '50%',
-                background: 'rgba(255,255,255,0.5)',
-              }} />
-
-              {/* Home penalty area (bottom) */}
-              <div style={{
-                position: 'absolute',
-                bottom: 4,
-                left: '22%',
-                right: '22%',
-                height: '18%',
-                border: '1px solid rgba(255,255,255,0.5)',
-              }} />
-              {/* Home goal area (bottom) */}
-              <div style={{
-                position: 'absolute',
-                bottom: 4,
-                left: '36%',
-                right: '36%',
-                height: '8%',
-                border: '1px solid rgba(255,255,255,0.4)',
-              }} />
-              {/* Home goal */}
-              <div style={{
-                position: 'absolute',
-                bottom: 2,
-                left: '40%',
-                right: '40%',
-                height: '3%',
-                background: 'rgba(255,255,255,0.15)',
-                border: '1px solid rgba(255,255,255,0.5)',
-              }} />
-
-              {/* Away penalty area (top) */}
-              <div style={{
-                position: 'absolute',
-                top: 4,
-                left: '22%',
-                right: '22%',
-                height: '18%',
-                border: '1px solid rgba(255,255,255,0.5)',
-              }} />
-              {/* Away goal area (top) */}
-              <div style={{
-                position: 'absolute',
-                top: 4,
-                left: '36%',
-                right: '36%',
-                height: '8%',
-                border: '1px solid rgba(255,255,255,0.4)',
-              }} />
-              {/* Away goal */}
-              <div style={{
-                position: 'absolute',
-                top: 2,
-                left: '40%',
-                right: '40%',
-                height: '3%',
-                background: 'rgba(255,255,255,0.15)',
-                border: '1px solid rgba(255,255,255,0.5)',
-              }} />
-
-              {/* Team labels */}
-              <div style={{
-                position: 'absolute',
-                top: '26%',
-                left: '50%',
-                transform: 'translate(-50%,-50%)',
-                color: 'rgba(255,255,255,0.25)',
-                fontSize: 9,
-                fontWeight: 700,
-                letterSpacing: 1,
-                textTransform: 'uppercase',
-                whiteSpace: 'nowrap',
-              }}>
-                {awayTeam}
-              </div>
-              <div style={{
-                position: 'absolute',
-                top: '74%',
-                left: '50%',
-                transform: 'translate(-50%,-50%)',
-                color: 'rgba(255,255,255,0.25)',
-                fontSize: 9,
-                fontWeight: 700,
-                letterSpacing: 1,
-                textTransform: 'uppercase',
-                whiteSpace: 'nowrap',
-              }}>
-                {homeTeam}
-              </div>
-
-              {/* Ball */}
-              <div style={{
-                position: 'absolute',
-                top: `${ballPos.y}%`,
-                left: `${ballPos.x}%`,
-                width: 14,
-                height: 14,
-                borderRadius: '50%',
-                background: goalFlash ? '#ffd700' : 'white',
-                transform: 'translate(-50%,-50%)',
-                transition: 'all 0.5s ease, background 0.3s',
-                boxShadow: goalFlash
-                  ? '0 0 16px 4px rgba(255,215,0,0.9)'
-                  : '0 0 8px rgba(255,255,255,0.8)',
-                zIndex: 10,
-              }} />
-
-              {/* Recent event indicators */}
-              {visibleEvents.slice(-3).map((ev, i) => {
-                const pos = getBallPosition([ev], ev.minute);
-                const opacity = 0.2 + i * 0.15;
-                return (
-                  <div key={i} style={{
-                    position: 'absolute',
-                    top: `${pos.y}%`,
-                    left: `${pos.x}%`,
-                    width: 6,
-                    height: 6,
-                    borderRadius: '50%',
-                    background: EVENT_COLORS[ev.type] || '#aaa',
-                    transform: 'translate(-50%,-50%)',
-                    opacity,
-                    pointerEvents: 'none',
-                  }} />
-                );
-              })}
-            </div>
-
-            {/* Minute label */}
-            <div style={{ textAlign: 'center', marginTop: 8, color: '#aaa', fontSize: 12 }}>
-              <span style={{ color: '#00e5ff', fontWeight: 700, fontSize: 16 }}>{currentMinute}'</span>
-              <span style={{ color: '#555', marginLeft: 4 }}>/ 95'</span>
-            </div>
+          <div style={{ flexShrink: 0 }}>
+            <StatsStrip stats={stats} homeTeam={homeTeam} awayTeam={awayTeam} />
           </div>
         </div>
 
-        {/* Stats panel */}
-        <div style={statsPanelStyle}>
-          <div style={{ color: '#aaa', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10, textAlign: 'center' }}>
-            İstatistikler
+        {/* Right: Commentary + Behavioral Matrix (smaller) */}
+        <div className="simViewerSide" style={{ display: 'flex', width: 320, flexShrink: 0, overflow: 'hidden', background: 'rgba(0,0,0,0.1)', minHeight: 0 }}>
+
+          {/* Commentary */}
+          <div className="simViewerLogCol" style={{ width: 160, display: 'flex', flexDirection: 'column', borderRight: '1px solid var(--glass-border)', minHeight: 0, overflow: 'hidden' }}>
+            <EventLog visibleEvents={allEvents} eventLogRef={eventLogRef} />
           </div>
 
-          {/* Column headers */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: 4, marginBottom: 6 }}>
-            <div style={{ color: '#4a9eff', fontSize: 10, fontWeight: 700, textAlign: 'center' }}>EV</div>
-            <div style={{ width: 70 }} />
-            <div style={{ color: '#ff6b6b', fontSize: 10, fontWeight: 700, textAlign: 'center' }}>DEP</div>
-          </div>
-
-          {statRows.map(({ label, homeVal, awayVal }) => {
-            const max = Math.max(homeVal, awayVal, 1);
-            return (
-              <div key={label} style={{ marginBottom: 8 }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: 4 }}>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ color: '#e0e0e0', fontSize: 13, fontWeight: 700 }}>{homeVal}</div>
-                    <StatBar value={homeVal} max={max} color="#4a9eff" align="right" />
-                  </div>
-                  <div style={{ color: '#666', fontSize: 10, width: 70, textAlign: 'center', whiteSpace: 'nowrap' }}>
-                    {label}
-                  </div>
-                  <div>
-                    <div style={{ color: '#e0e0e0', fontSize: 13, fontWeight: 700 }}>{awayVal}</div>
-                    <StatBar value={awayVal} max={max} color="#ff6b6b" />
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-
-          {/* Possession */}
-          <div style={{ marginBottom: 8 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: 4 }}>
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ color: '#e0e0e0', fontSize: 13, fontWeight: 700 }}>{stats.homePoss}%</div>
-              </div>
-              <div style={{ color: '#666', fontSize: 10, width: 70, textAlign: 'center' }}>Top Kont.</div>
-              <div>
-                <div style={{ color: '#e0e0e0', fontSize: 13, fontWeight: 700 }}>{stats.awayPoss}%</div>
-              </div>
+          {/* Behavioral Matrix */}
+          <div className="simViewerMatrixCol" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
+            <div style={{ padding: '10px 12px', color: 'var(--accent-cyan)', fontSize: 9, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 2, borderBottom: '1px solid var(--glass-border)', background: 'rgba(0,242,255,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+              <span>DAVRANIŞ MATRİSİ</span>
+              <span style={{ color: 'var(--text-tertiary)', fontWeight: 800 }}>{currentMinute}'</span>
             </div>
-            <div style={{ display: 'flex', height: 6, borderRadius: 3, overflow: 'hidden', marginTop: 4 }}>
-              <div style={{ width: `${stats.homePoss}%`, background: '#4a9eff', transition: 'width 0.4s' }} />
-              <div style={{ flex: 1, background: '#ff6b6b' }} />
+            <div style={{ flex: 1, overflowY: 'auto', padding: '8px', scrollbarWidth: 'none' }}>
+              {currentBehavioralState ? (
+                <BehavioralGrid behavioralAnalysis={currentBehavioralState} homeTeam={homeTeam} awayTeam={awayTeam} compact />
+              ) : (
+                <div style={{ padding: 30, color: 'var(--text-tertiary)', fontSize: 11, textAlign: 'center', fontStyle: 'italic' }}>
+                  Simülasyon başlatın...
+                </div>
+              )}
             </div>
           </div>
-
-          {/* Goal scorers */}
-          {goalEvents.length > 0 && (
-            <div style={{ marginTop: 12, borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 10 }}>
-              <div style={{ color: '#ffd700', fontSize: 11, fontWeight: 700, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
-                ⚽ Goller
-              </div>
-              {goalEvents.map((ev, i) => (
-                <div key={i} style={{ fontSize: 11, color: '#ccc', marginBottom: 3, display: 'flex', gap: 4 }}>
-                  <span style={{ color: ev.team === 'home' ? '#4a9eff' : '#ff6b6b' }}>{ev.minute}'</span>
-                  <span>{ev.player || '—'}</span>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Cards */}
-          {cardEvents.length > 0 && (
-            <div style={{ marginTop: 12, borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 10 }}>
-              <div style={{ color: '#ffeb3b', fontSize: 11, fontWeight: 700, marginBottom: 6 }}>
-                🟡 Kartlar
-              </div>
-              {cardEvents.map((ev, i) => (
-                <div key={i} style={{ fontSize: 11, color: '#ccc', marginBottom: 3, display: 'flex', gap: 4 }}>
-                  <span>{ev.type === 'yellow_card' ? '🟡' : '🔴'}</span>
-                  <span style={{ color: ev.team === 'home' ? '#4a9eff' : '#ff6b6b' }}>{ev.minute}'</span>
-                  <span>{ev.player || '—'}</span>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
       </div>
 
       <style>{`
         @keyframes goalPulse {
-          0% { background: rgba(255,215,0,0.1); }
-          50% { background: rgba(255,215,0,0.35); }
-          100% { background: rgba(255,215,0,0.1); }
+          0%   { background: rgba(255,140,0,0.05); }
+          50%  { background: rgba(255,140,0,0.18); }
+          100% { background: rgba(255,140,0,0.05); }
         }
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(-4px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        .simViewerMain  { min-height: 0; }
+        .simViewerLeft  { min-height: 0; }
+        .simViewerFieldWrap {
+          height: clamp(280px, 46vh, 540px);
+          box-sizing: border-box;
+        }
+        .simViewerSide, .simViewerLogCol, .simViewerMatrixCol { min-height: 0; }
       `}</style>
     </div>
   );

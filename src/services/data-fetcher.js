@@ -17,7 +17,10 @@ async function fetchAllMatchData(eventId) {
   const startTime = Date.now();
 
   // 1. Maç temel bilgisi — tournamentId, seasonId, teamId'ler buradan çıkacak
+  const eventDataStart = Date.now();
   const eventData = await api.getEvent(eventId);
+  const eventDataElapsed = Date.now() - eventDataStart;
+
   if (!eventData || !eventData.event) {
     throw new Error(`Event ${eventId} not found or API error`);
   }
@@ -36,240 +39,243 @@ async function fetchAllMatchData(eventId) {
   console.log(`[DataFetcher] Match: ${event.homeTeam.name} vs ${event.awayTeam.name}`);
   console.log(`[DataFetcher] Tournament: ${tournamentId}, Season: ${seasonId}`);
 
-  // 2. Maç seviyesi veriler (paralel)
-  // Promise.allSettled kullanılıyor: tek bir API hatası tüm fetch'i çökertmemeli.
-  // Her sonuç { status: 'fulfilled'|'rejected', value|reason } şeklinde gelir.
-  // Not: getEventStats, getEventIncidents, getEventShotmap ve getEventGraph
-  // mevcut (henüz oynanmamış) maç için anlamsız veri döner ve hiçbir metrik
-  // hesaplayıcı tarafından tüketilmez — bu nedenle bu çağrılar kaldırıldı.
-  const matchLevelResults = await Promise.allSettled([
-    api.getEventLineups(eventId),               // 0
-    api.getEventH2H(eventId),                   // 1
-    api.getEventH2HEvents(eventCustomId),       // 2 — customId (slug) gerektirir
-    api.getEventOdds(eventId),                  // 3
-    api.getEventMissingPlayers(eventId),        // 4
-    api.getEventStreaks(eventId),               // 5
-    api.getEventForm(eventId),                  // 6
-    api.getEventManagers(eventId),              // 7
-    api.getEventVotes(eventId),                 // 8
-  ]);
-
-  const matchLevelNames = [
-    'lineups', 'h2h', 'h2hEvents', 'odds', 'missingPlayers',
-    'streaks', 'form', 'managers', 'votes',
-  ];
-  matchLevelResults.forEach((r, i) => {
-    if (r.status === 'rejected') {
-      console.warn(`[DataFetcher] Non-critical fetch failed (${matchLevelNames[i]}): ${r.reason?.message || r.reason}`);
+  // Helper for tracking parallel calls
+  async function track(name, promise, isCritical = false) {
+    const start = Date.now();
+    try {
+      const value = await promise;
+      return { name, value, elapsedMs: Date.now() - start, isCritical };
+    } catch (error) {
+      // Re-throw with timing metadata so allSettled captures it as a rejection
+      error.elapsedMs = Date.now() - start;
+      error.isCritical = isCritical;
+      error.trackName = name;
+      throw error;
     }
-  });
+  }
 
-  let [
-    lineups, h2h, h2hEvents, odds, missingPlayers,
-    streaks, form, managers, votes
-  ] = matchLevelResults.map(r => (r.status === 'fulfilled' ? r.value : null));
-  const teamH2H = null;
-
-  // 3 + 4. Takım verileri — Ev sahibi ve deplasman (paralel)
-  const teamLevelResults = await Promise.allSettled([
-    api.getTeam(homeTeamId),              // 0
-    api.getTeamPlayers(homeTeamId),       // 1
-    api.getTeamLastEvents(homeTeamId, 0), // 2
-    api.getTeamLastEvents(homeTeamId, 1), // 3
-    api.getTeam(awayTeamId),              // 4
-    api.getTeamPlayers(awayTeamId),       // 5
-    api.getTeamLastEvents(awayTeamId, 0), // 6
-    api.getTeamLastEvents(awayTeamId, 1), // 7
+  // 2. Maç seviyesi veriler (paralel)
+  const matchLevelResults = await Promise.allSettled([
+    track('lineups', api.getEventLineups(eventId), true),
+    track('h2h', api.getEventH2H(eventId)),
+    track('h2hEvents', api.getEventH2HEvents(eventCustomId)),
+    track('odds', api.getEventOdds(eventId)),
+    track('missingPlayers', api.getEventMissingPlayers(eventId)),
+    track('streaks', api.getEventStreaks(eventId)),
+    track('form', api.getEventForm(eventId)),
+    track('managers', api.getEventManagers(eventId)),
+    track('votes', api.getEventVotes(eventId)),
   ]);
 
-  const teamLevelNames = [
-    'homeTeam', 'homePlayers', 'homeLastEvents0', 'homeLastEvents1',
-    'awayTeam', 'awayPlayers', 'awayLastEvents0', 'awayLastEvents1',
-  ];
-  teamLevelResults.forEach((r, i) => {
+  matchLevelResults.forEach((r) => {
     if (r.status === 'rejected') {
-      console.warn(`[DataFetcher] Non-critical fetch failed (${teamLevelNames[i]}): ${r.reason?.message || r.reason}`);
+      const name = r.reason?.trackName || 'unknown';
+      console.warn(`[DataFetcher] Non-critical fetch failed (${name}): ${r.reason?.message || r.reason}`);
     }
   });
 
   const [
-    homeTeam, homePlayers, homeLastEvents0, homeLastEvents1,
-    awayTeam, awayPlayers, awayLastEvents0, awayLastEvents1
-  ] = teamLevelResults.map(r => (r.status === 'fulfilled' ? r.value : null));
+    lineupsRes, h2hRes, h2hEventsRes, oddsRes, missingPlayersRes,
+    streaksRes, formRes, managersRes, votesRes
+  ] = matchLevelResults;
+
+  let lineups = lineupsRes.status === 'fulfilled' ? lineupsRes.value.value : null;
+  let h2h = h2hRes.status === 'fulfilled' ? h2hRes.value.value : null;
+  let h2hEvents = h2hEventsRes.status === 'fulfilled' ? h2hEventsRes.value.value : null;
+  let odds = oddsRes.status === 'fulfilled' ? oddsRes.value.value : null;
+  let missingPlayers = missingPlayersRes.status === 'fulfilled' ? missingPlayersRes.value.value : null;
+  let streaks = streaksRes.status === 'fulfilled' ? streaksRes.value.value : null;
+  let form = formRes.status === 'fulfilled' ? formRes.value.value : null;
+  let managers = managersRes.status === 'fulfilled' ? managersRes.value.value : null;
+  let votes = votesRes.status === 'fulfilled' ? votesRes.value.value : null;
+
+  const teamH2H = null;
+
+  // 3 + 4. Takım verileri — Ev sahibi ve deplasman (paralel)
+  const teamLevelResults = await Promise.allSettled([
+    track('homeTeam', api.getTeam(homeTeamId)),
+    track('homePlayers', api.getTeamPlayers(homeTeamId)),
+    track('homeLastEvents0', api.getTeamLastEvents(homeTeamId, 0)),
+    track('homeLastEvents1', api.getTeamLastEvents(homeTeamId, 1)),
+    track('awayTeam', api.getTeam(awayTeamId)),
+    track('awayPlayers', api.getTeamPlayers(awayTeamId)),
+    track('awayLastEvents0', api.getTeamLastEvents(awayTeamId, 0)),
+    track('awayLastEvents1', api.getTeamLastEvents(awayTeamId, 1)),
+  ]);
+
+  teamLevelResults.forEach((r) => {
+    if (r.status === 'rejected') {
+      const name = r.reason?.trackName || 'unknown';
+      console.warn(`[DataFetcher] Non-critical fetch failed (${name}): ${r.reason?.message || r.reason}`);
+    }
+  });
+
+  const [
+    homeTeamRes, homePlayersRes, homeLastEvents0Res, homeLastEvents1Res,
+    awayTeamRes, awayPlayersRes, awayLastEvents0Res, awayLastEvents1Res
+  ] = teamLevelResults;
+
+  const homeTeam = homeTeamRes.status === 'fulfilled' ? homeTeamRes.value.value : null;
+  const homePlayers = homePlayersRes.status === 'fulfilled' ? homePlayersRes.value.value : null;
+  const homeLastEvents0 = homeLastEvents0Res.status === 'fulfilled' ? homeLastEvents0Res.value.value : null;
+  const homeLastEvents1 = homeLastEvents1Res.status === 'fulfilled' ? homeLastEvents1Res.value.value : null;
+  const awayTeam = awayTeamRes.status === 'fulfilled' ? awayTeamRes.value.value : null;
+  const awayPlayers = awayPlayersRes.status === 'fulfilled' ? awayPlayersRes.value.value : null;
+  const awayLastEvents0 = awayLastEvents0Res.status === 'fulfilled' ? awayLastEvents0Res.value.value : null;
+  const awayLastEvents1 = awayLastEvents1Res.status === 'fulfilled' ? awayLastEvents1Res.value.value : null;
 
   // 5. Lig/Turnuva verileri
-  let standingsTotal = null;
-  let standingsHome = null;
-  let standingsAway = null;
-  let homeTeamSeasonStats = null;
-  let awayTeamSeasonStats = null;
-  let homeTopPlayers = null;
-  let awayTopPlayers = null;
+  let standingsTotal = null, standingsHome = null, standingsAway = null;
+  let homeTeamSeasonStats = null, awayTeamSeasonStats = null;
+  let homeTopPlayers = null, awayTopPlayers = null;
+  let leagueResults = [];
 
   if (tournamentId && seasonId) {
-    const leagueResults = await Promise.allSettled([
-      api.getStandings(tournamentId, seasonId, 'total'),             // 0
-      api.getStandings(tournamentId, seasonId, 'home'),              // 1
-      api.getStandings(tournamentId, seasonId, 'away'),              // 2
-      api.getTeamSeasonStats(homeTeamId, tournamentId, seasonId),    // 3
-      api.getTeamSeasonStats(awayTeamId, tournamentId, seasonId),    // 4
-      api.getTeamTopPlayers(homeTeamId, tournamentId, seasonId),     // 5
-      api.getTeamTopPlayers(awayTeamId, tournamentId, seasonId),     // 6
+    leagueResults = await Promise.allSettled([
+      track('standingsTotal', api.getStandings(tournamentId, seasonId, 'total')),
+      track('standingsHome', api.getStandings(tournamentId, seasonId, 'home')),
+      track('standingsAway', api.getStandings(tournamentId, seasonId, 'away')),
+      track('homeTeamSeasonStats', api.getTeamSeasonStats(homeTeamId, tournamentId, seasonId)),
+      track('awayTeamSeasonStats', api.getTeamSeasonStats(awayTeamId, tournamentId, seasonId)),
+      track('homeTopPlayers', api.getTeamTopPlayers(homeTeamId, tournamentId, seasonId)),
+      track('awayTopPlayers', api.getTeamTopPlayers(awayTeamId, tournamentId, seasonId)),
     ]);
 
-    const leagueNames = [
-      'standingsTotal', 'standingsHome', 'standingsAway',
-      'homeTeamSeasonStats', 'awayTeamSeasonStats',
-      'homeTopPlayers', 'awayTopPlayers',
-    ];
-    leagueResults.forEach((r, i) => {
+    leagueResults.forEach((r) => {
       if (r.status === 'rejected') {
-        console.warn(`[DataFetcher] Non-critical fetch failed (${leagueNames[i]}): ${r.reason?.message || r.reason}`);
+        const name = r.reason?.trackName || 'unknown';
+        console.warn(`[DataFetcher] Non-critical fetch failed (${name}): ${r.reason?.message || r.reason}`);
       }
     });
 
-    const [st, sh, sa, hss, ass, htp, atp] = leagueResults.map(r => (r.status === 'fulfilled' ? r.value : null));
-    standingsTotal = st; standingsHome = sh; standingsAway = sa;
-    homeTeamSeasonStats = hss; awayTeamSeasonStats = ass;
-    homeTopPlayers = htp; awayTopPlayers = atp;
+    const [st, sh, sa, hss, ass, htp, atp] = leagueResults;
+    standingsTotal = st.status === 'fulfilled' ? st.value.value : null;
+    standingsHome = sh.status === 'fulfilled' ? sh.value.value : null;
+    standingsAway = sa.status === 'fulfilled' ? sa.value.value : null;
+    homeTeamSeasonStats = hss.status === 'fulfilled' ? hss.value.value : null;
+    awayTeamSeasonStats = ass.status === 'fulfilled' ? ass.value.value : null;
+    homeTopPlayers = htp.status === 'fulfilled' ? htp.value.value : null;
+    awayTopPlayers = atp.status === 'fulfilled' ? atp.value.value : null;
   }
 
-  // 6. Hakem verisi
-  let refereeStats = refereeId ? (await api.getRefereeStats(refereeId).catch(() => null)) || null : null;
-  // Root event içindeki hakem verisini refereeStats'a ekle (Kariyer verisi burada mevcut)
+  // 6. Hakem verileri (Paralel)
+  const refereeTrackResults = await Promise.allSettled([
+    track('refereeStats', refereeId ? api.getRefereeStats(refereeId) : Promise.resolve(null)),
+    track('refereeLastEvents', refereeId ? api.getRefereeLastEvents(refereeId, 0) : Promise.resolve(null)),
+  ]);
+  let refereeStats = refereeTrackResults[0].status === 'fulfilled' ? refereeTrackResults[0].value.value : null;
+  const refereeLastEvents = refereeTrackResults[1].status === 'fulfilled' ? refereeTrackResults[1].value.value : null;
+
   if (event.referee && refereeId) {
     if (!refereeStats) refereeStats = { statistics: {} };
-    refereeStats.eventReferee = event.referee; // Kariyer verilerini (games, yellowCards, redCards) taşıyan düğüm
+    refereeStats.eventReferee = event.referee;
   }
-  // Hakemin son maçları — M115/M116 (kırmızı kart bias), M118b (ev yanlılık), gol/maç verileri için
-  const refereeLastEvents = refereeId
-    ? (await api.getRefereeLastEvents(refereeId, 0).catch(() => null)) || null
-    : null;
 
   // 7. Menajer verileri
-  // Manager ID'leri event'ten veya managers endpoint'ten al
   let actualHomeManagerId = homeManagerId;
   let actualAwayManagerId = awayManagerId;
-
   if (managers) {
     if (managers.homeManager) actualHomeManagerId = managers.homeManager.id;
     if (managers.awayManager) actualAwayManagerId = managers.awayManager.id;
   }
-  if (!actualHomeManagerId && homeTeam?.team?.manager?.id) {
-    actualHomeManagerId = homeTeam.team.manager.id;
-  }
-  if (!actualAwayManagerId && awayTeam?.team?.manager?.id) {
-    actualAwayManagerId = awayTeam.team.manager.id;
-  }
+  if (!actualHomeManagerId && homeTeam?.team?.manager?.id) actualHomeManagerId = homeTeam.team.manager.id;
+  if (!actualAwayManagerId && awayTeam?.team?.manager?.id) actualAwayManagerId = awayTeam.team.manager.id;
 
-  // Manager son maçları — M139/M140 için (/manager/{id}/career 404 döner, son maçlar kullanılır)
-  const [homeManagerCareer, awayManagerCareer] = await Promise.all([
-    actualHomeManagerId ? api.getManagerLastEvents(actualHomeManagerId, 0).catch(() => null) : Promise.resolve(null),
-    actualAwayManagerId ? api.getManagerLastEvents(actualAwayManagerId, 0).catch(() => null) : Promise.resolve(null),
+  const managerTrackResults = await Promise.allSettled([
+    track('homeManagerLastEvents', actualHomeManagerId ? api.getManagerLastEvents(actualHomeManagerId, 0) : Promise.resolve(null)),
+    track('awayManagerLastEvents', actualAwayManagerId ? api.getManagerLastEvents(actualAwayManagerId, 0) : Promise.resolve(null)),
   ]);
 
-  // 7b. H2H maçlarının kart/korner verilerini çek — M129/M130 için
-  const h2hMatchDetails = await fetchH2HMatchDetails(h2hEvents);
+  const homeManagerCareer = managerTrackResults[0].status === 'fulfilled' ? managerTrackResults[0].value.value : null;
+  const awayManagerCareer = managerTrackResults[1].status === 'fulfilled' ? managerTrackResults[1].value.value : null;
 
-  // 8. Son maçların incident/stats verilerini çek (son 5 maç deep-dive)
-  // Her iki sayfa birleştirilip sıralanarak gerçek son 5 maç alınır (cross-competition).
-  const homeMergedEvents = mergeAndSortEvents(homeLastEvents0, homeLastEvents1);
-  const awayMergedEvents = mergeAndSortEvents(awayLastEvents0, awayLastEvents1);
-  const homeRecentMatchDetails = await fetchRecentMatchDetails(homeMergedEvents, 5);
-  const awayRecentMatchDetails = await fetchRecentMatchDetails(awayMergedEvents, 5);
+  // 8. Derinlemesine Detaylar (H2H & Son Maçlar - Paralel)
+  const [h2hMatchDetails, homeRecentMatchDetails, awayRecentMatchDetails] = await Promise.all([
+    fetchH2HMatchDetails(h2hEvents),
+    fetchRecentMatchDetails(mergeAndSortEvents(homeLastEvents0, homeLastEvents1), 5),
+    fetchRecentMatchDetails(mergeAndSortEvents(awayLastEvents0, awayLastEvents1), 5),
+  ]);
 
   // --- FALLBACK LINEUP GENERATOR ---
-  function buildFallbackLineup(topPlayers, squadPlayers) {
-    if (!topPlayers && !squadPlayers) return { players: [] };
+  function buildFallbackLineup(squadPlayers) {
+    if (!squadPlayers?.players) return { players: [] };
+    
+    const pool = squadPlayers.players.map(p => ({
+      player: p.player,
+      position: p.player?.position || 'M',
+      shirtNumber: p.player?.shirtNumber || '',
+      substitute: false,
+    }));
 
-    let pool = [];
-    if (topPlayers?.topPlayers?.rating) {
-      pool = topPlayers.topPlayers.rating.map(p => ({
-        player: p.player,
-        position: p.player?.position || 'M',
-        shirtNumber: p.player?.shirtNumber || '',
-        substitute: false,
-      }));
-    } else if (squadPlayers?.players) {
-      pool = squadPlayers.players.map(p => ({
-        player: p.player,
-        position: p.player?.position || 'M',
-        shirtNumber: p.player?.shirtNumber || '',
-        substitute: false,
-      }));
-    }
+    if (pool.length === 0) return { players: [] };
 
-    // Pozisyon bazlı seçim — kaleci garantisi
     const byPos = { G: [], D: [], M: [], F: [] };
-    for (const p of pool) {
-      const pos = p.position;
-      if (byPos[pos]) byPos[pos].push(p);
+    for (const p of pool) { 
+      const pos = (p.position || 'M').toUpperCase()[0];
+      if (byPos[pos]) byPos[pos].push(p); 
+      else byPos['M'].push(p);
     }
 
     const starting = [];
     const usedIdx = new Set();
-
+    
     function pickN(posArr, n) {
       let picked = 0;
-      for (const p of posArr) {
-        if (picked >= n) break;
-        if (!usedIdx.has(p.player?.id)) {
-          starting.push({ ...p, substitute: false });
-          usedIdx.add(p.player?.id);
-          picked++;
-        }
-      }
-      // Yeterli oyuncu yoksa genel havuzdan doldur
-      if (picked < n) {
-        for (const p of pool) {
-          if (picked >= n) break;
-          if (!usedIdx.has(p.player?.id)) {
-            starting.push({ ...p, substitute: false });
-            usedIdx.add(p.player?.id);
-            picked++;
-          }
-        }
+      for (const p of posArr) { 
+        if (picked >= n) break; 
+        if (!usedIdx.has(p.player?.id)) { 
+          starting.push({ ...p, substitute: false }); 
+          usedIdx.add(p.player?.id); 
+          picked++; 
+        } 
       }
     }
 
-    // 4-3-3 varsayılan formasyon
-    pickN(byPos.G, 1); // 1 kaleci
-    pickN(byPos.D, 4); // 4 defans
-    pickN(byPos.M, 3); // 3 orta saha
-    pickN(byPos.F, 3); // 3 forvet
+    pickN(byPos.G, 1); 
+    pickN(byPos.D, 4); 
+    pickN(byPos.M, 3); 
+    pickN(byPos.F, 3);
 
-    // Yedekler: kalan oyunculardan
-    const subs = pool
-      .filter(p => !usedIdx.has(p.player?.id))
-      .slice(0, 7)
-      .map(p => ({ ...p, substitute: true }));
-
-    return {
-      players: [...starting, ...subs],
-      formation: '4-3-3',
-      isFallback: true,
-    };
+    const subs = pool.filter(p => !usedIdx.has(p.player?.id)).slice(0, 11).map(p => ({ ...p, substitute: true }));
+    return { players: [...starting, ...subs], formation: '4-3-3', isFallback: true };
   }
 
-  if (!lineups) lineups = {};
+  function normalizeStarters(lineup) {
+    if (!lineup || !lineup.players) return lineup;
+    let starterCount = 0;
+    const players = lineup.players.map(p => {
+      if (!p.substitute) {
+        if (starterCount >= 11) {
+          return { ...p, substitute: true };
+        }
+        starterCount++;
+      }
+      return p;
+    });
+    return { ...lineup, players };
+  }
+
   if (!lineups.home || !lineups.home.players || lineups.home.players.length === 0) {
-    console.log(`[DataFetcher] No home lineup found, generating fallback Auto-Lineup...`);
-    lineups.home = buildFallbackLineup(homeTopPlayers, homePlayers);
-    lineups.isFallback = true;
+    lineups.home = buildFallbackLineup(homePlayers); lineups.isFallback = true;
+  } else {
+    lineups.home = normalizeStarters(lineups.home);
   }
-  
   if (!lineups.away || !lineups.away.players || lineups.away.players.length === 0) {
-    console.log(`[DataFetcher] No away lineup found, generating fallback Auto-Lineup...`);
-    lineups.away = buildFallbackLineup(awayTopPlayers, awayPlayers);
-    lineups.isFallback = true;
+    lineups.away = buildFallbackLineup(awayPlayers); lineups.isFallback = true;
+  } else {
+    lineups.away = normalizeStarters(lineups.away);
   }
 
-  // 9. İlk 11 oyuncuların bireysel istatistikleri
-  const { stats: homePlayerStats, log: homePlayerLog } = await fetchPlayerStats(lineups?.home?.players, tournamentId, seasonId);
-  const { stats: awayPlayerStats, log: awayPlayerLog } = await fetchPlayerStats(lineups?.away?.players, tournamentId, seasonId);
+  // 9. Oyuncu Sezon İstatistikleri (Ev ve Deplasman Paralel)
+  const [homePResult, awayPResult] = await Promise.all([
+    fetchPlayerStats(lineups?.home?.players, tournamentId, seasonId),
+    fetchPlayerStats(lineups?.away?.players, tournamentId, seasonId),
+  ]);
+  const { stats: homePlayerStats, log: homePlayerLog } = homePResult;
+  const { stats: awayPlayerStats, log: awayPlayerLog } = awayPResult;
 
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-  console.log(`[DataFetcher] All data fetched in ${elapsed}s`);
+  console.log(`[DataFetcher] Optimized fetch completed in ${elapsed}s`);
 
   // Actual API URLs for each matchLevel endpoint
   const matchLevelUrls = {
@@ -290,44 +296,48 @@ async function fetchAllMatchData(eventId) {
       endpoint: 'getEvent',
       url: `/event/${eventId}`,
       success: !!eventData,
+      elapsedMs: eventDataElapsed,
       responseSize: eventData ? JSON.stringify(eventData).length : 0,
       data: eventData,
     },
-    ...matchLevelNames.map((name, i) => {
-      const fulfilled = matchLevelResults[i].status === 'fulfilled';
-      const val = fulfilled ? matchLevelResults[i].value : null;
-      return {
-        endpoint: name,
-        url: matchLevelUrls[name] || `/${name}`,
-        success: fulfilled,
-        error: fulfilled ? null : (matchLevelResults[i].reason?.message || 'failed'),
-        responseSize: val ? JSON.stringify(val).length : 0,
-        data: val,
-      };
-    }),
-    // Hakem son maçları
-    {
-      endpoint: 'refereeLastEvents',
-      url: refereeId ? `/referee/${refereeId}/events/last/0` : 'N/A (no referee)',
-      success: !!refereeLastEvents,
-      responseSize: refereeLastEvents ? JSON.stringify(refereeLastEvents).length : 0,
-      data: refereeLastEvents,
-    },
-    // Menajer kariyer
-    {
-      endpoint: 'homeManagerLastEvents',
-      url: actualHomeManagerId ? `/manager/${actualHomeManagerId}/events/last/0` : 'N/A (no manager)',
-      success: !!homeManagerCareer,
-      responseSize: homeManagerCareer ? JSON.stringify(homeManagerCareer).length : 0,
-      data: homeManagerCareer,
-    },
-    {
-      endpoint: 'awayManagerLastEvents',
-      url: actualAwayManagerId ? `/manager/${actualAwayManagerId}/events/last/0` : 'N/A (no manager)',
-      success: !!awayManagerCareer,
-      responseSize: awayManagerCareer ? JSON.stringify(awayManagerCareer).length : 0,
-      data: awayManagerCareer,
-    },
+    ...matchLevelResults.map(r => ({
+      endpoint: r.status === 'fulfilled' ? r.value.name : (r.reason?.trackName || 'unknown'),
+      status: r.status,
+      success: r.status === 'fulfilled',
+      elapsedMs: r.status === 'fulfilled' ? r.value.elapsedMs : (r.reason?.elapsedMs || 0),
+      isCritical: r.status === 'fulfilled' ? r.value.isCritical : (r.reason?.isCritical || false),
+      error: r.status === 'rejected' ? (r.reason?.message || 'failed') : null,
+      data: r.status === 'fulfilled' ? r.value.value : null
+    })),
+    ...teamLevelResults.map(r => ({
+      endpoint: r.status === 'fulfilled' ? r.value.name : (r.reason?.trackName || 'unknown'),
+      status: r.status,
+      success: r.status === 'fulfilled',
+      elapsedMs: r.status === 'fulfilled' ? r.value.elapsedMs : (r.reason?.elapsedMs || 0),
+      data: r.status === 'fulfilled' ? r.value.value : null
+    })),
+    ...leagueResults.map(r => ({
+      endpoint: r.status === 'fulfilled' ? r.value.name : (r.reason?.trackName || 'unknown'),
+      status: r.status,
+      success: r.status === 'fulfilled',
+      elapsedMs: r.status === 'fulfilled' ? r.value.elapsedMs : (r.reason?.elapsedMs || 0),
+      data: r.status === 'fulfilled' ? r.value.value : null
+    })),
+    // Hakem & Menajer
+    ...refereeTrackResults.map(r => ({
+      endpoint: r.status === 'fulfilled' ? r.value.name : (r.reason?.trackName || 'unknown'),
+      status: r.status,
+      success: r.status === 'fulfilled',
+      elapsedMs: r.status === 'fulfilled' ? r.value.elapsedMs : (r.reason?.elapsedMs || 0),
+      data: r.status === 'fulfilled' ? r.value.value : null
+    })),
+    ...managerTrackResults.map(r => ({
+      endpoint: r.status === 'fulfilled' ? r.value.name : (r.reason?.trackName || 'unknown'),
+      status: r.status,
+      success: r.status === 'fulfilled',
+      elapsedMs: r.status === 'fulfilled' ? r.value.elapsedMs : (r.reason?.elapsedMs || 0),
+      data: r.status === 'fulfilled' ? r.value.value : null
+    })),
     // H2H maç detayları (M129/M130)
     {
       endpoint: 'h2hMatchDetails',
@@ -336,20 +346,18 @@ async function fetchAllMatchData(eventId) {
       responseSize: JSON.stringify(h2hMatchDetails).length,
       data: h2hMatchDetails,
     },
-    // Player stats summary entries (grouped by team, not per-player)
+    // Player stats summary
     {
       endpoint: 'homePlayerStats',
-      url: `fetchPlayerStats × ${homePlayerLog.length} oyuncu (ev sahibi)`,
+      url: `fetchPlayerStats × ${homePlayerLog.length} oyuncu`,
       success: homePlayerStats.length > 0,
-      responseSize: JSON.stringify(homePlayerStats).length,
       data: homePlayerStats,
       _detail: homePlayerLog,
     },
     {
       endpoint: 'awayPlayerStats',
-      url: `fetchPlayerStats × ${awayPlayerLog.length} oyuncu (deplasman)`,
+      url: `fetchPlayerStats × ${awayPlayerLog.length} oyuncu`,
       success: awayPlayerStats.length > 0,
-      responseSize: JSON.stringify(awayPlayerStats).length,
       data: awayPlayerStats,
       _detail: awayPlayerLog,
     },
@@ -501,46 +509,44 @@ async function fetchPlayerStats(players, tournamentId, seasonId) {
 
   const stats = [];
   const log = [];
-  const batchSize = 5;
 
-  for (let i = 0; i < targetPlayers.length; i += batchSize) {
-    const batch = targetPlayers.slice(i, i + batchSize);
-    
-    await Promise.all(batch.map(async (p) => {
-      const playerId = p.player?.id;
-      if (!playerId) return;
+  // Artık batching'i playwright-client'ın içindeki 200ms rate-limiter'a bırakıyoruz.
+  // Tüm oyuncuları aynı anda Promise.all ile başlatmak, toplam süreyi minimize eder.
+  await Promise.all(targetPlayers.map(async (p) => {
+    const playerId = p.player?.id;
+    if (!playerId) return;
 
-      const t0 = Date.now();
-      const [seasonStats, attributes, characteristics] = await Promise.all([
-        api.getPlayerSeasonStats(playerId, tournamentId, seasonId).catch(() => null),
-        api.getPlayerAttributes(playerId).catch(() => null),
-        api.getPlayerCharacteristics(playerId).catch(() => null),
-      ]);
-      const duration = Date.now() - t0;
+    const t0 = Date.now();
+    const [seasonStats, attributes, characteristics] = await Promise.all([
+      api.getPlayerSeasonStats(playerId, tournamentId, seasonId).catch(() => null),
+      api.getPlayerAttributes(playerId).catch(() => null),
+      api.getPlayerCharacteristics(playerId).catch(() => null),
+    ]);
+    const duration = Date.now() - t0;
 
-      stats.push({
-        playerId,
-        name: p.player.name,
-        position: p.player.position || p.position,
-        shirtNumber: p.shirtNumber,
-        substitute: p.substitute || false,
-        seasonStats,
-        attributes,
-        characteristics,
-      });
+    stats.push({
+      playerId,
+      name: p.player.name,
+      position: p.player.position || p.position,
+      shirtNumber: p.shirtNumber,
+      substitute: p.substitute || false,
+      seasonStats,
+      attributes,
+      characteristics,
+    });
 
-      log.push({
-        playerId,
-        name: p.player.name,
-        substitute: p.substitute || false,
-        durationMs: duration,
-        hasSeasonStats: !!seasonStats,
-        hasAttributes: !!attributes,
-        hasCharacteristics: !!characteristics,
-        rating: seasonStats?.statistics?.rating ?? null,
-      });
-    }));
-  }
+    log.push({
+      playerId,
+      name: p.player.name,
+      substitute: p.substitute || false,
+      durationMs: duration,
+      hasSeasonStats: !!seasonStats,
+      hasAttributes: !!attributes,
+      hasCharacteristics: !!characteristics,
+      rating: seasonStats?.statistics?.rating ?? null,
+    });
+  }));
+
   return { stats, log };
 }
 
@@ -601,4 +607,42 @@ function mergeAndSortEvents(page0, page1) {
   return [...events0, ...events1].sort((a, b) => (b.startTimestamp || 0) - (a.startTimestamp || 0));
 }
 
-module.exports = { fetchAllMatchData };
+/**
+ * Workshop için: belirli oyuncuların istatistiklerini fetch eder.
+ * fetchPlayerStats ile aynı mantık — sadece filtre olmadan tüm oyuncuları alır.
+ * @param {Array} players - { player: { id, name, position }, substitute, isReserve, ... }
+ * @param {number} tournamentId
+ * @param {number} seasonId
+ * @returns {Promise<Array>} stats array (homePlayerStats / awayPlayerStats formatında)
+ */
+async function fetchPlayerStatsForPlayers(players, tournamentId, seasonId) {
+  if (!players?.length || !tournamentId || !seasonId) return [];
+
+  const stats = [];
+  await Promise.all(players.map(async (p) => {
+    const playerId = p.player?.id;
+    if (!playerId) return;
+
+    const [seasonStats, attributes, characteristics] = await Promise.all([
+      api.getPlayerSeasonStats(playerId, tournamentId, seasonId).catch(() => null),
+      api.getPlayerAttributes(playerId).catch(() => null),
+      api.getPlayerCharacteristics(playerId).catch(() => null),
+    ]);
+
+    stats.push({
+      playerId,
+      name: p.player.name,
+      position: p.player.position || p.position || 'M',
+      shirtNumber: p.shirtNumber || '',
+      substitute: p.substitute || false,
+      isReserve: p.isReserve || false,
+      seasonStats,
+      attributes,
+      characteristics,
+    });
+  }));
+
+  return stats;
+}
+
+module.exports = { fetchAllMatchData, fetchPlayerStatsForPlayers };
