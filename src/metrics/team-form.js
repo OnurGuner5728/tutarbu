@@ -58,13 +58,15 @@ function calculateTeamFormMetrics(data, side) {
   const fp10 = formPoints(last10);
   const fp20 = formPoints(last20);
   const M046raw = fp5.valid > 0 ? (fp5.points / (fp5.valid * 3)) * 100 : null;
-  const M046 = M046raw != null && formPct != null
-    ? M046raw * 0.7 + formPct * 0.3
-    : M046raw != null
-      ? M046raw
-      : formPct != null
-        ? formPct
-        : null;
+  // Event bazlı raw ne kadar çok maç kaynağı varsa o kadar ağır basar; formPct string 1 kaynak.
+  const _rawW = fp5.valid;
+  const _fW = formPct != null ? 1 : 0;
+  const _fTot = _rawW + _fW;
+  const M046 = (M046raw != null && formPct != null && _fTot > 0)
+    ? M046raw * (_rawW / _fTot) + formPct * (_fW / _fTot)
+    : M046raw != null ? M046raw
+    : formPct != null ? formPct
+    : null;
   const M047 = fp10.valid > 0 ? (fp10.points / (fp10.valid * 3)) * 100 : null;
   const M048 = fp20.valid > 0 ? (fp20.points / (fp20.valid * 3)) * 100 : null;
 
@@ -135,7 +137,12 @@ function calculateTeamFormMetrics(data, side) {
   } else if (avgRating != null) {
     const M050streak = Math.min(M050raw, 10) * 10; // 0-100
     const M050rating = Math.min(Math.max((avgRating - 6) / (9 - 6), 0), 1) * 100; // 0-100
-    M050 = M050streak * 0.6 + M050rating * 0.4;
+    // Streak ham sayı olarak örneklem sayısını temsil eder (M050raw = kaç maçlık seri)
+    // avgRating 1 kaynak → eşit ağırlık değilse sample-bazlı.
+    const _sW = M050raw > 0 ? M050raw : 1;
+    const _rW = 1;
+    const _tot = _sW + _rW;
+    M050 = M050streak * (_sW / _tot) + M050rating * (_rW / _tot);
   } else {
     M050 = Math.min(M050raw, 10) * 10; // normalize to 0-100
   }
@@ -157,25 +164,30 @@ function calculateTeamFormMetrics(data, side) {
   const M054 = (prev5ConcAvg != null && last5ConcAvg != null && prev5ConcAvg > 0)
     ? (last5ConcAvg - prev5ConcAvg) / prev5ConcAvg : null;
 
-  // ── M055-M057: Puan Durumu Skorları ──
+  // ── M055-M057: Puan Durumu Skorları (Non-Linear Power) ──
+  const calculateRankScore = (row, total) => {
+    if (!row || !total || total < 2) return null;
+    // 1. sırada olan %100, sonuncu olan %0 alır.
+    // pow(x, 1.5) ile üst sıralar arasındaki makas daha gerçekçi açılır.
+    const norm = (total - row.position) / (total - 1);
+    return Math.pow(norm, 1.5) * 100;
+  };
+
   const teamStanding = findTeamInStandings(standings, teamId);
   const totalTeams = getTotalTeams(standings);
-  const M055 = teamStanding && totalTeams > 0
-    ? ((totalTeams - teamStanding.position + 1) / totalTeams) * 100 : null;
+  const M055 = calculateRankScore(teamStanding, totalTeams);
 
   const homeTeamStanding = findTeamInStandings(homeStandings, teamId);
-  const M056 = homeTeamStanding && totalTeams > 0
-    ? ((totalTeams - homeTeamStanding.position + 1) / totalTeams) * 100 : null;
+  const M056 = calculateRankScore(homeTeamStanding, totalTeams);
 
   const awayTeamStanding = findTeamInStandings(awayStandings, teamId);
-  const M057 = awayTeamStanding && totalTeams > 0
-    ? ((totalTeams - awayTeamStanding.position + 1) / totalTeams) * 100 : null;
+  const M057 = calculateRankScore(awayTeamStanding, totalTeams);
 
   // ── M058: Goal Difference ──
   const M058 = teamStanding
     ? (teamStanding.scoresFor != null && teamStanding.scoresAgainst != null
-        ? teamStanding.scoresFor - teamStanding.scoresAgainst
-        : null)
+      ? teamStanding.scoresFor - teamStanding.scoresAgainst
+      : null)
     : null;
 
   // ── M059-M061: Üst/Alt ve KG Var ──

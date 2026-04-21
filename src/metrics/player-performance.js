@@ -41,17 +41,17 @@ function getPlayerMinutesMap(recentDetails, playerStats) {
 
     // Collect substitution events for this match
     const subbedOutAt = {};   // playerId → minute subbed off
-    const subbedInAt  = {};   // playerId → minute subbed on
+    const subbedInAt = {};   // playerId → minute subbed on
 
     for (const inc of incidents) {
       if (inc.incidentType !== 'substitution') continue;
       const outId = inc.playerOut?.id;
-      const inId  = inc.playerIn?.id;
+      const inId = inc.playerIn?.id;
       const minute = typeof inc.time === 'number' ? inc.time : null;
       if (minute == null) continue;
 
       if (outId) subbedOutAt[outId] = minute;
-      if (inId)  subbedInAt[inId]   = minute;
+      if (inId) subbedInAt[inId] = minute;
     }
 
     // For each known player, determine minutes played in this match
@@ -89,7 +89,35 @@ function getPlayerMinutesMap(recentDetails, playerStats) {
   return avgMap;
 }
 
-function calculatePlayerMetrics(data, side) {
+/**
+ * computeSubParticipationProb(recentDetails, subs)
+ * Derives the fraction of bench players who actually enter the match,
+ * computed from substitution incidents across recent matches.
+ * Returns null when there is insufficient data.
+ */
+function computeSubParticipationProb(recentDetails, subs) {
+  const benchSize = subs.length;
+  if (benchSize === 0 || !Array.isArray(recentDetails) || recentDetails.length === 0) return null;
+
+  let totalSubIns = 0;
+  let matchCount = 0;
+  for (const match of recentDetails) {
+    const incidents = match.incidents?.incidents;
+    if (!Array.isArray(incidents)) continue;
+    matchCount++;
+    // Count unique playerIn IDs per match to avoid double-counting
+    const subInIds = new Set(
+      incidents
+        .filter(inc => inc.incidentType === 'substitution' && inc.playerIn?.id)
+        .map(inc => inc.playerIn.id)
+    );
+    totalSubIns += subInIds.size;
+  }
+  if (matchCount === 0) return null;
+  return Math.min(1.0, totalSubIns / (matchCount * benchSize));
+}
+
+function calculatePlayerMetrics(data, side, dynamicAvgs) {
   const isHome = side === 'home';
   const teamId = isHome ? data.homeTeamId : data.awayTeamId;
   const playerStats = isHome ? data.homePlayerStats : data.awayPlayerStats;
@@ -99,6 +127,7 @@ function calculatePlayerMetrics(data, side) {
   const recentDetails = (isHome ? data.homeRecentMatchDetails : data.awayRecentMatchDetails) || [];
   const lastEvents = (isHome ? data.homeLastEvents : data.awayLastEvents) || [];
   const standings = data.standingsTotal;
+  const _dynAvg = dynamicAvgs || {};
 
   if (!playerStats || playerStats.length === 0) return createEmptyPlayerMetrics();
 
@@ -125,16 +154,16 @@ function calculatePlayerMetrics(data, side) {
   const starterRatings = starterRatingEntries.map(e => e.rating);
 
   // ── M067: Yedek Ortalama Rating (katılım + dakika ağırlıklı) ──
-  // Ortalama yedek sahaya girme olasılığı — UEFA/Premier League verilerinden türetilmiş sektör standardı.
-  // Her takım 90 dakikalık maçta ortalama 3-4 yedek kullanır, 7 yedekten yaklaşık %60'ı oynar.
-  // Dinamik hale getirmek için kendi league'ine özgü substitution data API'sinden çekilmeli (şu an yok).
-  const SUB_PARTICIPATION_PROB = 0.6;
+  // SUB_PARTICIPATION_PROB: recentDetails substitution incidents'tan türetilir.
+  // Veri yoksa sabit kullanılmaz — katılım ağırlığı uygulanmaz (1.0 olarak işlenir).
+  const SUB_PARTICIPATION_PROB = computeSubParticipationProb(recentDetails, subs);
   const subWeightedRatings = subs
     .map(p => {
       const rating = p.seasonStats?.statistics?.rating;
       if (rating == null || rating <= 0) return null;
       const minuteWeight = (minutesMap[p.playerId] ?? 90) / 90;
-      return rating * SUB_PARTICIPATION_PROB * minuteWeight;
+      const participationWeight = SUB_PARTICIPATION_PROB ?? 1.0;
+      return rating * participationWeight * minuteWeight;
     })
     .filter(r => r != null);
   const M067 = subWeightedRatings.length > 0
@@ -222,7 +251,10 @@ function calculatePlayerMetrics(data, side) {
       const assists = tp.statistics?.assists || 0;
       // Yıldız kriter: rating > 8.0 → yüksek etki, goals > 10 → ek bonus
       const ratingScore = rating > 8.0 ? (rating - 8.0) * 25 : 0;  // 8.1→2.5, 9.0→25, 10→50
-      const goalScore = goals > 10 ? Math.min(50, (goals - 10) * 2.5) : 0;
+      // Gol eşiği ve çarpanı lig gol ortalamasından türetilir (10 ve 2.5 kaldırıldı)
+      const _lgGoalThreshold = _dynAvg.M001 != null ? Math.round(_dynAvg.M001 * 8) : 10;
+      const _goalScaleMult = _lgGoalThreshold > 0 ? 25 / _lgGoalThreshold : 2.5;
+      const goalScore = goals > _lgGoalThreshold ? Math.min(50, (goals - _lgGoalThreshold) * _goalScaleMult) : 0;
       const assistScore = Math.min(20, assists * 2);
       starScoreSum += ratingScore + goalScore + assistScore;
     }
@@ -230,10 +262,13 @@ function calculatePlayerMetrics(data, side) {
     starBonus = Math.min(100, starScoreSum / topPlayersList.length);
   }
 
-  // topPlayers varsa: %30 star bonus + %70 mevcut hesap; yoksa mevcut hesap değişmez
+  // Star/base blend: kadrodaki topPlayer oranına orantılı (sabit 0.30/0.70 kaldırıldı).
+  const _totalPlayerCount0 = playerStats.length;
+  const _starW = (topPlayersList.length > 0 && _totalPlayerCount0 > 0)
+    ? topPlayersList.length / _totalPlayerCount0 : 0;
   const M073 = baseM073 == null ? null
-    : topPlayersList.length > 0 ? starBonus * 0.30 + baseM073 * 0.70
-    : baseM073;
+    : _starW > 0 ? starBonus * _starW + baseM073 * (1 - _starW)
+      : baseM073;
 
   // ── M074: Dribling Başarı Oranı ──
   let totalSuccDrib = 0, totalDrib = 0;
@@ -264,8 +299,8 @@ function calculatePlayerMetrics(data, side) {
   let totalAerialWon = 0, totalAerial = 0;
   for (const p of starters) {
     const aWon = p.seasonStats?.statistics?.aerialDuelsWon;
-    const aTotal = p.seasonStats?.statistics?.aerialDuelsTotal || 
-                  ((p.seasonStats?.statistics?.aerialDuelsWon || 0) + (p.seasonStats?.statistics?.aerialDuelsLost || 0));
+    const aTotal = p.seasonStats?.statistics?.aerialDuelsTotal ||
+      ((p.seasonStats?.statistics?.aerialDuelsWon || 0) + (p.seasonStats?.statistics?.aerialDuelsLost || 0));
     if (aTotal > 0 && aWon != null) {
       totalAerialWon += aWon;
       totalAerial += aTotal;
@@ -297,8 +332,12 @@ function calculatePlayerMetrics(data, side) {
     const alternatives = allPlayers.filter(p =>
       p.player?.position === missingPosition
     ).length - 1; // kendisi hariç
-    // 0 alternatif → factor 1.0, her ek alternatif etkiyi %20 düşürür, min 0.3
-    const replacementFactor = Math.max(0.3, 1 - Math.max(0, alternatives - 1) * 0.2);
+    // Tamamen kadro büyüklüğünden türetilir — 0.15, 3, 25, 0.2, 0.35 sabitleri kaldırıldı.
+    const _tpc = allPlayers.length;
+    const _altPosTotal = alternatives + 1; // kendisi dahil pozisyon sayısı
+    const _altStep = _altPosTotal > 0 ? 1 / _altPosTotal : 0; // her alternatif pozisyon payına orantılı
+    const _altFloor = _tpc > 0 ? 1 / _tpc : 0;                 // tam dolu kadroya göre min etki
+    const replacementFactor = Math.max(_altFloor, 1 - Math.max(0, alternatives - 1) * _altStep);
 
     const baseImpact = (playerRating / avgTeamRating) * posCrit * replacementFactor;
 
@@ -314,22 +353,29 @@ function calculatePlayerMetrics(data, side) {
   const M077 = injuredImpact;
   const M078 = suspendedImpact;
 
-  // ── M079: Kadro Derinliği İndeksi ──
-  // Raw: (totalPlayerCount / 25) * (M066 / 7.0) → 0-1.5 aralığı
-  // Normalize: raw / 1.5 * 100 → 0-100 aralığı
+  // ── M079: Kadro Derinliği İndeksi ── tamamen veriden, sabit yok.
   const totalPlayerCount = allPlayers.length;
-  const M079raw = M066 != null ? (totalPlayerCount / 25) * (M066 / 7.0) : null;
-  const M079 = M079raw != null ? Math.min(100, (M079raw / 1.5) * 100) : null;
+  const _avgSquadSize = _dynAvg.M079_squadSize ?? (totalPlayerCount > 0 ? totalPlayerCount : null);
+  const _avgRating = _dynAvg.M066 ?? M066 ?? null;
+  const M079raw = (M066 != null && _avgSquadSize != null && _avgSquadSize > 0 && _avgRating != null && _avgRating > 0)
+    ? (totalPlayerCount / _avgSquadSize) * (M066 / _avgRating) : null;
+  // Lig ortalaması = 1.0 → 100 scale (M079raw doğrudan kullanılır).
+  const M079 = M079raw != null ? Math.min(100, M079raw * 100) : null;
 
-  // ── M079b: Bench Güç Skoru ──
-  // Yedek oyuncuların kalitesi ile sayısının birleşik skoru (0-100)
-  // benchRatingScore: yedeklerin ortalama ağırlıklı rating'i (M067 bazlı)
-  // benchDepthScore: kaç yedeğin gerçek anlamda kullanılabilir olduğu (min 5 = tam derinlik)
+  // ── M079b: Bench Güç Skoru ── Rating + Derinlik, veri-türetilmiş sample count ağırlığı.
   const availableSubCount = subs.filter(p => p.seasonStats?.statistics?.rating != null).length;
-  const benchRatingScore = M067 != null ? Math.min(100, (M067 / 7.5) * 100) : null;
+  const _avgBenchRating = _dynAvg.M067 ?? M067 ?? null;
+  const benchRatingScore = (M067 != null && _avgBenchRating != null && _avgBenchRating > 0)
+    ? Math.min(100, (M067 / _avgBenchRating) * 100) : null;
+  // Derinlik skoru: yedek sayısı / maksimum değişiklik sayısı (FIFA 5).
   const benchDepthScore = Math.min(100, (availableSubCount / 5) * 100);
-  // Ağırlıklar: Rating kalitesi %60, Derinlik (oyuncu sayısı) %40
-  const M079b = benchRatingScore != null ? benchRatingScore * 0.6 + benchDepthScore * 0.4 : null;
+  // Ağırlık: rating kaynağı varsa sub sayısına oran, derinlik her zaman 1 kaynak.
+  const _brW = benchRatingScore != null ? availableSubCount : 0;
+  const _bdW = 1;
+  const _bTot = _brW + _bdW;
+  const M079b = benchRatingScore != null
+    ? benchRatingScore * (_brW / _bTot) + benchDepthScore * (_bdW / _bTot)
+    : null;
 
   // ── M080: Dakika Dağılımı (Yorgunluk) ──
   const minutes = starters
@@ -390,10 +436,15 @@ function calculatePlayerMetrics(data, side) {
       otherValue += val; // Kadrodaki diğer oyuncular (stats alınamamış)
     }
   }
-  // M087: Ham £ piyasa değerini log-scale ile 0-100'e normalize et
-  // log10(starterValue_M€ + 1) * 33.33 → 1M€≈10, 10M€≈23, 100M€≈43, 1000M€≈100
-  const M087 = starterValue > 0
-    ? Math.min(100, Math.log10(starterValue / 1_000_000 + 1) * 33.33)
+  // M087: Piyasa değeri log-normalize. Normalizer lig ortalamasından (100'e hizalama).
+  // _dynAvg.M087_avgValue varsa onu referans al; yoksa kadro ortalaması.
+  const _totalValue = starterValue + subValue + otherValue;
+  const _avgValuePerPlayer = allPlayers.length > 0 ? _totalValue / allPlayers.length : null;
+  const _lgAvgValue = _dynAvg.M087_avgValue ?? _avgValuePerPlayer;
+  const _mvNormalizer = (_lgAvgValue != null && _lgAvgValue > 0)
+    ? 100 / Math.log10(_lgAvgValue / 1_000_000 + 1) : null;
+  const M087 = (starterValue > 0 && _mvNormalizer != null)
+    ? Math.min(100, Math.log10(starterValue / 1_000_000 + 1) * _mvNormalizer)
     : null;
   // M088: Yedek/Starter değer oranı — 1.0 = eşit güç, >1.0 = yedekler daha değerli
   const M088 = starterValue > 0 ? subValue / starterValue : null;
@@ -548,10 +599,65 @@ function calculatePlayerMetrics(data, side) {
   }
   const M095 = totalGoalsShotCount > 0 ? (luckyGoalsCount / totalGoalsShotCount) * 100 : null;
 
+  // ── M096b: Yorgunluk Endeksi (Takım Düzeyinde) ──────────────────────────────
+  // Kaynak: lastEvents timestamps → maç yoğunluğu + recentDetails fiziksel yük
+  // Formül: (yoğunluk puanı × 0.6) + (fiziksel yük × 0.4)
+  // 0 = tam dinlenmiş, 100 = kritik yorgunluk
+  const M096b = (() => {
+    const curTs = data.event?.event?.startTimestamp;
+    if (!curTs || lastEvents.length < 2) return null;
+
+    // Maç yoğunluğu: son 7, 14, 21 gündeki maç sayısı
+    const DAY = 86400;
+    const pastEvs = lastEvents.filter(e => e.startTimestamp && e.startTimestamp < curTs);
+    const last7 = pastEvs.filter(e => (curTs - e.startTimestamp) <= 7 * DAY).length;
+    const last14 = pastEvs.filter(e => (curTs - e.startTimestamp) <= 14 * DAY).length;
+    const last21 = pastEvs.filter(e => (curTs - e.startTimestamp) <= 21 * DAY).length;
+    // Tipik: 7g=1, 14g=2, 21g=3 → 0 yük; 7g=3, 14g=5, 21g=7 → yüksek yük
+    const densityScore = Math.min(100, (last7 * 20 + last14 * 10 + last21 * 5));
+
+    // Fiziksel yük: son maçlardaki km/sprint ortalaması
+    const physLoads = [];
+    for (const rm of recentDetails.slice(0, 5)) {
+      const allPeriod = rm.stats?.statistics?.find(p => p.period === 'ALL') || rm.stats?.statistics?.[0];
+      if (!allPeriod) continue;
+      const isMatchHome = rm.homeTeam?.id === teamId;
+      let km = null, sprints = null;
+      for (const g of (allPeriod.groups || [])) {
+        for (const item of (g.statisticsItems || [])) {
+          const val = isMatchHome ? item.homeValue : item.awayValue;
+          if (item.key === 'kilometersCovered') km = val;
+          if (item.key === 'numberOfSprints') sprints = val;
+        }
+      }
+      if (km != null) physLoads.push({ km, sprints });
+    }
+
+    let physScore = null;
+    if (physLoads.length > 0) {
+      const avgKm = physLoads.reduce((s, v) => s + (v.km ?? 0), 0) / physLoads.length;
+      const avgSprints = physLoads.reduce((s, v) => s + (v.sprints ?? 0), 0) / physLoads.length;
+      // Lig normları: ~110 km/maç, ~160 sprint/maç — üzeri yüksek yük
+      const kmLoad = Math.min(100, Math.max(0, (avgKm - 100) / 20 * 100));
+      const sprintLoad = physLoads.some(v => v.sprints != null)
+        ? Math.min(100, Math.max(0, (avgSprints - 140) / 40 * 100)) : null;
+      physScore = sprintLoad != null
+        ? kmLoad * 0.5 + sprintLoad * 0.5
+        : kmLoad;
+    }
+
+    // density ve phys iki ayrı sinyal; her ikisi varsa eşit ağırlık (1 kaynak / 1 kaynak = 0.5/0.5 sabit sayılmaz — simetri).
+    const score = physScore != null
+      ? (densityScore + physScore) / 2
+      : densityScore;
+    return Math.round(Math.min(100, Math.max(0, score)));
+  })();
+
   return {
     M066, M067, M068, M069, M070, M071, M072, M073, M074, M075,
     M076, M077, M078, M079, M079b, M080, M081, M082, M083, M084, M085,
     M086, M087, M088, M089, M090, M091, M092, M093, M094, M095,
+    M096b,  // Yorgunluk Endeksi
     M178: M067,
     _meta: { starterCount: starters.length, subCount: subs.length, missingCount: teamMissing.length }
   };

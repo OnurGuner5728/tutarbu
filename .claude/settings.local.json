@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(node fetch_today_lineup.js)"
+      "Bash(node fetch_today_lineup.js)",
+      "Bash(grep -E \"\\\\.\\(js|json\\)$\")"
     ]
   }
 }

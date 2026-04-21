@@ -255,15 +255,16 @@ async function fetchAllMatchData(eventId) {
     return { ...lineup, players };
   }
 
-  if (!lineups.home || !lineups.home.players || lineups.home.players.length === 0) {
-    lineups.home = buildFallbackLineup(homePlayers); lineups.isFallback = true;
+  const lineupsSafe = lineups || {};
+  if (!lineupsSafe.home || !lineupsSafe.home.players || lineupsSafe.home.players.length === 0) {
+    lineupsSafe.home = buildFallbackLineup(homePlayers); lineupsSafe.isFallback = true;
   } else {
-    lineups.home = normalizeStarters(lineups.home);
+    lineupsSafe.home = normalizeStarters(lineupsSafe.home);
   }
-  if (!lineups.away || !lineups.away.players || lineups.away.players.length === 0) {
-    lineups.away = buildFallbackLineup(awayPlayers); lineups.isFallback = true;
+  if (!lineupsSafe.away || !lineupsSafe.away.players || lineupsSafe.away.players.length === 0) {
+    lineupsSafe.away = buildFallbackLineup(awayPlayers); lineupsSafe.isFallback = true;
   } else {
-    lineups.away = normalizeStarters(lineups.away);
+    lineupsSafe.away = normalizeStarters(lineupsSafe.away);
   }
 
   // 9. Oyuncu Sezon İstatistikleri (Ev ve Deplasman Paralel)

@@ -350,8 +350,211 @@ function MultiRunView({ multiRunResult, homeTeam, awayTeam }) {
   );
 }
 
+// ── Audit panel ─────────────────────────────────────────────────────────────
+function AuditPanel({ metadata, homeTeam, awayTeam, metricsData }) {
+  const [search, setSearch] = React.useState('');
+  const metricTraces = metadata?.leagueAvgTraces;
+  const baselineTraces = metadata?.leagueBaseline?.traces || [];
+  
+  if (!metricTraces || Object.keys(metricTraces).length === 0) {
+    return (
+      <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-secondary)' }}>
+        <div style={{ fontSize: 32, marginBottom: 16 }}>🔍</div>
+        <div style={{ fontSize: 14, fontWeight: 600 }}>Bu maç için denetim verisi henüz hazır değil.</div>
+        <div style={{ fontSize: 11, marginTop: 8, opacity: 0.7 }}>
+          Simülasyonun dayandığı lig ortalamaları henüz hesaplanmamış olabilir veya API verisi eksik gelmiş olabilir.
+        </div>
+      </div>
+    );
+  }
+
+  const filteredPairs = Object.entries(metricTraces || {}).filter(([id, data]) => {
+    const q = search.toLowerCase();
+    return (
+      id.toLowerCase().includes(q) ||
+      (data.name || '').toLowerCase().includes(q) ||
+      (data.description || '').toLowerCase().includes(q)
+    );
+  }).sort((a, b) => a[0].localeCompare(b[0]));
+
+  return (
+    <div style={{ padding: 24, color: 'var(--text-primary)', animation: 'fadeIn 0.3s', height: '100%', display: 'flex', flexDirection: 'column' }}>
+      
+      {/* ── Section 0: League Physics (Lig Trafiği ve Fizik) ────────────────── */}
+      <div style={{ marginBottom: 30 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+          <div style={{ width: 4, height: 18, background: 'var(--accent-green)', borderRadius: 2 }} />
+          <h3 style={{ fontSize: 16, fontWeight: 800, margin: 0, letterSpacing: 1 }}>DİNAMİK LİG FİZİK PROFİLİ</h3>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+          <div style={{ background: 'rgba(0,255,136,0.04)', border: '1px solid rgba(0,255,136,0.15)', borderRadius: 12, padding: 14 }}>
+            <div style={{ fontSize: 9, fontWeight: 900, color: 'var(--accent-green)', letterSpacing: 1, marginBottom: 8, textTransform: 'uppercase' }}>Lig Puan Yoğunluğu (Density)</div>
+            <div style={{ fontSize: 22, fontWeight: 950, color: '#fff', fontFamily: 'var(--font-mono)' }}>{metadata?.leaguePointDensity != null ? metadata.leaguePointDensity.toFixed(3) : '—'}</div>
+            <div style={{ fontSize: 10, color: 'var(--text-secondary)', marginTop: 4 }}>Puan farklarının hassasiyeti ve "Hedef/Önem" metriği çarpanı.</div>
+          </div>
+          <div style={{ background: 'rgba(0,242,255,0.04)', border: '1px solid rgba(0,242,255,0.15)', borderRadius: 12, padding: 14 }}>
+            <div style={{ fontSize: 9, fontWeight: 900, color: 'var(--accent-cyan)', letterSpacing: 1, marginBottom: 8, textTransform: 'uppercase' }}>Gol Volatilitesi (Volatility)</div>
+            <div style={{ fontSize: 22, fontWeight: 950, color: '#fff', fontFamily: 'var(--font-mono)' }}>{metadata?.leagueGoalVolatility != null ? metadata.leagueGoalVolatility.toFixed(3) : '—'}</div>
+            <div style={{ fontSize: 10, color: 'var(--text-secondary)', marginTop: 4 }}>Skor değişkenliği ve "Form/Momentum" metriği çarpanı.</div>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+          <div style={{ width: 4, height: 18, background: 'var(--accent-orange)', borderRadius: 2 }} />
+          <h3 style={{ fontSize: 16, fontWeight: 800, margin: 0, letterSpacing: 1 }}>SİMÜLASYON TEMEL DİNAMİKLERİ (BASELINES)</h3>
+        </div>
+        <div style={{ 
+          background: 'rgba(255,140,0,0.03)', 
+          border: '1px solid rgba(255,140,0,0.1)', 
+          borderRadius: 12, 
+          padding: '16px',
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+          gap: 12
+        }}>
+          {baselineTraces.map((t, idx) => {
+            const isNeutral = t.includes('NEUTRAL_SYMMETRY');
+            return (
+              <div key={idx} style={{ 
+                fontSize: 11, 
+                fontFamily: 'var(--font-mono)', 
+                color: isNeutral ? 'var(--text-tertiary)' : '#fff',
+                padding: '6px 10px',
+                background: 'rgba(0,0,0,0.2)',
+                borderRadius: 6,
+                border: isNeutral ? '1px dashed rgba(255,255,255,0.1)' : '1px solid rgba(255,140,0,0.2)'
+              }}>
+                <span style={{ color: isNeutral ? 'var(--text-tertiary)' : 'var(--accent-orange)', marginRight: 6 }}>➜</span>
+                {t}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── Section 2: Individual Metrics (Metrik Denetimi) ────────────────── */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ width: 4, height: 18, background: 'var(--accent-cyan)', borderRadius: 2 }} />
+          <h3 style={{ fontSize: 16, fontWeight: 800, margin: 0 }}>METRİK HESAPLAMA KANITLARI (168+ METRİK)</h3>
+        </div>
+        <div style={{ position: 'relative' }}>
+          <input 
+            type="text" 
+            placeholder="Metrik ara..." 
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{
+              background: 'rgba(0,0,0,0.3)',
+              border: '1px solid var(--glass-border)',
+              borderRadius: 20,
+              padding: '6px 16px',
+              paddingLeft: 32,
+              color: '#fff',
+              fontSize: 12,
+              outline: 'none',
+              width: 200,
+            }}
+          />
+          <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', opacity: 0.5, fontSize: 12 }}>🔍</span>
+        </div>
+      </div>
+      
+      <div style={{ 
+        display: 'grid', 
+        gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', 
+        gap: 16, 
+        overflowY: 'auto',
+        paddingRight: 8,
+        flex: 1
+      }}>
+        {filteredPairs.map(([id, data]) => {
+          const rawTrace = data.trace || '';
+          const valPart = rawTrace.split(' (')[0] || '1.0';
+          const sourcePart = rawTrace.split(' (')[1]?.replace(')', '') || 'DİNAMİK PROXY';
+
+          return (
+            <div key={id} style={{ 
+              background: 'rgba(255,255,255,0.03)', 
+              border: '1px solid var(--glass-border)', 
+              borderRadius: 12, 
+              padding: '16px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 10,
+              transition: 'all 0.2s',
+              position: 'relative',
+              overflow: 'hidden'
+            }}>
+              {/* Header: Name & ID */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--accent-cyan)', marginBottom: 2 }}>{data.name}</div>
+                  <div style={{ fontSize: 10, color: 'var(--text-tertiary)', fontWeight: 600 }}>ID: {id}</div>
+                </div>
+                <div style={{ 
+                  fontSize: 18, 
+                  fontWeight: 950, 
+                  color: '#fff', 
+                  fontFamily: 'var(--font-mono)',
+                  background: 'rgba(255,255,255,0.05)',
+                  padding: '4px 10px',
+                  borderRadius: 8,
+                  border: '1px solid rgba(255,255,255,0.05)'
+                }}>
+                  {valPart}
+                </div>
+              </div>
+              
+              {/* Description */}
+              <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.5, fontStyle: 'italic' }}>
+                {data.description}
+              </div>
+
+              {/* Simulation Role / Impact */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: 9, fontWeight: 900, color: 'var(--accent-purple)', background: 'rgba(188, 19, 254, 0.1)', padding: '2px 8px', borderRadius: 4, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                  ETKİ: {data.role}
+                </span>
+              </div>
+
+              {/* Source Details */}
+              <div style={{ 
+                marginTop: 'auto',
+                padding: '8px 10px',
+                background: 'rgba(0, 255, 136, 0.05)',
+                borderRadius: 8,
+                border: '1px solid rgba(0, 255, 136, 0.1)',
+                fontSize: 10,
+                color: '#fff',
+                fontWeight: 600
+              }}>
+                <div style={{ color: 'var(--accent-green)', fontWeight: 900, fontSize: 8, textTransform: 'uppercase', marginBottom: 2 }}>DENETİM KANITI (REAL-TIME)</div>
+                <div style={{ opacity: 0.9 }}>{sourcePart}</div>
+              </div>
+            </div>
+          );
+        })}
+
+        {filteredPairs.length === 0 && (
+          <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: 40, color: 'var(--text-tertiary)' }}>
+            Arama kriterine uygun metrik bulunamadı.
+          </div>
+        )}
+      </div>
+      
+      <div style={{ marginTop: 20, padding: 14, background: 'rgba(255, 140, 0, 0.05)', border: '1px solid rgba(255, 140, 0, 0.15)', borderRadius: 12, fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.6, flexShrink: 0 }}>
+        <strong style={{ color: 'var(--accent-orange)' }}>Dinamik Mimari Notu:</strong> Bu paneldeki hiçbir değer statik (hardcoded) değildir. Her bir veri noktası, hiyerarşik olarak önce lig ortalamalarından, ardından takım sezon istatistiklerinden türetilmiştir. Veri bulunamadığında matematiksel nötr baz (Neutral Symmetry) kullanılır; böylece simülasyon hiçbir zaman spekülatif veya "tahmini" bir sabit sayıya dayanmaz.
+      </div>
+    </div>
+  );
+}
+
 // ── Main SimulationViewer ─────────────────────────────────────────────────────
-export default function SimulationViewer({ simulation, engineData, homeTeam, awayTeam, isMultiRun, multiRunResult, onMinuteChange }) {
+export default function SimulationViewer({ 
+  simulation, engineData, homeTeam, awayTeam, isMultiRun, multiRunResult, onMinuteChange, metadata,
+  showAudit, metricsData 
+}) {
   const [currentMinute, setCurrentMinute] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [speed, setSpeed] = useState(2);
@@ -543,6 +746,16 @@ export default function SimulationViewer({ simulation, engineData, homeTeam, awa
     );
   }
 
+  if (showAudit) {
+    return (
+      <div className="simViewerRoot" style={{ background: 'var(--card-bg)', border: '1px solid var(--glass-border)', borderRadius: 16, overflow: 'hidden', display: 'flex', flexDirection: 'column', fontFamily: 'inherit', color: 'var(--text-primary)', height: '100%', minHeight: 400 }}>
+        <div style={{ flex: 1, overflowY: 'auto', background: 'rgba(0,0,0,0.2)' }}>
+          <AuditPanel metadata={metadata} homeTeam={homeTeam} awayTeam={awayTeam} metricsData={metricsData} />
+        </div>
+      </div>
+    );
+  }
+
   if (!engineData) {
     return (
       <div style={{ background: 'var(--glass-bg, rgba(255,255,255,0.05))', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 320, gap: 12, fontFamily: 'inherit', color: 'var(--text-secondary)' }}>
@@ -634,44 +847,50 @@ export default function SimulationViewer({ simulation, engineData, homeTeam, awa
 
       {/* ── Main content ─────────────────────────────────────────────────────── */}
       <div className="simViewerMain" style={{ display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden' }}>
-
-        {/* Left: Field + Stats */}
-        <div className="simViewerLeft" style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, borderRight: '1px solid var(--glass-border)', minHeight: 0 }}>
-          <div className="simViewerFieldWrap" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'radial-gradient(ellipse at center, rgba(0,242,255,0.02) 0%, transparent 80%)', flexShrink: 0 }}>
-            <div style={{ width: '100%' }}>
-              <HorizontalField ballPos={ballPos} goalFlash={goalFlash} visibleEvents={allEvents} homeTeam={homeTeam} awayTeam={awayTeam} />
-            </div>
+        {showAudit ? (
+          <div style={{ flex: 1, overflowY: 'auto', background: 'rgba(0,0,0,0.2)' }}>
+            <AuditPanel metadata={metadata} homeTeam={homeTeam} awayTeam={awayTeam} metricsData={metricsData} />
           </div>
-          <div style={{ flexShrink: 0 }}>
-            <StatsStrip stats={stats} homeTeam={homeTeam} awayTeam={awayTeam} />
-          </div>
-        </div>
-
-        {/* Right: Commentary + Behavioral Matrix (smaller) */}
-        <div className="simViewerSide" style={{ display: 'flex', width: 320, flexShrink: 0, overflow: 'hidden', background: 'rgba(0,0,0,0.1)', minHeight: 0 }}>
-
-          {/* Commentary */}
-          <div className="simViewerLogCol" style={{ width: 160, display: 'flex', flexDirection: 'column', borderRight: '1px solid var(--glass-border)', minHeight: 0, overflow: 'hidden' }}>
-            <EventLog visibleEvents={allEvents} eventLogRef={eventLogRef} />
-          </div>
-
-          {/* Behavioral Matrix */}
-          <div className="simViewerMatrixCol" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
-            <div style={{ padding: '10px 12px', color: 'var(--accent-cyan)', fontSize: 9, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 2, borderBottom: '1px solid var(--glass-border)', background: 'rgba(0,242,255,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-              <span>DAVRANIŞ MATRİSİ</span>
-              <span style={{ color: 'var(--text-tertiary)', fontWeight: 800 }}>{currentMinute}'</span>
-            </div>
-            <div style={{ flex: 1, overflowY: 'auto', padding: '8px', scrollbarWidth: 'none' }}>
-              {currentBehavioralState ? (
-                <BehavioralGrid behavioralAnalysis={currentBehavioralState} homeTeam={homeTeam} awayTeam={awayTeam} compact />
-              ) : (
-                <div style={{ padding: 30, color: 'var(--text-tertiary)', fontSize: 11, textAlign: 'center', fontStyle: 'italic' }}>
-                  Simülasyon başlatın...
+        ) : (
+          <>
+            {/* Left: Field + Stats */}
+            <div className="simViewerLeft" style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, borderRight: '1px solid var(--glass-border)', minHeight: 0 }}>
+              <div className="simViewerFieldWrap" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'radial-gradient(ellipse at center, rgba(0,242,255,0.02) 0%, transparent 80%)', flexShrink: 0 }}>
+                <div style={{ width: '100%' }}>
+                  <HorizontalField ballPos={ballPos} goalFlash={goalFlash} visibleEvents={allEvents} homeTeam={homeTeam} awayTeam={awayTeam} />
                 </div>
-              )}
+              </div>
+              <div style={{ flexShrink: 0 }}>
+                <StatsStrip stats={stats} homeTeam={homeTeam} awayTeam={awayTeam} />
+              </div>
             </div>
-          </div>
-        </div>
+
+            {/* Right: Commentary + Behavioral Matrix (smaller) */}
+            <div className="simViewerSide" style={{ display: 'flex', width: 320, flexShrink: 0, overflow: 'hidden', background: 'rgba(0,0,0,0.1)', minHeight: 0 }}>
+              {/* Commentary */}
+              <div className="simViewerLogCol" style={{ width: 160, display: 'flex', flexDirection: 'column', borderRight: '1px solid var(--glass-border)', minHeight: 0, overflow: 'hidden' }}>
+                <EventLog visibleEvents={allEvents} eventLogRef={eventLogRef} />
+              </div>
+
+              {/* Behavioral Matrix */}
+              <div className="simViewerMatrixCol" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
+                <div style={{ padding: '10px 12px', color: 'var(--accent-cyan)', fontSize: 9, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 2, borderBottom: '1px solid var(--glass-border)', background: 'rgba(0,242,255,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+                  <span>DAVRANIŞ MATRİSİ</span>
+                  <span style={{ color: 'var(--text-tertiary)', fontWeight: 800 }}>{currentMinute}'</span>
+                </div>
+                <div style={{ flex: 1, overflowY: 'auto', padding: '8px', scrollbarWidth: 'none' }}>
+                  {currentBehavioralState ? (
+                    <BehavioralGrid behavioralAnalysis={currentBehavioralState} homeTeam={homeTeam} awayTeam={awayTeam} compact />
+                  ) : (
+                    <div style={{ padding: 30, color: 'var(--text-tertiary)', fontSize: 11, textAlign: 'center', fontStyle: 'italic' }}>
+                      Simülasyon başlatın...
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       <style>{`

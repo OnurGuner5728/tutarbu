@@ -381,6 +381,38 @@ export default function App() {
                             ))}
                           </div>
                         )}
+                        
+                        {/* Dynamic Trust Index */}
+                        <div style={{ 
+                          marginTop: 12, 
+                          display: 'flex', 
+                          gap: 8, 
+                          paddingTop: 8, 
+                          borderTop: '1px solid rgba(255,255,255,0.06)' 
+                        }}>
+                          <div title="Veri yoğunluğu ve metrik tamlık oranı" style={{ 
+                            background: 'rgba(0,255,136,0.1)', 
+                            border: '1px solid rgba(0,255,136,0.2)', 
+                            borderRadius: 6, 
+                            padding: '3px 8px', 
+                            fontSize: '0.65rem', 
+                            color: '#00ff88', 
+                            fontWeight: 800 
+                          }}>
+                            %{prediction.result?.confidence || 0} Güven
+                          </div>
+                          <div title="Model harmanlama önceliği" style={{ 
+                            background: 'rgba(0,242,255,0.1)', 
+                            border: '1px solid rgba(0,242,255,0.2)', 
+                            borderRadius: 6, 
+                            padding: '3px 8px', 
+                            fontSize: '0.65rem', 
+                            color: '#00f2ff', 
+                            fontWeight: 800 
+                          }}>
+                            {prediction.result?.source || 'Hibrit'}
+                          </div>
+                        </div>
                       </div>
                     </div>
 
@@ -1060,27 +1092,46 @@ function ProbBar({ label, val, color }) {
 
 function LineupColumn({ title, players, icon, side, swapMode, onSwapMode, onSwap, originalIds }) {
   const safePlayers = Array.isArray(players) ? players : [];
-  // Sort players: Starters first (CAP at 11), then Subs (including excess starters), then Reserves
-  const allStarters = safePlayers.filter(p => !p.substitute);
+  // Sort players: Starters first (CAP at 11), then Subs (including excess starters, max 9), then Reserves
+  const allStarters = safePlayers.filter(p => !p.substitute && !p.isReserve);
   const starters = allStarters.slice(0, 11);
   const excessStarters = allStarters.slice(11);
-  
-  const subs = [
+
+  const rawSubs = [
     ...excessStarters,
     ...safePlayers.filter(p => p.substitute && !p.isReserve)
   ];
-  const reserves = safePlayers.filter(p => p.substitute && p.isReserve);
+  const subs = rawSubs.slice(0, 9);
+  // Any subs beyond 9 overflow visually into reserves section
+  const overflowSubs = rawSubs.slice(9);
+
+  const reserves = [
+    ...overflowSubs,
+    ...safePlayers.filter(p => p.isReserve)
+  ];
+
+  // Determine which rendered group a player belongs to
+  const getPlayerGroup = (p) => {
+    const pid = p.player?.id;
+    if (starters.some(s => s.player?.id === pid)) return 'starter';
+    if (subs.some(s => s.player?.id === pid)) return 'sub';
+    return 'reserve';
+  };
 
   const handlePlayerClick = (p) => {
+    const group = getPlayerGroup(p);
     if (!swapMode) {
-      // First player selected
-      onSwapMode({ playerOut: p });
+      // First player selected — record their group
+      onSwapMode({ playerOut: p, fromGroup: group });
     } else {
       if (swapMode.playerOut?.player?.id === p.player?.id) {
         // Deselect
         onSwapMode(null);
+      } else if (group === swapMode.fromGroup) {
+        // Same-group swap blocked — silently ignore (groups must differ)
+        return;
       } else {
-        // Second player selected - Trigger Swap
+        // Valid cross-group swap
         onSwap(swapMode.playerOut, p, side);
       }
     }
@@ -1089,11 +1140,15 @@ function LineupColumn({ title, players, icon, side, swapMode, onSwapMode, onSwap
   const renderPlayer = (p, type) => {
     const isSelected = swapMode?.playerOut?.player?.id === p.player?.id;
     const isModified = originalIds ? !originalIds.has(p.player?.id) : false;
-    
+    // Dim players that are in the same group as the currently selected player (cannot swap within group)
+    const isSameGroupBlocked = swapMode?.fromGroup != null
+      && !isSelected
+      && getPlayerGroup(p) === swapMode.fromGroup;
+
     return (
       <div
         key={p.player?.id}
-        className={`player-card ${type}${isSelected ? ' selected-out' : ''}${isModified ? ' player-modified' : ''}`}
+        className={`player-card ${type}${isSelected ? ' selected-out' : ''}${isModified ? ' player-modified' : ''}${isSameGroupBlocked ? ' swap-blocked' : ''}`}
         onClick={() => handlePlayerClick(p)}
         role="button"
         tabIndex={0}
@@ -1114,16 +1169,16 @@ function LineupColumn({ title, players, icon, side, swapMode, onSwapMode, onSwap
     <div className="workshop-col">
       <div className="col-header">{icon} {title}</div>
       <div className="squad-section">
-        <div className="squad-label">İlk 11 ({starters.length})</div>
+        <div className="squad-label">İlk 11 ({starters.length}/11)</div>
         <div className="player-list-mini">
           {starters.map(p => renderPlayer(p, 'starter'))}
         </div>
 
-        <div className="squad-label" style={{ marginTop: '16px' }}>Yedek Kulübesi ({subs.length})</div>
+        <div className="squad-label" style={{ marginTop: '16px' }}>Yedek Kulübesi ({subs.length}/9)</div>
         <div className="player-list-mini">
           {subs.map(p => renderPlayer(p, 'sub'))}
         </div>
-        
+
         <div className="squad-label" style={{ marginTop: '16px', color: 'var(--text-tertiary)' }}>Kadro Dışı ({reserves.length})</div>
         <div className="player-list-mini">
           {reserves.map(p => renderPlayer(p, 'sub reserve'))}

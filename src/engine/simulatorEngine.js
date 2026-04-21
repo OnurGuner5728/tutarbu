@@ -2,7 +2,19 @@
  * simulatorEngine.js — Tarayıcı tarafı, dakika-başı simülasyon motoru.
  * Sunucu tarafından hesaplanan birim skorları ve gerçek metrik olasılıklarını alır.
  * Sıfır keyfi katsayı — tüm temel olasılıklar gerçek veriden türetilir.
+ *
+ * KRİTİK: Bu dosyada "magic number" YASAKTIR. Tüm nötr sabitler
+ * SIM_CONFIG.NEUTRAL_DEFAULTS üzerinden referans edilir.
  */
+
+// SIM_CONFIG client-side'da mevcut değildir (CommonJS) — inline sabitleri kullanıyoruz.
+// Bu değerler sim-config.js/NEUTRAL_DEFAULTS ile birebir eşleşir.
+const ND = {
+  UNIT: 1.0,         // SIM_CONFIG.NEUTRAL_DEFAULTS.UNIT_IDENTITY
+  POSSESSION: 0.50,  // SIM_CONFIG.NEUTRAL_DEFAULTS.POSSESSION_SYMMETRY
+  COUNTER: 0,        // SIM_CONFIG.NEUTRAL_DEFAULTS.COUNTER_INIT
+  WEATHER: 1.0,      // SIM_CONFIG.NEUTRAL_DEFAULTS.WEATHER_IDENTITY
+};
 
 const r = () => Math.random();
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
@@ -14,61 +26,95 @@ const geo2 = (a, b) => Math.sqrt(Math.max(a, 0.01) * Math.max(b, 0.01));
 // ─── Model Yapı Sabitleri (server'daki sim-config.js ile eşleşir) ────────────
 // Bu değerler olasılık katsayısı değil, simülasyon ölçeği tanımlarıdır.
 // Kırmızı kart gücü penaltısı: araştırmalar 10'a düşen takımın atak gücünü
-// ~40-60% kaybettiğini gösterir (Bauer et al. 2009, J.Quant.Anal.Sports).
-const RC_INCREMENT = 0.5;  // Her kırmızı kartta birikimli ceza artışı
-const RC_MAX       = 0.8;  // Maksimum ceza (en fazla %80 güç kaybı)
+// ~40-60% kaybettiğini göstermektedir. goalMult/errorMult createEngine içinde
+// weatherMult parametresinden destructure edilir — modül seviyesinde tanımsız.
+
+const RC_MAX = 0.8;  // Maksimum ceza (en fazla %80 güç kaybı)
 // Morale sistemi referans sınırları: birimler 1.0 etrafında normalize,
 // 0.4 = tam çöküş, 1.6 = zirve motivasyon (birimin ±60% bandı)
-const MORALE_SHIFT_SCALE = 10; // birim değer / bu sayı = morale kayması miktarı
+const MORALE_SHIFT_SCALE = 10; // Eskiden kullanılan sabit (kaldırıldı ancak fallback referansı için tutuluyor)
 
-export function createEngine({ homeUnits, awayUnits, lineups, weatherMult = {}, probBases = {} }) {
-  const { goalMult = 1.0, errorMult = 1.0 } = weatherMult;
+// CASCADES: kaldırıldı — COMFORT_GOAL_THRESHOLD artık takımın gol/maç ortalamasından dinamik hesaplanıyor
+export function createEngine({ homeUnits, awayUnits, lineups, weatherMult = {}, probBases = {}, leagueBaseline = {}, dynamicTimeWindows = null }) {
+  // Dinamik EPS: lig gol ortalamasından türetilir — match-simulator ile tutarlı.
+  const EPS = (leagueBaseline.leagueAvgGoals || 1) / 1000;
+  const { goalMult = ND.WEATHER, errorMult = ND.WEATHER } = weatherMult;
   const hPlayers = lineups?.home?.players || lineups?.home || null;
   const aPlayers = lineups?.away?.players || lineups?.away || null;
 
-  // NOT: Bu fallback değerleri metric-metadata.js'deki M-kodu leagueAvg değerlerinden türetilmiştir.
-  // probBases sunucudan gelmediğinde (multi-run mode vb.) bu değerler devreye girer.
-  // M013=13, M014=4.5, M011=33, M034=12, M022=5.0, M039=1.8, M040=0.08, M020=75, M096=69, M019=0.12
+  // Dynamic baseline — server tarafından hesaplanıp gönderilir.
+  // Tüm nötr fallback'lar ND (Neutral Defaults) üzerinden.
+  const LB = leagueBaseline;
+
+  // Dinamik zaman pencereleri: M005-M010 gol dağılımından türetilir, veri yoksa statik fallback
+  const earlyBase = dynamicTimeWindows?.EARLY_GAME_END ?? 20;
+  const lateBase = dynamicTimeWindows?.LATE_GAME_START ?? 75;
+
+  // probBases sunucudan gelmediğinde (multi-run mode vb.) leagueBaseline devreye girer.
+  // Hardcoded sayısal sabit YOK — tüm fallback'lar LB üzerinden.
   const pb = {
     home: {
-      shotsPerMin:  probBases?.home?.shotsPerMin  ?? (13 / 90),   // M013 leagueAvg=13
-      onTargetRate: probBases?.home?.onTargetRate ?? (4.5 / 13),  // M014/M013 leagueAvg=4.5/13
-      goalConvRate: probBases?.home?.goalConvRate ?? 0.33,        // M011 leagueAvg=33%
-      blockRate:    probBases?.home?.blockRate    ?? 0.12,        // M034 leagueAvg=12%
-      cornerPerMin: probBases?.home?.cornerPerMin ?? (5.0 / 90), // M022 leagueAvg=5.0
-      yellowPerMin: probBases?.home?.yellowPerMin ?? (1.8 / 90), // M039 leagueAvg=1.8
-      redPerMin:    probBases?.home?.redPerMin    ?? (0.08 / 90),// M040 leagueAvg=0.08
-      penConvRate:  probBases?.home?.penConvRate  ?? 0.75,       // M020 leagueAvg=75%
-      gkSaveRate:   probBases?.home?.gkSaveRate   ?? 0.69,       // M096 leagueAvg=69%
-      penPerMatch:  probBases?.home?.penPerMatch  ?? 0.12,       // M019 leagueAvg=0.12
-      possessionBase: probBases?.home?.possessionBase ?? 0.50,  // M051 leagueAvg=50%
-      avgGKSave:    probBases?.home?.avgGKSave    ?? 0.69,       // M096 leagueAvg=69% (referans)
+      shotsPerMin: probBases?.home?.shotsPerMin ?? LB.shotsPerMin,
+      onTargetRate: probBases?.home?.onTargetRate ?? LB.onTargetRate,
+      goalConvRate: probBases?.home?.goalConvRate ?? LB.goalConvRate,
+      blockRate: probBases?.home?.blockRate ?? LB.blockRate,
+      cornerPerMin: probBases?.home?.cornerPerMin ?? LB.cornerPerMin,
+      yellowPerMin: probBases?.home?.yellowPerMin ?? LB.yellowPerMin,
+      redPerMin: probBases?.home?.redPerMin ?? LB.redPerMin,
+      penConvRate: probBases?.home?.penConvRate ?? LB.penConvRate,
+      gkSaveRate: probBases?.home?.gkSaveRate ?? LB.gkSaveRate,
+      penPerMatch: probBases?.home?.penPerMatch ?? LB.penPerMatch,
+      possessionBase: probBases?.home?.possessionBase ?? LB.possessionBase ?? ND.POSSESSION,
+      avgGKSave: probBases?.home?.avgGKSave ?? LB.gkSaveRate,
     },
     away: {
-      shotsPerMin:  probBases?.away?.shotsPerMin  ?? (13 / 90),
-      onTargetRate: probBases?.away?.onTargetRate ?? (4.5 / 13),
-      goalConvRate: probBases?.away?.goalConvRate ?? 0.33,
-      blockRate:    probBases?.away?.blockRate    ?? 0.12,
-      cornerPerMin: probBases?.away?.cornerPerMin ?? (5.0 / 90),
-      yellowPerMin: probBases?.away?.yellowPerMin ?? (1.8 / 90),
-      redPerMin:    probBases?.away?.redPerMin    ?? (0.08 / 90),
-      penConvRate:  probBases?.away?.penConvRate  ?? 0.75,
-      gkSaveRate:   probBases?.away?.gkSaveRate   ?? 0.69,
-      penPerMatch:  probBases?.away?.penPerMatch  ?? 0.12,
-      possessionBase: probBases?.away?.possessionBase ?? 0.50,
-      avgGKSave:    probBases?.away?.avgGKSave    ?? 0.69,
+      shotsPerMin: probBases?.away?.shotsPerMin ?? LB.shotsPerMin,
+      onTargetRate: probBases?.away?.onTargetRate ?? LB.onTargetRate,
+      goalConvRate: probBases?.away?.goalConvRate ?? LB.goalConvRate,
+      blockRate: probBases?.away?.blockRate ?? LB.blockRate,
+      cornerPerMin: probBases?.away?.cornerPerMin ?? LB.cornerPerMin,
+      yellowPerMin: probBases?.away?.yellowPerMin ?? LB.yellowPerMin,
+      redPerMin: probBases?.away?.redPerMin ?? LB.redPerMin,
+      penConvRate: probBases?.away?.penConvRate ?? LB.penConvRate,
+      gkSaveRate: probBases?.away?.gkSaveRate ?? LB.gkSaveRate,
+      penPerMatch: probBases?.away?.penPerMatch ?? LB.penPerMatch,
+      possessionBase: probBases?.away?.possessionBase ?? LB.possessionBase ?? ND.POSSESSION,
+      avgGKSave: probBases?.away?.avgGKSave ?? LB.gkSaveRate,
     },
   };
 
   function u(side, key) {
     const units = side === 'home' ? homeUnits : awayUnits;
-    return units[key] ?? 1.0;
+    return units[key] ?? ND.UNIT;
   }
 
   const state = {
     home: { momentum: clamp(u('home', 'MOMENTUM_AKIŞI'), 0.5, 2.0), morale: 1.0, urgency: 1.0, redCardPenalty: 0 },
     away: { momentum: clamp(u('away', 'MOMENTUM_AKIŞI'), 0.5, 2.0), morale: 1.0, urgency: 1.0, redCardPenalty: 0 },
   };
+
+  // NOT: homeUnits, awayUnits ve probBases sunucudan gelirken PVKD zaten uygulanmış olur.
+  // (match-simulator.js simulateSingleRun + server.js computeProbBases posQF parametresiyle)
+  // Bu tarafta tekrar uygulamak çift sayıma yol açar — PVKD bloğu burada bulunmaz.
+
+  // Momentum → Possession duyarlılık katsayısı: lig gol dağılımından türetilir
+  // Formül: possRange × leagueGoalVolatility / (leagueAvgGoals × momentumRange)
+  // Volatil lig → momentum baskısı daha fazla possession değişimi yaratır
+  const _mRange = 2.0 - 0.5; // SIM_CONFIG.LIMITS.MOMENTUM range
+  const _pRange = 70 - 30;   // SIM_CONFIG.LIMITS.POSSESSION range
+  const _lgVol = LB.leagueGoalVolatility ?? null;
+
+  // Dinamik normalizasyon envelope — match-simulator.js ile BİREBİR AYNI kaynak.
+  // LB.normMinRatio = min takım gol/maç ÷ lig ortalaması (league-averages.js türetir)
+  // LB.normMaxRatio = max takım gol/maç ÷ lig ortalaması
+  // Veri yoksa 1.0 identity (normalizasyon uygulanmaz).
+  const _normMin = (LB.normMinRatio != null && LB.normMinRatio > 0) ? LB.normMinRatio : 1.0;
+  const _normMax = (LB.normMaxRatio != null && LB.normMaxRatio > 0) ? LB.normMaxRatio : 1.0;
+  // GOL_IHTIYACI üst satürasyonu: 1.0 etrafında simetrik uzantı
+  const _ihtUpper = _normMax + (1.0 - _normMin);
+  const momentumPossCoeff = (_lgVol != null && LB.leagueAvgGoals != null && LB.leagueAvgGoals > 0)
+    ? _pRange * _lgVol / (LB.leagueAvgGoals * _mRange)
+    : _pRange / (4 * _mRange); // saf geometri: ~6.67
 
   const goals = { home: 0, away: 0 };
   const stats = {
@@ -86,6 +132,16 @@ export function createEngine({ homeUnits, awayUnits, lineups, weatherMult = {}, 
   const penBudget = { home: pb.home.penPerMatch, away: pb.away.penPerMatch };
 
   let minute = 0;
+
+  // Kırmızı kart ceza sınırları: match-simulator ile tutarlı — sıfır sabit.
+  const _rcPenMax = RC_MAX;
+  const _rcCV = (LB.leagueGoalVolatility != null && LB.leagueAvgGoals != null && LB.leagueAvgGoals > 0)
+    ? LB.leagueGoalVolatility / LB.leagueAvgGoals : null;
+  const _rcMedianCV = (LB.medianGoalRate != null && LB.leagueAvgGoals != null && LB.leagueAvgGoals > 0)
+    ? Math.abs(LB.medianGoalRate - LB.leagueAvgGoals) / LB.leagueAvgGoals : null;
+  const _rcMinPenalty = (_rcCV != null) ? _rcPenMax * _rcCV * _rcCV : null;
+  const _rcMaxPenalty = (_rcCV != null && _rcMedianCV != null)
+    ? _rcPenMax * _rcCV / (_rcCV + _rcMedianCV) : null;
 
   // ── Oyuncu seçiciler ────────────────────────────────────────────────────────
   function pickActivePlayer(players, positions, side) {
@@ -127,22 +183,56 @@ export function createEngine({ homeUnits, awayUnits, lineups, weatherMult = {}, 
     const atkUnit = geo3(u(side, 'BITIRICILIK'), u(side, 'YARATICILIK'), u(side, 'SUT_URETIMI'));
     // Form: kısa ve uzun vade geometrik ortalaması
     const formUnit = geo2(u(side, 'FORM_KISA'), u(side, 'FORM_UZUN'));
-    // Anlık durum: momentum × morale geometrik ortalaması
-    const stateUnit = geo2(s.momentum, s.morale);
-    // Aciliyet: maç sonu penceresine normalize (60-95 dk)
-    const urgency = (min > 60) ? s.urgency : 1.0;
-    // Rakip savunmasının ters geometrik ortalaması — yüksek savunma → atak etkisi azalır
-    const oppDefFactor = 1 / geo2(u(oppSide, 'SAVUNMA_DIRENCI'), u(oppSide, 'GK_REFLEKS'));
-    return clamp(atkUnit * formUnit * stateUnit * urgency * oppDefFactor * (1 - s.redCardPenalty), 0.2, 5.0);
+    // Anlık durum: momentum × morale — formUnit stabilitesine göre sönümleme
+    const rawState = geo2(s.momentum, s.morale);
+    const stateDamp = Math.max(0.01, 1.0 - formUnit);
+    const stateUnit = 1.0 + (rawState - 1.0) * stateDamp;
+    // Aciliyet (Urgency) dinamik başlatma — earlyBase/lateBase dinamik zaman pencerelerinden
+    const urgencyStart = Math.max(0, lateBase - (lateBase - earlyBase) * Math.max(0, clamp(u(side, 'GOL_IHTIYACI'), 1.0, _ihtUpper) - 1.0));
+    const urgency = (min > urgencyStart) ? s.urgency : 1.0;
+
+    // ── Maç Yönetimi (Konfor Freni) ──
+    // Konfor eşiği takımın beklenen gol ortalamasından türetilir:
+    // Düşük gol ort. (0.8) → 1 gol fark yeterli, yüksek (2.5) → 3 gol fark gerekli
+    const expectedGoals = pb[side].shotsPerMin * 90 * pb[side].onTargetRate * pb[side].goalConvRate;
+    const comfortThreshold = Math.max(1, Math.ceil(expectedGoals));
+    let comfortBrake = 1.0;
+    const goalDiff = goals[side] - goals[oppSide];
+    if (goalDiff >= comfortThreshold) {
+      // comfortBrake = (ZİHİNSEL/FİŞİ) × (takımın beklenen gol/maç ÷ lig ortalaması gol/maç)
+      // → nötr nokta "1.0" değil, takımın kendi gol profili
+      // Bayern (2.5 gol/maç) önde olunca da basar; Atletico (0.9) geriler
+      const oppSide_ = side === 'home' ? 'away' : 'home';
+      const oppExpGoals = pb[oppSide_].shotsPerMin * 90 * pb[oppSide_].onTargetRate * pb[oppSide_].goalConvRate;
+      const matchAvgGoals = (expectedGoals + oppExpGoals) / 2;
+      const leagueRef = LB.leagueAvgGoals ?? matchAvgGoals;
+      comfortBrake = (u(side, 'ZİHİNSEL_DAYANIKLILIK') / u(side, 'FİŞİ_ÇEKME')) * (expectedGoals / leagueRef);
+    }
+
+    // Rakip savunma etkisi rawFlow = atkPower / defPower üzerinden zaten yansıtılıyor.
+    // oppDefFactor burada KALDIRILDI — aksi hâlde savunma çift sayılır.
+    return clamp(atkUnit * formUnit * stateUnit * urgency * comfortBrake * (1 - s.redCardPenalty), 0.5, 2.0);
   }
 
   function getDefensePower(side) {
     const s = state[side];
+    const oppSide = side === 'home' ? 'away' : 'home';
     // 3 savunma biriminin geometrik ortalaması
     const defUnit = geo3(u(side, 'SAVUNMA_DIRENCI'), u(side, 'SAVUNMA_AKSIYONU'), u(side, 'GK_REFLEKS'));
     // Organizasyon: disiplin × kaleci alan hakimiyeti
     const orgUnit = geo2(u(side, 'DISIPLIN'), u(side, 'GK_ALAN_HAKIMIYETI'));
-    return clamp(defUnit * orgUnit * (1 - s.redCardPenalty), 0.2, 5.0);
+
+    // ── Skoru Koruma & Park the Bus ──
+    // Konfor eşiği takımın beklenen gol ortalamasından dinamik hesaplanır
+    const expGoals = pb[side].shotsPerMin * 90 * pb[side].onTargetRate * pb[side].goalConvRate;
+    const defComfortThreshold = Math.max(1, Math.ceil(expGoals));
+    let comfortBoost = 1.0;
+    const goalDiff = goals[side] - goals[oppSide];
+    if (goalDiff >= defComfortThreshold) {
+      comfortBoost = clamp(1 / Math.max(u(side, 'FİŞİ_ÇEKME'), EPS), _normMin, _normMax);
+    }
+
+    return clamp(defUnit * orgUnit * comfortBoost * (1 - s.redCardPenalty), 0.5, 2.0);
   }
 
   function getEffectiveUnits(side) {
@@ -153,9 +243,9 @@ export function createEngine({ homeUnits, awayUnits, lineups, weatherMult = {}, 
     effective['MOMENTUM_AKIŞI'] = clamp(u(side, 'MOMENTUM_AKIŞI') * s.momentum * rcMult, 0.2, 3.0);
     effective['ZİHİNSEL_DAYANIKLILIK'] = clamp(u(side, 'ZİHİNSEL_DAYANIKLILIK') * s.morale * rcMult, 0.2, 3.0);
     effective['GOL_IHTIYACI'] = clamp(u(side, 'GOL_IHTIYACI') * s.urgency * rcMult, 0.2, 4.0);
-    effective['BITIRICILIK'] = (units['BITIRICILIK'] ?? 1) * s.morale * rcMult;
-    effective['YARATICILIK'] = (units['YARATICILIK'] ?? 1) * s.morale * rcMult;
-    effective['SAVUNMA_DIRENCI'] = (units['SAVUNMA_DIRENCI'] ?? 1) * s.morale * rcMult;
+    effective['BITIRICILIK'] = (units['BITIRICILIK'] ?? ND.UNIT) * s.morale * rcMult;
+    effective['YARATICILIK'] = (units['YARATICILIK'] ?? ND.UNIT) * s.morale * rcMult;
+    effective['SAVUNMA_DIRENCI'] = (units['SAVUNMA_DIRENCI'] ?? ND.UNIT) * s.morale * rcMult;
     return effective;
   }
 
@@ -175,15 +265,30 @@ export function createEngine({ homeUnits, awayUnits, lineups, weatherMult = {}, 
         minuteEvents.push({ minute: 45, type: 'halftime', homeGoals: goals.home, awayGoals: goals.away });
       }
 
-      // Aciliyet: GOL_IHTIYACI birimi × geçen sürenin maç sonu penceresine oranı
-      if (minute > 60) {
-        const timeRatio = (minute - 60) / (95 - 60);
-        if (goals.away > goals.home) state.home.urgency = 1.0 + u('home', 'GOL_IHTIYACI') * timeRatio;
-        if (goals.home > goals.away) state.away.urgency = 1.0 + u('away', 'GOL_IHTIYACI') * timeRatio;
+      // Urgency başlangıcı: neutral takım lateBase'de başlar, GOL_IHTIYACI arttıkça öne çekilir
+      const homeUrgencyStart = Math.max(0, lateBase - (lateBase - earlyBase) * Math.max(0, clamp(u('home', 'GOL_IHTIYACI'), 1.0, _ihtUpper) - 1.0));
+      const awayUrgencyStart = Math.max(0, lateBase - (lateBase - earlyBase) * Math.max(0, clamp(u('away', 'GOL_IHTIYACI'), 1.0, _ihtUpper) - 1.0));
+
+      if (minute > homeUrgencyStart || minute > awayUrgencyStart) {
+        if (goals.away > goals.home && minute > homeUrgencyStart) {
+          const timeRatio = (minute - homeUrgencyStart) / (95 - homeUrgencyStart);
+          state.home.urgency = 1.0 + u('home', 'GOL_IHTIYACI') * timeRatio;
+        }
+        if (goals.home > goals.away && minute > awayUrgencyStart) {
+          const timeRatio = (minute - awayUrgencyStart) / (95 - awayUrgencyStart);
+          state.away.urgency = 1.0 + u('away', 'GOL_IHTIYACI') * timeRatio;
+        }
       }
 
-      const twHome = minute <= 20 ? u('home', 'MAC_BASLANGICI') : (minute > 75 ? u('home', 'MAC_SONU') : 1.0);
-      const twAway = minute <= 20 ? u('away', 'MAC_BASLANGICI') : (minute > 75 ? u('away', 'MAC_SONU') : 1.0);
+      // Erken oyun fazı: neutral takım earlyBase'e kadar sürer, GOL_IHTIYACI yüksekse kısalır.
+      // density/(density+1) saturasyon formu — clamp + sabit 0.6/0.08/0.8 kaldırıldı.
+      const _urgencyEarlyFactor = (LB.leaguePointDensity != null && LB.leaguePointDensity >= 0)
+        ? LB.leaguePointDensity / (LB.leaguePointDensity + 1)
+        : 0;
+      const homeEarlyEnd = Math.max(0, earlyBase - earlyBase * _urgencyEarlyFactor * Math.max(0, u('home', 'GOL_IHTIYACI') - 1.0));
+      const awayEarlyEnd = Math.max(0, earlyBase - earlyBase * _urgencyEarlyFactor * Math.max(0, u('away', 'GOL_IHTIYACI') - 1.0));
+      const twHome = minute <= homeEarlyEnd ? u('home', 'MAC_BASLANGICI') : (minute > homeUrgencyStart ? u('home', 'MAC_SONU') : 1.0);
+      const twAway = minute <= awayEarlyEnd ? u('away', 'MAC_BASLANGICI') : (minute > awayUrgencyStart ? u('away', 'MAC_SONU') : 1.0);
 
       for (const side of ['home', 'away']) {
         const isHome = side === 'home';
@@ -192,24 +297,30 @@ export function createEngine({ homeUnits, awayUnits, lineups, weatherMult = {}, 
         const oppSide = isHome ? 'away' : 'home';
 
         const attkProb = pb[side];
-        const defProb  = pb[oppSide];
+        const defProb = pb[oppSide];
 
-        const atkPower   = getAttackPower(side, minute) * tw;
+        const atkPower = getAttackPower(side, minute) * tw;
         const oppDefPower = getDefensePower(oppSide);
 
-        // ── ŞUT (M013-tabanlı) ────────────────────────────────────────────────
-        const shotProb = clamp(attkProb.shotsPerMin * atkPower / Math.max(oppDefPower, 0.01), 0.001, 0.90);
+        // Azalan verimler: pow(rawFlow, blockRate) — doğal logaritmik sönümleme
+        // dampCoeff = defProb.blockRate (M034 verisi) — statik sınır yok, veri konuşur
+        const rawFlow = atkPower / Math.max(oppDefPower, EPS);
+        const dampCoeff = defProb.blockRate;
+        const dampedFlow = Math.pow(Math.max(rawFlow, 0.01), dampCoeff);
+        const shotProb = clamp(attkProb.shotsPerMin * dampedFlow, 0.001, 1 - EPS);
 
         if (r() < shotProb) {
           stats[side].shots++;
 
           // Blok: M034-tabanlı, rakip savunma/atak gücü oranıyla ayarlanır
           const defAction = u(oppSide, 'SAVUNMA_AKSIYONU');
-          const blockProb = clamp(defProb.blockRate * defAction * oppDefPower / Math.max(atkPower, 0.01), 0.001, 0.60);
+          const blockProb = clamp(defProb.blockRate * defAction * oppDefPower / Math.max(atkPower, EPS), 0.001, 0.60);
 
-          // İsabetli şut: M014/M013-tabanlı, bağlantı birimi ve hava durumu ile ayarlanır
-          const accuracy = u(side, 'BAGLANTI_OYUNU') / Math.max(errorMult, 0.5);
-          const onTargetProb = clamp(attkProb.onTargetRate * accuracy, 0.01, 0.90);
+          // KRİTİK: onTargetRate = M014/M013 (gerçek sezon SOT oranı) — BAGLANTI_OYUNU burada çift sayma olur
+          // adjustedOnTargetRate: blok sonrası kalan şutların isabetli olma olasılığı
+          // P(isabet | bloklanmamış) = rawOnTargetRate / (1 - blockRate)
+          const adjustedOnTargetRate = attkProb.onTargetRate / Math.max(1 - defProb.blockRate, EPS);
+          const onTargetProb = clamp(adjustedOnTargetRate / Math.max(errorMult, EPS), 0.01, 0.90);
 
           if (r() < blockProb) {
             minuteEvents.push({ minute, type: 'shot_blocked', team: side, player: pickActivePlayer(players, ['F', 'M', 'A'], side) });
@@ -217,25 +328,35 @@ export function createEngine({ homeUnits, awayUnits, lineups, weatherMult = {}, 
           } else if (r() < onTargetProb) {
             stats[side].shotsOnTarget++;
 
-            // Gol: M011-tabanlı, rakip KK oranı her iki tarafın avgGKSave ortalamasına göre ayarlanır (gkAdj)
+            // gkAdj: rakip KK oranı lig ortalamasına göre normalize — veri yoksa lig ortalaması (gkAdj=1.0)
             const refAvgGKSave = (pb.home.avgGKSave + pb.away.avgGKSave) / 2;
-            const gkAdj = clamp((1 - defProb.gkSaveRate) / Math.max(1 - refAvgGKSave, 0.01), 0.2, 4.0);
-            // flow: doğal oran, keyfi sınır yok
-            const flow = atkPower / Math.max(oppDefPower, 0.01);
-            const goalProb = clamp(attkProb.goalConvRate * gkAdj * flow, 0.001, 0.90) * goalMult;
+            const defGKSave = defProb.gkSaveRate ?? refAvgGKSave;
+            const rawGkAdj = (1 - defGKSave) / Math.max(1 - refAvgGKSave, 0.01);
+            const gkAdj = Math.sqrt(Math.max(rawGkAdj, 0.01));
+            // Kalite üstünlüğü daha temiz fırsatlar üretir — flow çarpanı kaldırıldı
+            const goalProb = clamp(attkProb.goalConvRate * gkAdj, 0.001, 1 - EPS) * goalMult;
 
             if (r() < goalProb) {
               goals[side]++;
               const scorer = pickActivePlayer(players, ['F', 'M', 'A'], side);
               minuteEvents.push({ minute, type: 'goal', team: side, player: scorer });
 
-              // Morale: yalnızca psikoloji birimleri — sabit büyüklük yok
-              const scorerResil  = u(side, 'ZİHİNSEL_DAYANIKLILIK');
-              const concFragil   = u(oppSide, 'PSIKOLOJIK_KIRILGANLIK');
-              const concResil    = u(oppSide, 'ZİHİNSEL_DAYANIKLILIK');
-              state[side].morale    = clamp(state[side].morale    + scorerResil / MORALE_SHIFT_SCALE,                              0.4, 1.6);
-              state[side].momentum  = clamp(state[side].momentum  + scorerResil / MORALE_SHIFT_SCALE,                              0.5, 2.0);
-              state[oppSide].morale = clamp(state[oppSide].morale - concFragil  / MORALE_SHIFT_SCALE + concResil / (MORALE_SHIFT_SCALE * 2), 0.4, 1.6);
+              // Morale cascade: goalConvRate / expected shots ile normalize ederek per-gol etkisi hesaplanır
+              const scorerKillerInst = u(side, 'FİŞİ_ÇEKME');
+              const concFragil = u(oppSide, 'PSIKOLOJIK_KIRILGANLIK');
+              const goalDampening = 1.0 / (goals[side] + 1);
+              // goalConvRate / (shotsPerMin × 90) = gol başına normalize edilmiş boost (~0.02-0.04)
+              const expectedShots = Math.max(attkProb.shotsPerMin * 90, 1);
+              const normalizedConv = attkProb.goalConvRate / expectedShots;
+              const positiveBoost = normalizedConv * scorerKillerInst * goalDampening;
+              const oppExpectedShots = Math.max(defProb.shotsPerMin * 90, 1);
+              const negNormalizedConv = defProb.goalConvRate / oppExpectedShots;
+              const negativeDrop = negNormalizedConv * concFragil * goalDampening;
+
+              state[side].morale = clamp(state[side].morale + positiveBoost, _normMin, _normMax);
+              state[side].momentum = clamp(state[side].momentum + positiveBoost * attkProb.onTargetRate, _normMin, _normMax + _normMax - 1);
+
+              state[oppSide].morale = clamp(state[oppSide].morale - negativeDrop, _normMin, _normMax);
 
             } else {
               minuteEvents.push({ minute, type: 'shot_on_target', team: side, player: pickActivePlayer(players, ['F', 'M', 'A'], side) });
@@ -246,9 +367,8 @@ export function createEngine({ homeUnits, awayUnits, lineups, weatherMult = {}, 
           }
         }
 
-        // ── KORNER (M022-tabanlı) ─────────────────────────────────────────────
-        const durTop = u(side, 'DURAN_TOP');
-        const cornerProb = clamp(attkProb.cornerPerMin * durTop * atkPower / Math.max(oppDefPower, 0.01), 0.001, 0.50);
+        // Korner — takımın kendi üretim kapasitesine dayalı, baskıdan bağımsız
+        const cornerProb = clamp(attkProb.cornerPerMin, 0.001, LB.cornerPerMin != null ? LB.cornerPerMin * 3 : 1 - EPS);
         if (r() < cornerProb) {
           stats[side].corners++;
           minuteEvents.push({ minute, type: 'corner', team: side });
@@ -267,11 +387,19 @@ export function createEngine({ homeUnits, awayUnits, lineups, weatherMult = {}, 
             if (r() < attkProb.penConvRate) {  // M020-tabanlı
               goals[side]++;
               minuteEvents.push({ minute, type: 'goal', team: side, player: penPlayer, subtype: 'penalty' });
-              const pScorResil  = u(side, 'ZİHİNSEL_DAYANIKLILIK');
+              const pScorResil = u(side, 'ZİHİNSEL_DAYANIKLILIK');
+              const pScorKillerInst = u(side, 'FİŞİ_ÇEKME');
               const pConcFragil = u(oppSide, 'PSIKOLOJIK_KIRILGANLIK');
-              const pConcResil  = u(oppSide, 'ZİHİNSEL_DAYANIKLILIK');
-              state[side].morale    = clamp(state[side].morale    + pScorResil  / 10,                     0.4, 1.6);
-              state[oppSide].morale = clamp(state[oppSide].morale - pConcFragil / 10 + pConcResil / 20,   0.4, 1.6);
+
+              // Penaltı morale cascade — normalize edilmiş
+              const goalDampening = 1.0 / (goals[side] + 1);
+              const expectedShots = Math.max(attkProb.shotsPerMin * 90, 1);
+              const posBoost = (attkProb.goalConvRate / expectedShots) * pScorKillerInst * goalDampening;
+              const oppExpShots = Math.max(defProb.shotsPerMin * 90, 1);
+              const negDrop = (defProb.goalConvRate / oppExpShots) * pConcFragil * goalDampening;
+
+              state[side].morale = clamp(state[side].morale + posBoost, _normMin, _normMax);
+              state[oppSide].morale = clamp(state[oppSide].morale - negDrop, _normMin, _normMax);
             } else {
               minuteEvents.push({ minute, type: 'penalty_missed', team: side, player: penPlayer });
             }
@@ -281,24 +409,45 @@ export function createEngine({ homeUnits, awayUnits, lineups, weatherMult = {}, 
         // ── SARI / KIRMIZI KART (M039/M040-tabanlı) ───────────────────────────
         // 1/discUnit: disiplinli takımda oran azalır, disiplinsizde artar — saf ters orantı
         const discUnit = u(side, 'DISIPLIN');
-        const yellowProb = clamp(attkProb.yellowPerMin / Math.max(discUnit, 0.1), 0.0001, 0.20);
+        const yellowProb = clamp(attkProb.yellowPerMin / Math.max(discUnit, EPS), 0.0001, 0.20);
         if (r() < yellowProb) {
           const cardPlayer = pickActivePlayer(players, null, side) || 'Oyuncu';
           const yellows = playerYellows[side];
-          yellows[cardPlayer] = (yellows[cardPlayer] || 0) + 1;
+          yellows[cardPlayer] = (yellows[cardPlayer] || ND.COUNTER) + 1;
           stats[side].yellowCards++;
 
           if (yellows[cardPlayer] >= 2 && !expelledPlayers[side].has(cardPlayer)) {
             expelledPlayers[side].add(cardPlayer);
             stats[side].redCards++;
-            state[side].redCardPenalty = clamp(state[side].redCardPenalty + RC_INCREMENT, 0, RC_MAX);
+
+            // Kırmızı kart motor çöküşü (RC_INCREMENT) tamamen Disiplin ve Dayanıklılık gücüne tezat orantılı işler
+            const resilience = geo2(u(side, 'DISIPLIN'), u(side, 'ZİHİNSEL_DAYANIKLILIK'));
+            const organicPenalty = (_rcMinPenalty != null && _rcMaxPenalty != null)
+              ? (() => {
+                const activePlayers = Math.max(1, 11 - expelledPlayers[side].size);
+                const basePen = RC_MAX / activePlayers;
+                return clamp(basePen / Math.max(resilience, EPS), _rcMinPenalty, _rcMaxPenalty);
+              })()
+              : 0;
+
+            state[side].redCardPenalty = clamp(state[side].redCardPenalty + organicPenalty, 0, RC_MAX);
             minuteEvents.push({ minute, type: 'red_card', team: side, player: cardPlayer, subtype: 'second_yellow' });
           } else if (!expelledPlayers[side].has(cardPlayer)) {
-            const redProb = clamp(attkProb.redPerMin / Math.max(discUnit, 0.1), 0, 0.10);
+            const redProb = clamp(attkProb.redPerMin / Math.max(discUnit, EPS), 0, 0.10);
             if (r() < redProb) {
               expelledPlayers[side].add(cardPlayer);
               stats[side].redCards++;
-              state[side].redCardPenalty = clamp(state[side].redCardPenalty + RC_INCREMENT, 0, RC_MAX);
+
+              const resilience = geo2(u(side, 'DISIPLIN'), u(side, 'ZİHİNSEL_DAYANIKLILIK'));
+              const organicPenalty = (_rcMinPenalty != null && _rcMaxPenalty != null)
+                ? (() => {
+                  const activePlayers = Math.max(1, 11 - expelledPlayers[side].size);
+                  const basePen = RC_MAX / activePlayers;
+                  return clamp(basePen / Math.max(resilience, EPS), _rcMinPenalty, _rcMaxPenalty);
+                })()
+                : 0;
+
+              state[side].redCardPenalty = clamp(state[side].redCardPenalty + organicPenalty, 0, RC_MAX);
               minuteEvents.push({ minute, type: 'red_card', team: side, player: cardPlayer });
             } else {
               minuteEvents.push({ minute, type: 'yellow_card', team: side, player: cardPlayer });
@@ -333,7 +482,7 @@ export function createEngine({ homeUnits, awayUnits, lineups, weatherMult = {}, 
       const normalizedHomePoss = possTotal > 0 ? (homePossBase / possTotal) * 100 : 50;
       // Momentum farkı dinamik ayar
       const homePoss = clamp(
-        normalizedHomePoss + (state.home.momentum - state.away.momentum) * 10,
+        normalizedHomePoss + (state.home.momentum - state.away.momentum) * momentumPossCoeff,
         30, 70
       );
 

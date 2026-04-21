@@ -1,0 +1,369 @@
+════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+TUTARBU METRİK KANIT RAPORU
+Maç: Manchester United vs Leeds United
+Turnuva: Premier League
+Event ID: 14025024
+Tarih: 2026-04-13T12:59:52.916Z
+Toplam Benzersiz Metrik: 183
+════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+╔══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗
+║  BÖLÜM 1: DİNAMİK TEMEL DEĞİŞKENLER (BASELINES)                                                              ║
+║  Bu değerler simülasyonun temelini oluşturur. Hepsi API verisinden hesaplanmıştır.                              ║
+╚══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╝
+
+  ➜ leagueAvgGoals: 1.350 (NEUTRAL_SYMMETRY)
+  ➜ shotsPerMatch: 11 (HIERARCHY: NEUTRAL_SYMMETRY)
+  ➜ shotsOnTargetPerGame: 3.8499999999999996 (HIERARCHY: NEUTRAL_SYMMETRY)
+  ➜ goalConvRate: 0.351 (DERIVED)
+  ➜ gkSaveRate: 0.680 (NEUTRAL_SYMMETRY)
+  ➜ blockRate: 0.345 (TEAM_PROXY)
+  ➜ cornersPerMatch: 4.5 (HIERARCHY: NEUTRAL_SYMMETRY)
+  ➜ yellowCardsPerMatch: 2.1 (HIERARCHY: NEUTRAL_SYMMETRY)
+  ➜ redCardsPerMatch: 0.08 (HIERARCHY: NEUTRAL_SYMMETRY)
+  ➜ penConvRate: 0.667 (TEAM_PROXY)
+  ➜ penPerMatch: 0.194 (TEAM_PROXY)
+  ➜ possessionBase: 0.493 (TEAM_PROXY)
+
+╔══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗
+║  BÖLÜM 2: DİNAMİK LİG ORTALAMALARI (Her Metrik İçin)                                                         ║
+║  Bu değerler match-simulator.js tarafından normalizasyon için kullanılır.                                       ║
+╚══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╝
+
+  Toplam Dinamik Lig Ortalaması: 119
+
+  ID       DEĞER        KAYNAK                                                       METRİK ADI
+  ──────── ──────────── ──────────────────────────────────────────────────────────── ──────────────────────────────
+  M005     4.3478                                                                    0-15 Dakika Gol %
+  M006     4.3478                                                                    16-30 Dakika Gol %
+  M007     17.3913                                                                   31-45 Dakika Gol %
+  M008     8.6957                                                                    46-60 Dakika Gol %
+  M009     39.1304                                                                   61-75 Dakika Gol %
+  M010     26.0870                                                                   76-90 Dakika Gol %
+  M011     10.7407                                                                   İsabetli Şut → Gol %
+  M012     30.2083                                                                   Şut → Gol %
+  M013     13.5000                                                                   Maç Başı Toplam Şut
+  M014     4.8000                                                                    Maç Başı İsabetli Şut
+  M015     0.9494                                                                    Ortalama xG
+  M020     66.6667                                                                   Penaltı Gol %
+  M021     50.0000                                                                   Hücum Baskısı İndeksi
+  M024     3.4483                                                                    Serbest Vuruştan Gol %
+  M031     4.3478                                                                    0-15 Dakika Yenilen %
+  M032     26.0870                                                                   76-90 Dakika Yenilen %
+  M035     50.0552                                                                   Duel Kazanma %
+  M036     48.6647                                                                   Hava Dueli %
+  M041     50.0000                                                                   Baskı Altında Gol %
+  M044     79.1250                                                                   Tepki Süresi (dakika)
+  M050     50.0000                                                                   Yenilmezlik Serisi
+  M051     10.5000                                                                   Gol Atma Serisi
+  M052     0.0000                                                                    Clean Sheet Serisi
+  M053     0.0000                                                                    Gol Trendi
+  M054     0.0000                                                                    Gol Yeme Trendi
+  M055     50.0000                                                                   Lig Konumu Puanı
+  M056     50.0000                                                                   Ev Konumu Puanı
+  M057     50.0000                                                                   Deplasman Konumu Puanı
+  M058     0.0000                                                                    Gol Farkı
+  M062     50.0000                                                                   İlk Gol Atma %
+  M063     62.5000                                                                   İlk Gol → Kazanma %
+  M064     10.0000                                                                   Geriden Gelme %
+  M065     30.0000                                                                   Fişi Çekme İndeksi
+  M066     6.8502                                                                    İlk 11 Rating
+  M069     40.7767                                                                   Forvet Katkı %
+  M070     1.2166                                                                    Orta Saha Yaratıcılık
+  M071     6.7542                                                                    Defans Kararlılık
+  M072     0.1785                                                                    xG Katkı Oranı
+  M073     23.3010                                                                   Kilit Oyuncu Bağımlılığı
+  M074     53.1142                                                                   Dribling Başarı %
+  M075     81.2006                                                                   Pas Tamamlama %
+  M076     48.6647                                                                   Hava Topu %
+  M077     1.2500                                                                    Sakatlık Etkisi
+  M079     79.5928                                                                   Kadro Derinliği
+  M080     2311.0000                                                                 Dakika Dağılımı
+  M081     0.1353                                                                    Forvet xG/Şut
+  M082     43.8182                                                                   Saldırı Niteliği
+  M083     42.5455                                                                   Savunma Niteliği
+  M084     46.9091                                                                   Teknik Nitelik
+  M085     1.5000                                                                    Güçlü Yön / Starter
+  M086     0.4545                                                                    Zayıf Yön / Starter
+  M087     43.6133                                                                   Piyasa Değeri (Log)
+  M088     0.7392                                                                    Yedek / Starter Değer
+  M089     100.0000                                                                  H2H Lineup Presence
+  M090     1.5524                                                                    Gol StdDev
+  M091     0.8718                                                                    Asist StdDev
+  M092     0.0000                                                                    Rating Trendi
+  M093     11.1111                                                                   Güçlüye Gol %
+  M094     71.4286                                                                   Zayıftan Gol Yeme %
+  M095     20.6897                                                                   Şans Golü İndeksi
+  M096     64.5833                                                                   Kurtarış %
+  M097     2.3250                                                                    Maç Başı Kurtarış
+  M098     0.0000                                                                    xG Bazlı Verim
+  M100     57.6923                                                                   Büyük Şans Kurtarma %
+  M101     57.5114                                                                   Dağıtım Başarısı %
+  M102     6.9193                                                                    Sezon Rating
+  M103     0.0000                                                                    Clean Sheet Serisi
+  M104     100.0000                                                                  Uzak Mesafe Kurtarma %
+  M105     0.0000                                                                    Hata → Gol
+  M107     1.3750                                                                    Hava Hakimiyeti
+  M108     70.4286                                                                   Son 5 Maç Rating
+  M115     50.0000                                                                   Ev Faul %
+  M116     50.0000                                                                   Deplasman Faul %
+  M119     22.0000                                                                   H2H Ev Galibiyet
+  M120     22.0000                                                                   H2H Beraberlik
+  M121     18.0000                                                                   H2H Deplasman Galibiyet
+  M122     50.0000                                                                   Son 5 H2H Ev Performansı
+  M123     2.3065                                                                    H2H Gol Ortalaması
+  M124     32.2581                                                                   H2H 2.5 Üst %
+  M125     41.9355                                                                   H2H BTTS %
+  M126     0.0000                                                                    Son Maç Farkı
+  M127     50.0000                                                                   Menajer H2H %
+  M128     0.0000                                                                    H2H Gol Farkı Trendi
+  M131     40.0000                                                                   Ev 1X2 Bahis %
+  M132     30.0000                                                                   Beraberlik Bahis %
+  M133     30.0000                                                                   Deplasman Bahis %
+  M135     45.0000                                                                   Kullanıcı Oy Ev %
+  M136     25.0000                                                                   Kullanıcı Oy Beraberlik %
+  M137     30.0000                                                                   Kullanıcı Oy Deplasman %
+  M138     0.5000                                                                    Stadyum Kapasitesi
+  M139     50.0000                                                                   Menajer Deneyimi
+  M140     50.0000                                                                   Menajer Galibiyet %
+  M141     0.5000                                                                    Lig Haftası
+  M142     0.8601                                                                    Sıralama Farkı
+  M143     12.8701                                                                   Puan Farkı
+  M144     21740.8000                                                                Lig Gücü
+  M145     0.5000                                                                    Kadro Değer Oranı
+  M146     50.0000                                                                   Baskı İndeksi
+  M147     50.0000                                                                   Baskı Yeme
+  M148     69.5652                                                                   Baskı Altında Gol %
+  M149     73.9130                                                                   Dominant Gol %
+  M150     49.3387                                                                   Top Kontrolü %
+  M151     50.0000                                                                   Top → Gol Korelasyonu
+  M152     81.2006                                                                   Pas Tamamlama %
+  M153     48.3098                                                                   Uzun Pas Başarısı %
+  M154     26.7280                                                                   Cross Başarısı %
+  M156     50.0000                                                                   Hücum Gücü Skoru
+  M157     50.0000                                                                   Defans Gücü Skoru
+  M158     50.0000                                                                   Form Skoru
+  M159     50.0000                                                                   Oyuncu Kalitesi
+  M160     50.0000                                                                   Kaleci Gücü
+  M161     50.0000                                                                   Hakem Etkisi
+  M162     50.0000                                                                   H2H Avantajı
+  M163     50.0000                                                                   Bağlamsal Avantaj
+  M164     50.0000                                                                   Momentum Skoru
+  M165     50.0000                                                                   Gol Tutarlılığı
+  M166     50.0000                                                                   Toplam Güç
+  M168     50.0000                                                                   Kazanma Olasılığı
+  M169     50.0000                                                                   Formasyon Avantajı
+
+╔══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗
+║  BÖLÜM 3: TÜM BİREYSEL METRİKLER (Takım Bazlı)                                                              ║
+║  Her metriğin ev sahibi ve deplasman değeri, dinamik lig ortalaması ve kaynağı.                                 ║
+╚══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╝
+
+  ID       EV SAHİBİ      DEPLASMAN      PAYLAŞILAN     LİG ORT.     KATEGORİ           METRİK ADI
+  ──────── ────────────── ────────────── ────────────── ──────────── ────────────────── ────────────────────────────────────────
+  M001     1.9000         1.7500         —              —            attack             Maç Başı Gol Ortalaması
+  M002     2.0000         2.0909         —              —            attack             Ev/Deplasman Gol Ortalaması
+  M003     0.2000         0.6000         —              —            attack             İlk Yarı Gol Ortalaması
+  M004     1.6000         0.4000         —              —            attack             İkinci Yarı Gol Ortalaması
+  M005     0.0000         0.0000         —              4.3478       attack             0-15 Dakika Gol %
+  M006     0.0000         20.0000        —              4.3478       attack             16-30 Dakika Gol %
+  M007     11.1111        40.0000        —              17.3913      attack             31-45 Dakika Gol %
+  M008     22.2222        0.0000         —              8.6957       attack             46-60 Dakika Gol %
+  M009     55.5556        20.0000        —              39.1304      attack             61-75 Dakika Gol %
+  M010     11.1111        20.0000        —              26.0870      attack             76-90 Dakika Gol %
+  M011     12.0000        6.4103         —              10.7407      attack             İsabetli Şut → Gol %
+  M012     30.0000        20.0000        —              30.2083      attack             Şut → Gol %
+  M013     15.0000        15.6000        —              13.5000      attack             Maç Başı Toplam Şut
+  M014     6.0000         5.0000         —              4.8000       attack             Maç Başı İsabetli Şut
+  M015     1.5396         0.5639         —              0.9494       attack             Ortalama xG
+  M016     1.1691         1.7734         —              —            attack             xG Dönüşüm Oranı
+  M017     2.8000         2.2500         —              —            attack             Büyük Şans Ortalaması
+  M018     42.8571        33.3333        —              —            attack             Büyük Şans Gol %
+  M019     0.4000         0.2000         —              —            attack             Maç Başı Penaltı Kazanma
+  M020     100.0000       100.0000       —              66.6667      attack             Penaltı Gol %
+  M021     26.0909        23.8182        —              50.0000      attack             Hücum Baskısı İndeksi
+  M022     5.2000         6.2000         —              —            attack             Maç Başı Korner
+  M023     0.0000         0.0000         —              —            attack             Kornerden Gol %
+  M024     16.6667        37.5000        —              3.4483       attack             Serbest Vuruştan Gol %
+  M025     —              —              —              —            attack             Üçüncü Bölge Pas Başarısı
+  M025b    —              —              —              —            attack             M025b
+  M025c    5.2000         6.2000         —              —            attack             M025c
+  M026     1.3000         1.3500         —              —            defense            Maç Başı Yenilen Gol
+  M027     1.2000         1.6364         —              —            defense            Ev/Deplasman Yenilen Gol
+  M028     20.0000        25.0000        —              —            defense            Clean Sheet Oranı
+  M029     0.4000         0.0000         —              —            defense            İlk Yarı Yenilen Gol
+  M030     0.8000         0.6000         —              —            defense            İkinci Yarı Yenilen Gol
+  M031     16.6667        0.0000         —              4.3478       defense            0-15 Dakika Yenilen %
+  M032     33.3333        66.6667        —              26.0870      defense            76-90 Dakika Yenilen %
+  M033     1.2879         0.4061         —              —            defense            Rakip xG Ortalaması
+  M034     40.3509        52.0000        —              —            defense            Şut Engelleme %
+  M035     50.7746        49.3357        —              50.0552      defense            Duel Kazanma %
+  M036     49.7644        47.5649        —              48.6647      defense            Hava Dueli %
+  M037     9.0000         9.6000         —              —            defense            Maç Başı Kesinti
+  M038     11.0000        12.0000        —              —            defense            Maç Başı Faul
+  M039     2.6000         2.2000         —              —            defense            Maç Başı Sarı Kart
+  M040     0.2000         0.2000         —              —            defense            Maç Başı Kırmızı Kart
+  M041     16.6667        0.0000         —              50.0000      defense            Baskı Altında Gol %
+  M042     28.5714        0.0000         —              —            defense            Öne Geçince Yenilme %
+  M043     42.8571        100.0000       —              —            defense            Öne Geçince Kazanma %
+  M044     21.3333        —              —              79.1250      defense            Tepki Süresi (dakika)
+  M045     100.0000       100.0000       —              —            defense            Korner Engelleme %
+  M046     66.6667        53.3333        —              —            form               Son 5 Maç Form
+  M047     76.6667        53.3333        —              —            form               Son 10 Maç Form
+  M048     61.6667        50.0000        —              —            form               Son 20 Maç Form
+  M049     0.0000         1.0000         —              —            form               Kazanma Serisi
+  M050     20.0000        40.0000        —              50.0000      form               Yenilmezlik Serisi
+  M051     20.0000        1.0000         —              10.5000      form               Gol Atma Serisi
+  M052     0.0000         0.0000         —              0.0000       form               Clean Sheet Serisi
+  M053     -0.1818        -0.1818        —              0.0000       form               Gol Trendi
+  M054     0.2000         -0.3750        —              0.0000       form               Gol Yeme Trendi
+  M055     90.0000        30.0000        —              50.0000      form               Lig Konumu Puanı
+  M056     90.0000        40.0000        —              50.0000      form               Ev Konumu Puanı
+  M057     70.0000        15.0000        —              50.0000      form               Deplasman Konumu Puanı
+  M058     13.0000        -11.0000       —              0.0000       form               Gol Farkı
+  M059     60.0000        45.0000        —              —            form               2.5 Üst Oranı
+  M060     40.0000        55.0000        —              —            form               2.5 Altı Oranı
+  M061     80.0000        60.0000        —              —            form               BTTS Oranı
+  M062     80.0000        40.0000        —              50.0000      form               İlk Gol Atma %
+  M063     50.0000        100.0000       —              62.5000      form               İlk Gol → Kazanma %
+  M064     50.0000        50.0000        —              10.0000      form               Geriden Gelme %
+  M065     40.0000        85.7143        —              30.0000      form               Fişi Çekme İndeksi
+  M066     6.9449         6.7861         —              6.8502       player             İlk 11 Rating
+  M067     —              —              —              —            player             Yedek Rating
+  M068     0.9315         0.5945         —              —            player             Rating Farkı
+  M069     43.6620        34.3750        —              40.7767      player             Forvet Katkı %
+  M070     1.7778         0.6554         —              1.2166       player             Orta Saha Yaratıcılık
+  M071     6.7708         6.7442         —              6.7542       player             Defans Kararlılık
+  M072     0.2597         0.4618         —              0.1785       player             xG Katkı Oranı
+  M073     33.8028        34.3750        —              23.3010      player             Kilit Oyuncu Bağımlılığı
+  M074     100.0000       100.0000       —              53.1142      player             Dribling Başarı %
+  M075     82.2216        80.8269        —              81.2006      player             Pas Tamamlama %
+  M076     100.0000       100.0000       —              48.6647      player             Hava Topu %
+  M077     0.0000         0.0000         —              1.2500       player             Sakatlık Etkisi
+  M078     0.0000         0.0000         —              —            player             Süspansiyon Etkisi
+  M079     89.9532        69.8000        —              79.5928      player             Kadro Derinliği
+  M079b    —              —              —              —            player             M079b
+  M080     1715.0000      2178.0000      —              2311.0000    player             Dakika Dağılımı
+  M081     0.1151         0.1998         —              0.1353       player             Forvet xG/Şut
+  M082     45.9091        41.7273        —              43.8182      player             Saldırı Niteliği
+  M083     40.0909        45.0000        —              42.5455      player             Savunma Niteliği
+  M084     47.5455        46.2727        —              46.9091      player             Teknik Nitelik
+  M085     2.0909         0.9091         —              1.5000       player             Güçlü Yön / Starter
+  M086     0.3636         0.5455         —              0.4545       player             Zayıf Yön / Starter
+  M087     89.2051        73.5903        —              43.6133      player             Piyasa Değeri (Log)
+  M088     0.0000         0.0000         —              0.7392       player             Yedek / Starter Değer
+  M089     0.0000         0.0000         —              100.0000     player             H2H Lineup Presence
+  M090     0.7483         1.2649         —              1.5524       player             Gol StdDev
+  M091     0.6325         0.8000         —              0.8718       player             Asist StdDev
+  M092     0.2113         0.1231         —              0.0000       player             Rating Trendi
+  M093     13.1579        42.8571        —              11.1111      player             Güçlüye Gol %
+  M094     92.3077        18.5185        —              71.4286      player             Zayıftan Gol Yeme %
+  M095     —              —              —              20.6897      player             Şans Golü İndeksi
+  M096     64.0449        65.4545        —              64.5833      goalkeeper         Kurtarış %
+  M097     2.2800         2.4000         —              2.3250       goalkeeper         Maç Başı Kurtarış
+  M098     0.0683         -1.4627        —              0.0000       goalkeeper         xG Bazlı Verim
+  M099     0.0000         0.0000         —              —            goalkeeper         Penaltı Kurtarma %
+  M100     55.3846        61.5385        —              57.6923      goalkeeper         Büyük Şans Kurtarma %
+  M101     57.6087        57.3883        —              57.5114      goalkeeper         Dağıtım Başarısı %
+  M102     6.9320         6.9067         —              6.9193       goalkeeper         Sezon Rating
+  M103     0.0000         0.0000         —              0.0000       goalkeeper         Clean Sheet Serisi
+  M104     100.0000       100.0000       —              100.0000     goalkeeper         Uzak Mesafe Kurtarma %
+  M105     0.0000         0.0000         —              0.0000       goalkeeper         Hata → Gol
+  M106     —              —              —              —            goalkeeper         Kaleci Nitelik
+  M107     1.4800         1.2000         —              1.3750       goalkeeper         Hava Hakimiyeti
+  M108     70.6000        75.0000        —              70.4286      goalkeeper         Son 5 Maç Rating
+  M109     —              —              3.2487         —            shared.referee     Hakem Sarı Kart / Maç
+  M110     —              —              0.0653         —            shared.referee     Hakem Kırmızı Kart / Maç
+  M111     —              —              0.0653         —            shared.referee     Penaltı / Kırmızı Eğilim
+  M112     —              —              —              —            shared.referee     Hakem Faul / Maç
+  M113     —              —              3.2487         —            shared.referee     Hakem Sarı Kart (Detay)
+  M114     —              —              —              —            shared.referee     Dakika / Faul
+  M115     —              —              0.0000         50.0000      shared.referee     Ev Faul %
+  M116     —              —              0.0000         50.0000      shared.referee     Deplasman Faul %
+  M117     —              —              3.4447         —            shared.referee     Sertlik İndeksi
+  M118     —              —              —              —            shared.referee     Faul Toleransı
+  M118b    —              —              —              —            shared.referee     Hakem Ev Sahibi Yanlılık İndeksi
+  M119     —              —              6.0000         22.0000      shared.h2h         H2H Ev Galibiyet
+  M120     —              —              4.0000         22.0000      shared.h2h         H2H Beraberlik
+  M121     —              —              0.0000         18.0000      shared.h2h         H2H Deplasman Galibiyet
+  M122     —              —              60.0000        50.0000      shared.h2h         Son 5 H2H Ev Performansı
+  M123     —              —              2.3065         2.3065       shared.h2h         H2H Gol Ortalaması
+  M124     —              —              32.2581        32.2581      shared.h2h         H2H 2.5 Üst %
+  M125     —              —              41.9355        41.9355      shared.h2h         H2H BTTS %
+  M126     —              —              0.0000         0.0000       shared.h2h         Son Maç Farkı
+  M127     —              —              —              50.0000      shared.h2h         Menajer H2H %
+  M128     —              —              0.8000         0.0000       shared.h2h         H2H Gol Farkı Trendi
+  M129     —              —              2.5000         —            shared.h2h         H2H Kart Ortalaması
+  M130     —              —              9.0000         —            shared.h2h         H2H Korner Ortalaması
+  M131     —              —              64.5161        40.0000      shared.contextual  Ev 1X2 Bahis %
+  M132     —              —              23.8095        30.0000      shared.contextual  Beraberlik Bahis %
+  M133     —              —              18.1818        30.0000      shared.contextual  Deplasman Bahis %
+  M134     —              —              60.0000        —            shared.contextual  2.5 Üst Bahis %
+  M134b    —              —              51.9481        —            shared.contextual  Asian Handicap Ev %
+  M134c    —              —              83.3333        —            shared.contextual  Draw No Bet Ev %
+  M135     —              —              86.1622        45.0000      shared.contextual  Kullanıcı Oy Ev %
+  M136     —              —              8.1185         25.0000      shared.contextual  Kullanıcı Oy Beraberlik %
+  M137     —              —              5.7192         30.0000      shared.contextual  Kullanıcı Oy Deplasman %
+  M138     —              —              0.9360         0.5000       shared.contextual  Stadyum Kapasitesi
+  M139     —              —              —              50.0000      shared.contextual  Menajer Deneyimi
+  M140     —              —              —              50.0000      shared.contextual  Menajer Galibiyet %
+  M141     —              —              0.8421         0.5000       shared.contextual  Lig Haftası
+  M142     —              —              0.6000         0.8601       shared.contextual  Sıralama Farkı
+  M143     —              —              22.0000        12.8701      shared.contextual  Puan Farkı
+  M144     —              —              100.0000       21740.8000   shared.contextual  Lig Gücü
+  M145     —              —              1.0000         0.5000       shared.contextual  Kadro Değer Oranı
+  M146     26.0909        23.8182        —              50.0000      momentum           Baskı İndeksi
+  M147     22.1696        20.8456        —              50.0000      momentum           Baskı Yeme
+  M148     11.1111        0.0000         —              69.5652      momentum           Baskı Altında Gol %
+  M149     22.2222        40.0000        —              73.9130      momentum           Dominant Gol %
+  M150     53.0000        51.0000        —              49.3387      momentum           Top Kontrolü %
+  M151     44.8374        35.8981        —              50.0000      momentum           Top → Gol Korelasyonu
+  M152     82.7839        79.6174        —              81.2006      momentum           Pas Tamamlama %
+  M153     52.0161        44.6035        —              48.3098      momentum           Uzun Pas Başarısı %
+  M154     27.3921        26.0638        —              26.7280      momentum           Cross Başarısı %
+  M155     2.8000         1.6000         —              —            momentum           Gol Katkı / Maç
+  M156     54.1897        43.0729        —              50.0000      composite          Hücum Gücü Skoru
+  M157     50.0000        50.0000        —              50.0000      composite          Defans Gücü Skoru
+  M158     50.0000        50.0000        —              50.0000      composite          Form Skoru
+  M159     46.0056        37.5655        —              50.0000      composite          Oyuncu Kalitesi
+  M160     49.9176        50.8331        —              50.0000      composite          Kaleci Gücü
+  M164     25.5454        26.0294        —              50.0000      composite          Momentum Skoru
+  M165     84.2105        84.2105        —              50.0000      composite          Gol Tutarlılığı
+  M166     47.2067        43.5812        —              50.0000      composite          Toplam Güç
+  M167     NaN            NaN            —              —            composite          Lambda (Poisson λ)
+  M177     77.5170        68.7879        —              —            attack             M177
+  M178     —              —              —              —            player             M178
+  M179     1.2341         3.1034         —              —            attack             M179
+  M180     0.0000         0.0000         —              —            goalkeeper         M180
+  M181     —              —              —              —            shared.referee     M181
+  M182     —              —              —              —            shared.referee     M182
+  M183     —              —              2.3065         —            shared.h2h         M183
+  M184     —              —              32.2581        —            shared.h2h         M184
+  M185     —              —              41.9355        —            shared.h2h         M185
+  M186     -2.0000        2.0000         —              —            attack             M186
+  M187     —              —              —              —            shared.h2h         M187
+  M188     —              —              0.8000         —            shared.h2h         M188
+  M189     —              —              2.5000         —            shared.h2h         M189
+
+╔══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗
+║  BÖLÜM 4: ÖZET İSTATİSTİKLER                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╝
+
+  Toplam Benzersiz Metrik ID: 183
+  Değeri Olan Metrikler:      166
+  Değeri Olmayan (null):      17
+  Dinamik Lig Ortalamaları:   119
+  Baseline Trace Sayısı:      12
+
+  ── Veri Çözümleme Hiyerarşisi ──
+  LEAGUE_STANDINGS (Doğrudan API): 0
+  TEAM_PROXY (Takım Ortalaması):   4
+  DERIVED (Türetilmiş):            1
+  NEUTRAL_SYMMETRY (Nötr Baz):     7
+
+  📊 Dinamik Çözüm Oranı: %41.7
+  ⚠️  Nötr Simetri Oranı: %58.3
+
+════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+RAPOR SONU
+════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════

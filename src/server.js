@@ -4,6 +4,8 @@ const { fetchAllMatchData } = require('./services/data-fetcher');
 const { calculateAllMetrics } = require('./engine/metric-calculator');
 const { generatePrediction } = require('./engine/prediction-generator');
 const { getDynamicBaseline } = require('./engine/dynamic-baseline');
+const { METRIC_METADATA } = require('./engine/metric-metadata');
+const { computePositionMVBreakdown } = require('./engine/quality-factors');
 
 function createRNG(seed) {
   if (seed == null) return Math.random;
@@ -120,7 +122,7 @@ app.get('/api/matches', async (req, res) => {
       };
     });
 
-    res.json(matches.slice(0, 80));
+    res.json(matches);
   } catch (err) {
     console.error(`[API ERROR] Match list fetch failed: ${err.message}`);
     res.status(500).json({ error: err.message });
@@ -175,6 +177,21 @@ app.post('/api/predict/:eventId', async (req, res) => {
 
     // 4. Baseline & RNG
     const baseline = getDynamicBaseline(data);
+    // Lig fizik parametrelerini baseline'a enjekte et — match-simulator ve simulatorEngine tarafından kullanılır
+    baseline.leagueGoalVolatility = metrics.meta?.leagueGoalVolatility ?? null;
+    baseline.leaguePointDensity   = metrics.meta?.leaguePointDensity   ?? null;
+    baseline.medianGoalRate       = metrics.meta?.medianGoalRate       ?? null;
+    baseline.leagueTeamCount      = metrics.meta?.leagueTeamCount      ?? null;
+    baseline.ptsCV                = metrics.meta?.ptsCV                ?? null;
+    baseline.normMinRatio         = metrics.meta?.normMinRatio         ?? null;
+    baseline.normMaxRatio         = metrics.meta?.normMaxRatio         ?? null;
+
+    // Mevki Bazlı Piyasa Değeri Kalite Düzeltmesi (PVKD) — MC simülasyonu için
+    // match-simulator.js ve advanced-derived.js aynı quality-factors.js modülünü kullanır.
+    // Breakdown baseline'a eklenir; alpha + QF hesabı match-simulator'da tekrar yapılır
+    // (simulation her çalışmada güncel baseline parametrelerine ihtiyaç duyar).
+    baseline.homeMVBreakdown = computePositionMVBreakdown(data.homePlayers);
+    baseline.awayMVBreakdown = computePositionMVBreakdown(data.awayPlayers);
     const rng = createRNG(req.query.seed);
 
     // 5. Generate Report
@@ -197,6 +214,28 @@ app.post('/api/predict/:eventId', async (req, res) => {
       };
     }
 
+    prediction.leagueBaseline = baseline;
+    
+    // Enrich traces with human readable metadata
+    const enrichedTraces = {};
+    if (metrics.leagueAvgTraces) {
+      Object.entries(metrics.leagueAvgTraces).forEach(([id, trace]) => {
+        const meta = METRIC_METADATA[id];
+        enrichedTraces[id] = {
+          name: meta?.name || id,
+          description: meta?.description || 'Dinamik hesaplanmış lig ortalaması.',
+          role: meta?.simulationRole?.[0] || 'Genel simülasyon dengesi',
+          trace: trace
+        };
+      });
+    }
+
+    prediction.metadata = {
+      ...(prediction.metadata || {}),
+      dynamicLeagueAvgs: metrics.dynamicLeagueAvgs,
+      leagueAvgTraces: enrichedTraces,
+      dynamicHomeAdvantage: metrics.dynamicHomeAdvantage
+    };
     res.json(prediction);
   } catch (err) {
     console.error(`[API ERROR] predict/${eventId}: ${err.message}`);
@@ -307,6 +346,28 @@ app.post('/api/workshop/:eventId', async (req, res) => {
       };
     }
 
+    prediction.leagueBaseline = baseline;
+
+    // Enrich traces with human readable metadata
+    const enrichedTraces = {};
+    if (metrics.leagueAvgTraces) {
+      Object.entries(metrics.leagueAvgTraces).forEach(([id, trace]) => {
+        const meta = METRIC_METADATA[id];
+        enrichedTraces[id] = {
+          name: meta?.name || id,
+          description: meta?.description || 'Dinamik hesaplanmış lig ortalaması.',
+          role: meta?.simulationRole?.[0] || 'Genel simülasyon dengesi',
+          trace: trace
+        };
+      });
+    }
+
+    prediction.metadata = {
+      ...(prediction.metadata || {}),
+      dynamicLeagueAvgs: metrics.dynamicLeagueAvgs,
+      leagueAvgTraces: enrichedTraces,
+      dynamicHomeAdvantage: metrics.dynamicHomeAdvantage
+    };
     res.json(prediction);
   } catch (err) {
     console.error(`[API ERROR] workshop/${eventId}: ${err.message}`);
@@ -438,6 +499,23 @@ app.post('/api/simulate/:eventId', async (req, res) => {
     const baseline = getDynamicBaseline(cachedData);
     const rng = createRNG(req.body.seed || req.query.seed);
 
+    // Peer-enhanced averages: dynamicAvgs'da bulunmayan metrikler için
+    // iki takımın değer ortalaması kullanılır — sabit 1.0 yerine gerçek veri.
+    const allSimIds = new Set(
+      [...Object.keys(homeMetrics), ...Object.keys(awayMetrics)]
+        .filter(k => /^M\d{3}[a-z]?$/i.test(k))
+    );
+    const peerAvgs = { ...(metrics.dynamicLeagueAvgs || {}) };
+    for (const id of allSimIds) {
+      if (peerAvgs[id] != null) continue;
+      const hv = homeMetrics[id];
+      const av = awayMetrics[id];
+      const hvOk = hv != null && isFinite(hv);
+      const avOk = av != null && isFinite(av);
+      const avg = hvOk && avOk ? (hv + av) / 2 : hvOk ? hv : avOk ? av : null;
+      if (avg != null && avg > 0) peerAvgs[id] = avg;
+    }
+
     const result = simulateMatch({
       homeMetrics,
       awayMetrics,
@@ -447,20 +525,32 @@ app.post('/api/simulate/:eventId', async (req, res) => {
       weatherMetrics: cachedData.weatherMetrics,
       baseline,
       audit: metrics.metricAudit,
-      rng
+      rng,
+      dynamicAvgs: peerAvgs,
+      homeAdvantage: metrics.dynamicHomeAdvantage,
+      dynamicTimeWindows: metrics.dynamicTimeWindows,
     });
 
     // Attach engine data for client-side real-time simulation (single run only)
     if (runs === 1) {
       const { computeWeatherMultipliers } = require('./services/weather-service');
       const { computeProbBases } = require('./engine/match-simulator');
+      const { computeAlpha, computeQualityFactors } = require('./engine/quality-factors');
       result.lineups = cachedData.lineups;
       result.weatherMult = computeWeatherMultipliers(cachedData.weatherMetrics || {});
       const sel = new Set(selectedMetrics);
+      // Mevki bazlı kalite faktörlerini hesapla — probBases için
+      const _pbAlpha = computeAlpha(baseline.leagueGoalVolatility, baseline.leagueAvgGoals);
+      const _pbQF = computeQualityFactors(
+        baseline.homeMVBreakdown ?? { GK: 0, DEF: 0, MID: 0, ATK: 0, total: 0 },
+        baseline.awayMVBreakdown ?? { GK: 0, DEF: 0, MID: 0, ATK: 0, total: 0 },
+        _pbAlpha
+      );
       result.probBases = {
-        home: computeProbBases(homeMetrics, sel, result.units?.home || {}, baseline, metrics.metricAudit),
-        away: computeProbBases(awayMetrics, sel, result.units?.away || {}, baseline, metrics.metricAudit),
+        home: computeProbBases(homeMetrics, sel, result.units?.home || {}, baseline, metrics.metricAudit, _pbQF.home),
+        away: computeProbBases(awayMetrics, sel, result.units?.away || {}, baseline, metrics.metricAudit, _pbQF.away),
       };
+      result.dynamicTimeWindows = metrics.dynamicTimeWindows || null;
     }
 
     // Phase 1 Observation: Debug Payload
@@ -479,6 +569,29 @@ app.post('/api/simulate/:eventId', async (req, res) => {
         metricAudit: metrics.metricAudit
       };
     }
+
+    result.leagueBaseline = baseline;
+    
+    // Enrich traces for UI transparency (same as predict endpoint)
+    const enrichedTraces = {};
+    if (metrics.leagueAvgTraces) {
+      Object.entries(metrics.leagueAvgTraces).forEach(([id, trace]) => {
+        const meta = METRIC_METADATA[id];
+        enrichedTraces[id] = {
+          name: meta?.name || id,
+          description: meta?.description || 'Dinamik hesaplanmış lig ortalaması.',
+          role: meta?.simulationRole?.[0] || 'Genel simülasyon dengesi',
+          trace: trace
+        };
+      });
+    }
+
+    result.metadata = {
+      ...(metrics.meta || {}),
+      dynamicLeagueAvgs: metrics.dynamicLeagueAvgs,
+      leagueAvgTraces: enrichedTraces,
+      dynamicHomeAdvantage: metrics.dynamicHomeAdvantage
+    };
 
     res.json(result);
   } catch (err) {

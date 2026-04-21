@@ -49,6 +49,7 @@ function SimulationPage({ prediction, selectedMatch }) {
   const [runCount, setRunCount] = useState(1000);
   const [metricsData, setMetricsData] = useState({});
   const [error, setError] = useState(null);
+  const [showAudit, setShowAudit] = useState(false);
 
   useEffect(() => {
     if (!prediction || !selectedMatch) return;
@@ -120,6 +121,8 @@ function SimulationPage({ prediction, selectedMatch }) {
             lineups: result.lineups || null,
             weatherMult: result.weatherMult || {},
             probBases: result.probBases || null,
+            leagueBaseline: result.leagueBaseline || {},
+            dynamicTimeWindows: result.dynamicTimeWindows || null,
           });
         }
       }
@@ -151,6 +154,47 @@ function SimulationPage({ prediction, selectedMatch }) {
       {/* Header */}
       <div style={styles.header}>
         <div style={styles.headerLeft}>
+          {/* Dynamic Engine Indicator & Audit Toggle */}
+          <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+            <div style={{
+              background: 'rgba(0, 255, 136, 0.1)',
+              border: '1px solid rgba(0, 255, 136, 0.3)',
+              borderRadius: 20,
+              padding: '4px 10px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              boxShadow: '0 0 10px rgba(0, 255, 136, 0.15)',
+            }}>
+              <div style={{
+                width: 6, height: 6, borderRadius: '50%',
+                background: '#00ff88',
+                boxShadow: '0 0 8px #00ff88',
+                animation: 'pulseGlow 2s infinite'
+              }} />
+              <span style={{ fontSize: 9, fontWeight: 900, color: '#00ff88', textTransform: 'uppercase', letterSpacing: 0.5 }}>Dinamik Ortalama Motoru Aktif</span>
+            </div>
+            
+            <button 
+              onClick={() => setShowAudit(!showAudit)}
+              style={{
+                background: showAudit ? 'rgba(0, 242, 255, 0.15)' : 'rgba(255,255,255,0.05)',
+                border: `1px solid ${showAudit ? 'rgba(0, 242, 255, 0.4)' : 'var(--glass-border, rgba(255, 255, 255, 0.06))'}`,
+                borderRadius: 20,
+                padding: '4px 10px',
+                color: showAudit ? 'var(--accent-cyan, #00f2ff)' : 'var(--text-secondary, #6b6b80)',
+                fontSize: 9,
+                fontWeight: 900,
+                cursor: 'pointer',
+                textTransform: 'uppercase',
+                letterSpacing: 0.5,
+                transition: 'all 0.2s',
+              }}
+            >
+              {showAudit ? '✕ Kapat' : '📊 Veri Kaynakları'}
+            </button>
+          </div>
+
           <div style={styles.title}>90 Dakika Simulasyonu</div>
           <div style={styles.matchTitle}>
             {selectedMatch.homeTeam}
@@ -269,6 +313,9 @@ function SimulationPage({ prediction, selectedMatch }) {
             awayTeam={selectedMatch?.awayTeam}
             isMultiRun={runMode === 'multi' && !!multiRunResult}
             multiRunResult={multiRunResult}
+            metadata={simulation?.metadata || prediction?.metadata}
+            showAudit={showAudit}
+            metricsData={metricsData}
           />
         </div>
       </div>

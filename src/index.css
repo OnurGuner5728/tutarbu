@@ -961,6 +961,13 @@ body {
 }
 .swap-icon.selected { color: #ff6b6b; opacity: 1; }
 
+/* Same-group swap is blocked — dim player to signal unavailability */
+.player-card.swap-blocked {
+  opacity: 0.25;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
 .empty-lineup {
   color: var(--text-secondary);
   font-size: 0.85rem;

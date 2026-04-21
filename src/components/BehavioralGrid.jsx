@@ -13,12 +13,15 @@ const BehavioralGrid = ({ behavioralAnalysis, homeTeam, awayTeam, compact = fals
   };
 
   const renderUnit = (unitKey, hRaw, aRaw) => {
-    const homeVal = hRaw ?? 1.0;
-    const awayVal = aRaw ?? 1.0;
+    const homeVal = hRaw;
+    const awayVal = aRaw;
 
-    const diff = homeVal - awayVal;
-    const winner = diff > 0.05 ? 'home' : (diff < -0.05 ? 'away' : 'neutral');
-    const badgeText = winner === 'home' ? 'AVANTAJ' : (winner === 'away' ? 'BASKI' : 'DENGEDE');
+    // Veri yoksa birini bile gösterme — null state
+    const hasData = homeVal != null && awayVal != null;
+
+    const diff = hasData ? homeVal - awayVal : 0;
+    const winner = !hasData ? 'neutral' : diff > 0.05 ? 'home' : (diff < -0.05 ? 'away' : 'neutral');
+    const badgeText = !hasData ? 'VERİ YOK' : winner === 'home' ? 'AVANTAJ' : (winner === 'away' ? 'BASKI' : 'DENGEDE');
     
     return (
       <div
@@ -67,13 +70,13 @@ const BehavioralGrid = ({ behavioralAnalysis, homeTeam, awayTeam, compact = fals
             <span style={{ color: 'rgba(255,255,255,0.28)', fontSize: compact ? 9 : 8, fontWeight: 900, letterSpacing: 0.6 }}>
               {compact ? (homeTeam || 'HOME') : 'HOME'}
             </span>
-            <span style={{ color: winner === 'home' ? '#34d399' : '#fff' }}>{(homeVal).toFixed(2)}</span>
+            <span style={{ color: winner === 'home' ? '#34d399' : '#fff' }}>{hasData ? homeVal.toFixed(2) : '—'}</span>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'right' }}>
             <span style={{ color: 'rgba(255,255,255,0.28)', fontSize: compact ? 9 : 8, fontWeight: 900, letterSpacing: 0.6 }}>
               {compact ? (awayTeam || 'AWAY') : 'AWAY'}
             </span>
-            <span style={{ color: winner === 'away' ? '#fb7185' : '#fff' }}>{(awayVal).toFixed(2)}</span>
+            <span style={{ color: winner === 'away' ? '#fb7185' : '#fff' }}>{hasData ? awayVal.toFixed(2) : '—'}</span>
           </div>
         </div>
       </div>
