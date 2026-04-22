@@ -23,6 +23,32 @@ const PT = SIM_CONFIG?.POISSON_THRESHOLDS || {};
 let _calParams = null;
 try { _calParams = loadCalibration(); } catch (_) { _calParams = null; }
 
+// Edge DB Modül Seviyesi Önbellek (Memory Cache)
+const fs = require('fs');
+const path = require('path');
+let _cachedEdgeDb = null;
+let _lastEdgeDbRead = 0;
+const EDGE_DB_TTL = 5 * 60 * 1000; // 5 dakika
+
+function getEdgeDb() {
+  const edgeDbPath = path.join(__dirname, 'historical-edge-db.json');
+  const now = Date.now();
+  if (!_cachedEdgeDb || now - _lastEdgeDbRead > EDGE_DB_TTL) {
+    try {
+      if (fs.existsSync(edgeDbPath)) {
+        _cachedEdgeDb = JSON.parse(fs.readFileSync(edgeDbPath, 'utf8'));
+        _lastEdgeDbRead = now;
+      } else {
+        _cachedEdgeDb = { leagues: {}, teams: {} };
+      }
+    } catch (e) {
+      console.error("[PredictionGenerator] Edge DB okuma hatası:", e.message);
+      if (!_cachedEdgeDb) _cachedEdgeDb = { leagues: {}, teams: {} };
+    }
+  }
+  return _cachedEdgeDb;
+}
+
 /**
  * @param {object} metricsResult - calculateAllMetrics() çıktısı
  * @param {object} data - fetchAllMatchData() çıktısı
@@ -106,9 +132,7 @@ function generatePrediction(metricsResult, data, baseline, audit, rng) {
     awaySubQuality,
     dynamicAvgs: peerEnhancedAvgs,
     homeAdvantage: metricsResult.dynamicHomeAdvantage,
-    dynamicTimeWindows: metricsResult.dynamicTimeWindows,
-    lambdaAnchorHome: prediction.lambdaHome ?? null,
-    lambdaAnchorAway: prediction.lambdaAway ?? null,
+    dynamicTimeWindows: metricsResult.dynamicTimeWindows
   });
 
   // ── Detaylı tahmin raporu ──
@@ -126,6 +150,7 @@ function generatePrediction(metricsResult, data, baseline, audit, rng) {
         ? new Date(event.startTimestamp * 1000).toISOString() : '',
       isLive: event?.status?.type === 'inprogress' || (event?.status?.code >= 6 && event?.status?.code <= 40),
     },
+    missingPlayers: data.missingPlayers?.players || [],
 
     // Dynamic self-calibration metadata for UI_CFG transparency
     metadata: metricsResult.meta || {},
@@ -222,8 +247,18 @@ function generatePrediction(metricsResult, data, baseline, audit, rng) {
         awayWin: round2(awayWin),
         confidence: Math.round(prediction.confidenceScore),
         source: pW > 0.7 ? 'Analytic (Poisson dominant)' : (sW > 0.7 ? 'Behavioral (Sim dominant)' : 'Hybrid Balanced'),
-        calibrated: _calParams != null,
       };
+
+      // Organik Simülasyon Verisi: UI'ın (SimulationViewer) kendi başına simülasyon koşturmak yerine
+      // bu olayları (minuteLog) oynatması sağlanır.
+      res.simulation = {
+        distribution: simulation.distribution,
+        minuteLog: simulation.sampleRun?.minuteLog || [],
+        events: simulation.sampleRun?.events || [],
+        stats: simulation.sampleRun?.stats || null
+      };
+
+      res.calibrated = _calParams != null;
       res.mostLikelyResult = getMostLikelyResult(res);
       return res;
     })(),
@@ -455,6 +490,90 @@ function generatePrediction(metricsResult, data, baseline, audit, rng) {
     meta: metricsResult.meta,
   };
 
+  // --- Historical Edge / Model Stacking Boosts ---
+  try {
+    const edgeDb = getEdgeDb();
+    if (edgeDb) {
+      const leagueId = metricsResult.meta?.tournamentId?.toString();
+      const homeTeam = data.homeTeam?.name || (data.match ? data.match.split(' vs ')[0] : null);
+      const awayTeam = data.awayTeam?.name || (data.match ? data.match.split(' vs ')[1] : null);
+      
+      let edgeMeta = { leaguePenalty: false, premiumBTTS: false, messages: [] };
+
+      // 1. League Penalty/Boost check
+      if (leagueId && edgeDb.leagues && edgeDb.leagues[leagueId]) {
+         const lgData = edgeDb.leagues[leagueId];
+         // Negative edge means model is BETTER than bookmaker. Positive means bookmaker is better.
+         if (lgData.edge > 0.02 && lgData.n >= 5) {
+            // Dinamik Ceza Skalası: Brier farkını 500 çarpanıyla Confidence eksenine map'le
+            const penalty = Math.min(50, Math.round(lgData.edge * 500));
+            report.result.confidence = Math.max(10, report.result.confidence - penalty);
+            edgeMeta.leaguePenalty = true;
+            edgeMeta.messages.push(`Toxic League: Model Brier is behind bookmaker by +${lgData.edge.toFixed(3)}. Confidence penalized by -${penalty}.`);
+            report.meta.recommendation = "NO BET (Toxic League)";
+         } else if (lgData.edge < -0.015 && lgData.n >= 5) {
+            // Dinamik Ödül Skalası
+            const boost = Math.min(25, Math.round(Math.abs(lgData.edge) * 300));
+            edgeMeta.messages.push(`Strong League: Model historically beats bookmaker by ${Math.abs(lgData.edge).toFixed(3)}. Confidence boosted by +${boost}.`);
+            report.result.confidence = Math.min(SIM_CONFIG?.UI_THRESHOLDS?.MAX_UI_PROB || 95, report.result.confidence + boost);
+         }
+      }
+
+      // 2. Team Boost check (BTTS / OU) - Compound Explosion'ı Önlemek İçin Average Multiplier
+      let bttsMultipliers = [];
+      let ouMultipliers = [];
+      let bttsMessages = [];
+      let ouMessages = [];
+
+      [homeTeam, awayTeam].forEach(t => {
+         if (!t || !edgeDb.teams || !edgeDb.teams[t]) return;
+         const tData = edgeDb.teams[t];
+         
+         // BTTS Dynamic Accuracy Multiplier
+         if (tData.accBTTS > 0.50 && tData.n >= 2 && report.goals.btts > 50) {
+            const m = 1.0 + (tData.accBTTS - 0.50);
+            bttsMultipliers.push(m);
+            if (tData.accBTTS >= 0.80) edgeMeta.premiumBTTS = true;
+            bttsMessages.push(`BTTS Edge: ${t} (${(tData.accBTTS*100).toFixed(0)}% historic acc). Multiplier: ${m.toFixed(2)}x.`);
+         } else if (tData.accBTTS < 0.50 && tData.n >= 2 && report.goals.btts > 50) {
+            const m = 0.50 + tData.accBTTS;
+            bttsMultipliers.push(m);
+            bttsMessages.push(`BTTS Warning: ${t} (${(tData.accBTTS*100).toFixed(0)}% acc). Multiplier: ${m.toFixed(2)}x.`);
+         }
+
+         // OU xG Ratio Drift Adjustment (Gerçekleşen / Beklenen)
+         if (tData.xgRatio && Math.abs(tData.xgRatio - 1.0) > 0.1 && tData.n >= 2) {
+            const safeXgRatio = Math.max(0.6, Math.min(1.4, tData.xgRatio));
+            ouMultipliers.push(safeXgRatio);
+            ouMessages.push(`xG Drift: ${t} scores ${(safeXgRatio).toFixed(2)}x of expected goals.`);
+         }
+      });
+
+      // Çarpanları uygula (Bileşik patlamayı önlemek için ortalama alınır)
+      if (bttsMultipliers.length > 0) {
+          const avgBttsM = bttsMultipliers.reduce((a, b) => a + b, 0) / bttsMultipliers.length;
+          report.goals.btts = Math.max(20, Math.min(SIM_CONFIG?.UI_THRESHOLDS?.MAX_UI_PROB || 95, report.goals.btts * avgBttsM));
+          if (report.goals.bttsNo != null) report.goals.bttsNo = 100 - report.goals.btts;
+          edgeMeta.messages.push(...bttsMessages);
+          edgeMeta.messages.push(`Applied blended BTTS multiplier: ${avgBttsM.toFixed(2)}x`);
+      }
+
+      if (ouMultipliers.length > 0 && report.goals.over25 != null) {
+          const avgOuM = ouMultipliers.reduce((a, b) => a + b, 0) / ouMultipliers.length;
+          report.goals.over25 = Math.max(20, Math.min(SIM_CONFIG?.UI_THRESHOLDS?.MAX_UI_PROB || 95, report.goals.over25 * avgOuM));
+          if (report.goals.under25 != null) report.goals.under25 = 100 - report.goals.over25;
+          edgeMeta.messages.push(...ouMessages);
+          edgeMeta.messages.push(`Applied blended Over2.5 multiplier: ${avgOuM.toFixed(2)}x`);
+      }
+
+      if (edgeMeta.messages.length > 0) {
+          report.meta.edgeInsights = edgeMeta;
+      }
+    }
+  } catch(e) {
+    console.error("[PredictionGenerator] Edge DB application failed:", e.message);
+  }
+
   return report;
 }
 
@@ -670,9 +789,13 @@ function generateHighlights(home, away, shared, prediction, baseline) {
 }
 
 function getMostLikelyResult(prediction) {
-  const max = Math.max(prediction.homeWinProbability, prediction.drawProbability, prediction.awayWinProbability);
-  if (max === prediction.homeWinProbability) return '1 (Ev Sahibi Kazanır)';
-  if (max === prediction.awayWinProbability) return '2 (Deplasman Kazanır)';
+  const hw = prediction.homeWin !== undefined ? prediction.homeWin : prediction.homeWinProbability;
+  const dw = prediction.draw !== undefined ? prediction.draw : prediction.drawProbability;
+  const aw = prediction.awayWin !== undefined ? prediction.awayWin : prediction.awayWinProbability;
+  
+  const max = Math.max(hw, dw, aw);
+  if (max === hw) return '1 (Ev Sahibi Kazanır)';
+  if (max === aw) return '2 (Deplasman Kazanır)';
   return 'X (Beraberlik)';
 }
 
@@ -744,10 +867,10 @@ function calculateConfidence(prediction, shared, home, away, baseline) {
   const awayInjuries = away?.player?.M077 || ND.COUNTER_INIT;
   const maxInjuryImpact = Math.max(homeInjuries, awayInjuries);
   // Kadro derinliği (M079): 0-100 skalası, derin kadro = yüksek
-  const favSq귞pth = favModel === 'home' ? (home?.player?.M079 ?? ND.SQUAD_DEPTH_MEDIAN) : (away?.player?.M079 ?? ND.SQUAD_DEPTH_MEDIAN);
+  const favSqDepth = favModel === 'home' ? (home?.player?.M079 ?? ND.SQUAD_DEPTH_MEDIAN) : (away?.player?.M079 ?? ND.SQUAD_DEPTH_MEDIAN);
   const _lgAvgDepth = ((home?.player?.M079 ?? ND.SQUAD_DEPTH_MEDIAN) + (away?.player?.M079 ?? ND.SQUAD_DEPTH_MEDIAN)) / 2;
   const _depthCenter = _lgAvgDepth / ND.PERCENT_BASE;
-  const depthMultiplier = Math.max(0, (1.0 + _depthCenter) - (favSq귞pth / ND.PERCENT_BASE));
+  const depthMultiplier = Math.max(0, (1.0 + _depthCenter) - (favSqDepth / ND.PERCENT_BASE));
   
   const _injThresh = (baseline.leagueGoalVolatility != null && baseline.leagueAvgGoals > 0)
     ? (baseline.leagueGoalVolatility / baseline.leagueAvgGoals)

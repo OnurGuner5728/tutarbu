@@ -7,11 +7,7 @@ const { poissonPMF, weightedAvg, clamp, round2 } = require('../engine/math-utils
 const { calculateUnitImpact, SIM_BLOCKS } = require('../engine/match-simulator');
 const { SIM_CONFIG } = require('../engine/sim-config');
 const { BLOCK_QF_MAP, computeAlpha, computeQualityFactors } = require('../engine/quality-factors');
-const { blendScoreDistribution, loadScoreCalibration, applyScoreCalibration } = require('../engine/score-profile');
-
-// Skor kalibrasyon parametrelerini başlangıçta yükle
-let _scoreCalParams = null;
-try { _scoreCalParams = loadScoreCalibration(); } catch (_) { _scoreCalParams = null; }
+const { blendScoreDistribution } = require('../engine/score-profile');
 
 function calculateAdvancedMetrics(allMetrics) {
   const { homeAttack, awayAttack, homeDefense, awayDefense, homeForm, awayForm,
@@ -92,23 +88,25 @@ function calculateAdvancedMetrics(allMetrics) {
     if (awayUnits[blockId] != null) awayUnits[blockId] *= qf.away[qfType];
   }
 
-  // 2. Derive Lambda (Attack/Defense Power)
+  // EPS: Dinamik taban sınırı
+  const EPS = (leagueAvgGoals > 0) ? leagueAvgGoals / 1000 : 0.001;
+
   // Eşit ağırlıklı geometrik ortalama yardımcıları — keyfi ağırlık katsayısı yok
-  const geo2 = (a, b) => Math.sqrt(Math.max(a, 0.01) * Math.max(b, 0.01));
-  const geo3 = (a, b, c) => Math.cbrt(Math.max(a, 0.01) * Math.max(b, 0.01) * Math.max(c, 0.01));
+  const geo2 = (a, b) => Math.sqrt(Math.max(a, EPS) * Math.max(b, EPS));
+  const geo3 = (a, b, c) => Math.cbrt(Math.max(a, EPS) * Math.max(b, EPS) * Math.max(c, EPS));
 
   const getPower = (side, units) => {
 
     const atk = Math.pow(
-      Math.max(units.BITIRICILIK, 0.01) * Math.max(units.YARATICILIK, 0.01) * Math.max(units.SUT_URETIMI, 0.01) *
-      Math.max(units.FORM_KISA, 0.01) * Math.max(units.FORM_UZUN, 0.01) *
-      Math.max(units.TOPLA_OYNAMA, 0.01) * Math.max(units.BAGLANTI_OYUNU, 0.01),
+      Math.max(units.BITIRICILIK, EPS) * Math.max(units.YARATICILIK, EPS) * Math.max(units.SUT_URETIMI, EPS) *
+      Math.max(units.FORM_KISA, EPS) * Math.max(units.FORM_UZUN, EPS) *
+      Math.max(units.TOPLA_OYNAMA, EPS) * Math.max(units.BAGLANTI_OYUNU, EPS),
       1 / 7
     );
 
     const baseDef = Math.pow(
-      Math.max(units.SAVUNMA_DIRENCI, 0.01) * Math.max(units.SAVUNMA_AKSIYONU, 0.01) * Math.max(units.GK_REFLEKS, 0.01) *
-      Math.max(units.DISIPLIN, 0.01) * Math.max(units.GK_ALAN_HAKIMIYETI, 0.01),
+      Math.max(units.SAVUNMA_DIRENCI, EPS) * Math.max(units.SAVUNMA_AKSIYONU, EPS) * Math.max(units.GK_REFLEKS, EPS) *
+      Math.max(units.DISIPLIN, EPS) * Math.max(units.GK_ALAN_HAKIMIYETI, EPS),
       1 / 5
     );
     // Yüksek baskı savunmayı düşürür — kuplaj lig volatilitesine orantılı
@@ -127,12 +125,13 @@ function calculateAdvancedMetrics(allMetrics) {
       : 1.0;
     const def = baseDef / turnuvaMod;
 
-    // atk/def clamp: lig takımlarının gerçek gol oranı dağılımından (normMin/Max).
     // Kare alındı: güç = atak × savunma ürün skalasında, normalizasyon aralığının karesine izin ver.
+    const cvBand = (vol != null && leagueAvgGoals > 0) ? (vol / leagueAvgGoals) : 0;
     const _pwrMin = (allMetrics.normMinRatio != null && allMetrics.normMinRatio > 0)
-      ? allMetrics.normMinRatio * allMetrics.normMinRatio : 0.4;
+      ? allMetrics.normMinRatio * allMetrics.normMinRatio : (1 - cvBand);
     const _pwrMax = (allMetrics.normMaxRatio != null && allMetrics.normMaxRatio > 0)
-      ? allMetrics.normMaxRatio * allMetrics.normMaxRatio : 2.5;
+      ? allMetrics.normMaxRatio * allMetrics.normMaxRatio : (1 + cvBand);
+    
     return { atk: clamp(atk, _pwrMin, _pwrMax), def: clamp(def, _pwrMin, _pwrMax) };
   };
 
@@ -506,10 +505,7 @@ function calculateAdvancedMetrics(allMetrics) {
     if (blendResult) {
       scoreProbs = blendResult.scores;
 
-      // Skor kalibrasyon çarpanları uygula (varsa)
-      if (_scoreCalParams) {
-        applyScoreCalibration(scoreProbs, _scoreCalParams);
-      }
+
 
       let _homeWin = 0, _draw = 0, _awayWin = 0;
       let _over15 = 0, _over25 = 0, _over35 = 0, _btts = 0;

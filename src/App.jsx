@@ -36,53 +36,7 @@ export default function App() {
   const tabPaneRef = useRef(null);
   const autoRefreshRef = useRef(null);
 
-  useEffect(() => {
-    fetchMatches(selectedDate);
-  }, [selectedDate]);
-
-  // Auto-refresh for live matches — polls every 60s
-  useEffect(() => {
-    if (selectedMatch?.isLive && prediction) {
-      autoRefreshRef.current = setInterval(() => {
-        fetchPrediction(selectedMatch.id);
-      }, 60000);
-    }
-    return () => { if (autoRefreshRef.current) clearInterval(autoRefreshRef.current); };
-  }, [selectedMatch?.id, selectedMatch?.isLive]);
-
-  // Reset form/H2H pagination state when prediction changes
-  useEffect(() => {
-    if (!prediction) return;
-    setH2hAll(prediction.h2hMatches || []);
-    setHomeFormAll(prediction.recentForm?.home || []);
-    setAwayFormAll(prediction.recentForm?.away || []);
-    setH2hShown(5);
-    setHomeFormShown(5);
-    setAwayFormShown(5);
-    setHomeFormPage(1);
-    setAwayFormPage(1);
-  }, [prediction]);
-
-  const fetchMatches = async (dateStr = selectedDate) => {
-    setError(null);
-    setMatchLoading(true);
-    try {
-      const response = await fetch(`/api/matches?date=${dateStr}`);
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.error || `HTTP ${response.status}`);
-      }
-      const data = await response.json();
-      setMatches(data);
-    } catch (err) {
-      console.error('Failed to fetch matches', err);
-      setError('Maç listesi yüklenemedi. Sunucu çalışıyor mu?');
-    } finally {
-      setMatchLoading(false);
-    }
-  };
-
-  const fetchPrediction = async (id, lineup = null) => {
+  const fetchPrediction = useCallback(async (id, lineup = null) => {
     setError(null);
     const isWorkshop =
       lineup !== null &&
@@ -141,7 +95,55 @@ export default function App() {
       setLoading(false);
       setWorkshopLoading(false);
     }
+  }, []);
+
+  useEffect(() => {
+    fetchMatches(selectedDate);
+  }, [selectedDate]);
+
+  // Auto-refresh for live matches — polls every 60s
+  useEffect(() => {
+    if (selectedMatch?.isLive && prediction) {
+      autoRefreshRef.current = setInterval(() => {
+        fetchPrediction(selectedMatch.id);
+      }, 60000);
+    }
+    return () => { if (autoRefreshRef.current) clearInterval(autoRefreshRef.current); };
+  }, [selectedMatch?.id, selectedMatch?.isLive, prediction !== null, fetchPrediction]);
+
+  // Reset form/H2H pagination state when prediction changes
+  useEffect(() => {
+    if (!prediction) return;
+    setH2hAll(prediction.h2hMatches || []);
+    setHomeFormAll(prediction.recentForm?.home || []);
+    setAwayFormAll(prediction.recentForm?.away || []);
+    setH2hShown(5);
+    setHomeFormShown(5);
+    setAwayFormShown(5);
+    setHomeFormPage(1);
+    setAwayFormPage(1);
+  }, [prediction]);
+
+  const fetchMatches = async (dateStr = selectedDate) => {
+    setError(null);
+    setMatchLoading(true);
+    try {
+      const response = await fetch(`/api/matches?date=${dateStr}`);
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error || `HTTP ${response.status}`);
+      }
+      const data = await response.json();
+      setMatches(data);
+    } catch (err) {
+      console.error('Failed to fetch matches', err);
+      setError('Maç listesi yüklenemedi. Sunucu çalışıyor mu?');
+    } finally {
+      setMatchLoading(false);
+    }
   };
+
+
 
   // Load more events for form/H2H sections
   const loadMoreEvents = async (side) => {
@@ -388,15 +390,16 @@ export default function App() {
                           display: 'flex', 
                           gap: 8, 
                           paddingTop: 8, 
-                          borderTop: '1px solid rgba(255,255,255,0.06)' 
+                          borderTop: '1px solid rgba(255,255,255,0.06)',
+                          flexWrap: 'wrap'
                         }}>
                           <div title="Veri yoğunluğu ve metrik tamlık oranı" style={{ 
-                            background: 'rgba(0,255,136,0.1)', 
-                            border: '1px solid rgba(0,255,136,0.2)', 
+                            background: prediction.meta?.edgeInsights?.leaguePenalty ? 'rgba(255,82,82,0.1)' : 'rgba(0,255,136,0.1)', 
+                            border: `1px solid ${prediction.meta?.edgeInsights?.leaguePenalty ? 'rgba(255,82,82,0.3)' : 'rgba(0,255,136,0.2)'}`, 
                             borderRadius: 6, 
                             padding: '3px 8px', 
                             fontSize: '0.65rem', 
-                            color: '#00ff88', 
+                            color: prediction.meta?.edgeInsights?.leaguePenalty ? '#ff5252' : '#00ff88', 
                             fontWeight: 800 
                           }}>
                             %{prediction.result?.confidence || 0} Güven
@@ -412,7 +415,59 @@ export default function App() {
                           }}>
                             {prediction.result?.source || 'Hibrit'}
                           </div>
+                          {prediction.meta?.edgeInsights?.premiumBTTS && (
+                            <div title="Yüksek Geçmiş Başarı" style={{ 
+                              background: 'rgba(255,140,0,0.1)', 
+                              border: '1px solid rgba(255,140,0,0.3)', 
+                              borderRadius: 6, 
+                              padding: '3px 8px', 
+                              fontSize: '0.65rem', 
+                              color: '#ff8c00', 
+                              fontWeight: 800 
+                            }}>
+                              ⭐ Premium Sinyal
+                            </div>
+                          )}
+                          {prediction.meta?.recommendation === 'NO BET (Toxic League)' && (
+                            <div title="Zararlı Lig" style={{ 
+                              background: 'rgba(255,82,82,0.1)', 
+                              border: '1px solid rgba(255,82,82,0.3)', 
+                              borderRadius: 6, 
+                              padding: '3px 8px', 
+                              fontSize: '0.65rem', 
+                              color: '#ff5252', 
+                              fontWeight: 800 
+                            }}>
+                              ⛔ NO BET
+                            </div>
+                          )}
                         </div>
+
+                        {/* Edge Insights Messages */}
+                        {prediction.meta?.edgeInsights?.messages?.length > 0 && (
+                          <div style={{
+                            marginTop: 10,
+                            padding: '8px 10px',
+                            background: 'linear-gradient(90deg, rgba(188, 19, 254, 0.05) 0%, rgba(0, 242, 255, 0.05) 100%)',
+                            border: '1px solid rgba(188, 19, 254, 0.15)',
+                            borderRadius: 8,
+                            fontSize: '0.65rem'
+                          }}>
+                            <div style={{ color: 'var(--accent-purple)', fontWeight: 900, marginBottom: 4, letterSpacing: 0.5 }}>
+                              🧠 DİNAMİK MODEL STACKING
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                              {prediction.meta.edgeInsights.messages.map((msg, idx) => (
+                                <div key={idx} style={{ color: 'var(--text-secondary)', fontStyle: 'italic', display: 'flex', gap: 6 }}>
+                                  <span style={{ color: msg.includes('Warning') || msg.includes('Toxic') ? '#ff5252' : '#00ff88' }}>
+                                    {msg.includes('Warning') || msg.includes('Toxic') ? '⚠️' : '✅'}
+                                  </span>
+                                  <span>{msg}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -786,7 +841,7 @@ export default function App() {
                     </div>
                     <div className="lineup-grid">
                       {prediction?.lineups?.[workshopSide] ? (
-                        <LineupColumn
+                        <VisualPitch
                           title={
                             workshopSide === 'home'
                               ? prediction.match?.homeTeam
@@ -797,42 +852,59 @@ export default function App() {
                               ? modifiedLineup[workshopSide]
                               : prediction.lineups[workshopSide]?.players ?? []
                           }
-                          icon={<Users size={14} />}
+                          missingPlayers={prediction.missingPlayers}
                           side={workshopSide}
                           swapMode={swapMode}
                           onSwapMode={setSwapMode}
-                          originalIds={originalLineupIds[workshopSide]}
-                            onSwap={(playerA, playerB, side) => {
-                              const base =
-                                modifiedLineup[side] !== null
-                                  ? modifiedLineup[side]
-                                  : prediction.lineups[side]?.players ?? [];
-                              const currentPlayers = [...base];
+                          onSwap={(playerA, playerB, side) => {
+                            const base =
+                              modifiedLineup[side] !== null
+                                ? modifiedLineup[side]
+                                : prediction.lineups[side]?.players ?? [];
+                            const currentPlayers = [...base];
+                            
+                            const idxA = currentPlayers.findIndex(p => p?.player?.id === playerA?.player?.id);
+                            const idxB = currentPlayers.findIndex(p => p?.player?.id === playerB?.player?.id);
+                            
+                            if (idxA !== -1 && idxB !== -1) {
+                              const pA = { ...currentPlayers[idxA] };
+                              const pB = { ...currentPlayers[idxB] };
                               
-                              const idxA = currentPlayers.findIndex(p => p?.player?.id === playerA?.player?.id);
-                              const idxB = currentPlayers.findIndex(p => p?.player?.id === playerB?.player?.id);
+                              const tempSub = pA.substitute;
+                              const tempRes = pA.isReserve;
+                              const tempAssigned = pA.assignedPosition || (pA.player?.position || 'M').toUpperCase()[0];
                               
-                              if (idxA !== -1 && idxB !== -1) {
-                                const pA = { ...currentPlayers[idxA] };
-                                const pB = { ...currentPlayers[idxB] };
-                                
-                                // Swap their role statuses (starter vs sub vs reserve)
-                                const tempSub = pA.substitute;
-                                const tempRes = pA.isReserve;
-                                
-                                pA.substitute = pB.substitute;
-                                pA.isReserve = pB.isReserve;
-                                
-                                pB.substitute = tempSub;
-                                pB.isReserve = tempRes;
-                                
-                                currentPlayers[idxA] = pA;
-                                currentPlayers[idxB] = pB;
-                                
-                                setModifiedLineup(prev => ({ ...prev, [side]: currentPlayers }));
-                              }
-                              setSwapMode(null);
-                            }}
+                              pA.substitute = pB.substitute;
+                              pA.isReserve = pB.isReserve;
+                              pA.assignedPosition = pB.assignedPosition || (pB.player?.position || 'M').toUpperCase()[0];
+                              
+                              pB.substitute = tempSub;
+                              pB.isReserve = tempRes;
+                              pB.assignedPosition = tempAssigned;
+                              
+                              currentPlayers[idxA] = pA;
+                              currentPlayers[idxB] = pB;
+                              
+                              setModifiedLineup(prev => ({ ...prev, [side]: currentPlayers }));
+                            }
+                            setSwapMode(null);
+                          }}
+                          onMove={(player, newZonePos, side) => {
+                            const base =
+                              modifiedLineup[side] !== null
+                                ? modifiedLineup[side]
+                                : prediction.lineups[side]?.players ?? [];
+                            const currentPlayers = [...base];
+                            
+                            const idx = currentPlayers.findIndex(p => p?.player?.id === player?.player?.id);
+                            if (idx !== -1) {
+                              const p = { ...currentPlayers[idx] };
+                              p.assignedPosition = newZonePos;
+                              currentPlayers[idx] = p;
+                              setModifiedLineup(prev => ({ ...prev, [side]: currentPlayers }));
+                            }
+                            setSwapMode(null);
+                          }}
                         />
                       ) : (
                         <p className="empty-lineup">
@@ -840,28 +912,48 @@ export default function App() {
                         </p>
                       )}
                     </div>
-                    <div className="workshop-actions">
-                      <button
-                        className="workshop-btn secondary"
-                        disabled={loading || workshopLoading}
-                        onClick={() => {
-                          setModifiedLineup({ home: null, away: null });
-                          setSwapMode(null);
-                          if (selectedMatch) fetchPrediction(selectedMatch.id);
-                        }}
-                      >
-                        Orijinale Dön
-                      </button>
-                      <button
-                        className="workshop-btn primary"
-                        disabled={loading || workshopLoading}
-                        onClick={() => {
-                          if (selectedMatch) fetchPrediction(selectedMatch.id, modifiedLineup);
-                        }}
-                      >
-                        <Zap size={14} /> Kadroyla Yeniden Hesapla
-                      </button>
-                    </div>
+                    {(() => {
+                      const homeCurrentPlayers = modifiedLineup.home !== null ? modifiedLineup.home : prediction?.lineups?.home?.players ?? [];
+                      const awayCurrentPlayers = modifiedLineup.away !== null ? modifiedLineup.away : prediction?.lineups?.away?.players ?? [];
+                      const homeStartersCount = homeCurrentPlayers.filter(p => !p.substitute && !p.isReserve).length;
+                      const awayStartersCount = awayCurrentPlayers.filter(p => !p.substitute && !p.isReserve).length;
+                      const isHomeInvalid = homeCurrentPlayers.length > 0 && homeStartersCount !== 11;
+                      const isAwayInvalid = awayCurrentPlayers.length > 0 && awayStartersCount !== 11;
+                      const invalidLineup = isHomeInvalid || isAwayInvalid;
+
+                      return (
+                        <div className="workshop-actions" style={{ flexDirection: 'column' }}>
+                          <div style={{ display: 'flex', gap: '12px', width: '100%', justifyContent: 'flex-end' }}>
+                            <button
+                              className="workshop-btn secondary"
+                              disabled={loading || workshopLoading}
+                              onClick={() => {
+                                setModifiedLineup({ home: null, away: null });
+                                setSwapMode(null);
+                                if (selectedMatch) fetchPrediction(selectedMatch.id);
+                              }}
+                            >
+                              Orijinale Dön
+                            </button>
+                            <button
+                              className="workshop-btn primary"
+                              disabled={loading || workshopLoading || invalidLineup}
+                              title={invalidLineup ? "Simülasyon için İlk 11'de tam olarak 11 oyuncu olmalıdır!" : ""}
+                              onClick={() => {
+                                if (selectedMatch) fetchPrediction(selectedMatch.id, modifiedLineup);
+                              }}
+                            >
+                              <Zap size={14} /> Kadroyla Yeniden Hesapla
+                            </button>
+                          </div>
+                          {invalidLineup && (
+                            <div style={{ color: '#ff5252', fontSize: '0.8rem', marginTop: '8px', textAlign: 'right' }}>
+                              ⚠️ İlk 11'de tam olarak 11 oyuncu seçili olmalıdır. Lütfen kadroyu düzenleyin.
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
                 )}
 
@@ -988,11 +1080,41 @@ export default function App() {
                 <div style={{ marginTop: 18, padding: '12px 0', borderTop: '1px solid var(--glass-border)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', marginBottom: 4 }}>
                     <span style={{ color: 'var(--text-secondary)' }}>Confidence</span>
-                    <span style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 700 }}>
+                    <span style={{ 
+                      fontFamily: "'JetBrains Mono', monospace", 
+                      fontWeight: 700,
+                      color: prediction.meta?.edgeInsights?.leaguePenalty ? '#ff5252' : 'inherit'
+                    }}>
                       %{prediction.result?.confidence != null ? Number(prediction.result.confidence).toFixed(1) : '-'}
                     </span>
                   </div>
                 </div>
+
+                {/* Modal Edge Insights Messages */}
+                {prediction.meta?.edgeInsights?.messages?.length > 0 && (
+                  <div style={{
+                    marginTop: 10,
+                    padding: '12px',
+                    background: 'linear-gradient(90deg, rgba(188, 19, 254, 0.05) 0%, rgba(0, 242, 255, 0.05) 100%)',
+                    border: '1px solid rgba(188, 19, 254, 0.15)',
+                    borderRadius: 8,
+                    fontSize: '0.70rem'
+                  }}>
+                    <div style={{ color: 'var(--accent-purple)', fontWeight: 900, marginBottom: 6, letterSpacing: 0.5 }}>
+                      🧠 DİNAMİK MODEL STACKING
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      {prediction.meta.edgeInsights.messages.map((msg, idx) => (
+                        <div key={idx} style={{ color: 'var(--text-secondary)', fontStyle: 'italic', display: 'flex', gap: 6, lineHeight: 1.4 }}>
+                          <span style={{ color: msg.includes('Warning') || msg.includes('Toxic') ? '#ff5252' : '#00ff88' }}>
+                            {msg.includes('Warning') || msg.includes('Toxic') ? '⚠️' : '✅'}
+                          </span>
+                          <span>{msg}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 {prediction.analysis?.probabilities?.surpriseIndex != null && (
                   <div className="surprise-box">
                     <span>
@@ -1090,98 +1212,146 @@ function ProbBar({ label, val, color }) {
   );
 }
 
-function LineupColumn({ title, players, icon, side, swapMode, onSwapMode, onSwap, originalIds }) {
+function VisualPitch({ title, players, side, swapMode, onSwapMode, onSwap, onMove, missingPlayers }) {
   const safePlayers = Array.isArray(players) ? players : [];
-  // Sort players: Starters first (CAP at 11), then Subs (including excess starters, max 9), then Reserves
-  const allStarters = safePlayers.filter(p => !p.substitute && !p.isReserve);
-  const starters = allStarters.slice(0, 11);
-  const excessStarters = allStarters.slice(11);
+  
+  // Starters: limit to 11
+  const starters = safePlayers.filter(p => !p.substitute && !p.isReserve).slice(0, 11);
+  const bench = safePlayers.filter(p => !starters.includes(p));
 
-  const rawSubs = [
-    ...excessStarters,
-    ...safePlayers.filter(p => p.substitute && !p.isReserve)
-  ];
-  const subs = rawSubs.slice(0, 9);
-  // Any subs beyond 9 overflow visually into reserves section
-  const overflowSubs = rawSubs.slice(9);
+  // Determine assigned zones for starters
+  const zones = { 'F': [], 'M': [], 'D': [], 'G': [] };
+  
+  starters.forEach(p => {
+    const nativePos = (p.player?.position || 'M').toUpperCase()[0];
+    const assignedPos = (p.assignedPosition || nativePos).toUpperCase()[0];
+    
+    if (zones[assignedPos]) {
+      zones[assignedPos].push(p);
+    } else {
+      zones['M'].push(p);
+    }
+  });
 
-  const reserves = [
-    ...overflowSubs,
-    ...safePlayers.filter(p => p.isReserve)
-  ];
-
-  // Determine which rendered group a player belongs to
   const getPlayerGroup = (p) => {
-    const pid = p.player?.id;
-    if (starters.some(s => s.player?.id === pid)) return 'starter';
-    if (subs.some(s => s.player?.id === pid)) return 'sub';
-    return 'reserve';
+    if (starters.includes(p)) return 'starter';
+    return 'bench';
   };
 
-  const handlePlayerClick = (p) => {
+  const handlePlayerClick = (e, p) => {
+    e.stopPropagation(); // Prevent bubbling to zone
     const group = getPlayerGroup(p);
     if (!swapMode) {
-      // First player selected — record their group
       onSwapMode({ playerOut: p, fromGroup: group });
     } else {
       if (swapMode.playerOut?.player?.id === p.player?.id) {
-        // Deselect
-        onSwapMode(null);
-      } else if (group === swapMode.fromGroup) {
-        // Same-group swap blocked — silently ignore (groups must differ)
-        return;
+        onSwapMode(null); // Deselect
       } else {
-        // Valid cross-group swap
+        // Allow swap across everything: starter-bench, starter-starter, bench-bench
         onSwap(swapMode.playerOut, p, side);
       }
     }
   };
 
-  const renderPlayer = (p, type) => {
+  const handleZoneClick = (zonePos) => {
+    if (swapMode && swapMode.fromGroup === 'starter') {
+      // Formasyon/Mevki değişimi: Seçili ilk 11 oyuncusunu bu bölgeye taşı
+      if (onMove) {
+        onMove(swapMode.playerOut, zonePos, side);
+      }
+    }
+  };
+
+  const renderPlayerCard = (p, group) => {
     const isSelected = swapMode?.playerOut?.player?.id === p.player?.id;
-    const isModified = originalIds ? !originalIds.has(p.player?.id) : false;
-    // Dim players that are in the same group as the currently selected player (cannot swap within group)
-    const isSameGroupBlocked = swapMode?.fromGroup != null
-      && !isSelected
-      && getPlayerGroup(p) === swapMode.fromGroup;
+    // Dim bench if bench is selected (optional, but we allow bench to bench swap to organize)
+    const isSameGroupBlocked = swapMode?.fromGroup === 'bench' && group === 'bench' && !isSelected;
+    
+    const missingInfo = missingPlayers?.find(mp => mp.player?.id === p.player?.id);
+    const missingIcon = missingInfo?.type === 'injured' || missingInfo?.type === 'doubtful' ? '🚑' : missingInfo?.type === 'suspended' ? '🟥' : '⚠️';
+    
+    const nativePos = (p.player?.position || 'M').toUpperCase()[0];
+    const assignedPos = (p.assignedPosition || nativePos).toUpperCase()[0];
+    
+    let efficiency = 1.0;
+    if (group === 'starter') {
+      const map = { 'G': 0, 'D': 1, 'M': 2, 'F': 3 };
+      const nIdx = map[nativePos];
+      const aIdx = map[assignedPos];
+      if (nIdx !== undefined && aIdx !== undefined) {
+        const dist = Math.abs(nIdx - aIdx);
+        if (dist === 1) efficiency = 0.85;
+        if (dist === 2) efficiency = 0.60;
+        if (dist === 3) efficiency = 0.10;
+      }
+    }
 
     return (
-      <div
-        key={p.player?.id}
-        className={`player-card ${type}${isSelected ? ' selected-out' : ''}${isModified ? ' player-modified' : ''}${isSameGroupBlocked ? ' swap-blocked' : ''}`}
-        onClick={() => handlePlayerClick(p)}
-        role="button"
-        tabIndex={0}
-        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') handlePlayerClick(p); }}
+      <div 
+        key={p.player?.id} 
+        className={`pitch-player ${isSelected ? 'selected' : ''} ${isSameGroupBlocked ? 'swap-blocked' : ''}`}
+        onClick={(e) => handlePlayerClick(e, p)}
+        title={missingInfo ? missingInfo.type : ''}
       >
-        <span className="p-pos">{p.player?.position || '?'}</span>
-        <span className="p-name">{p.player?.shortName || p.player?.name}</span>
-        {isSelected ? (
-          <span className="swap-icon selected">&#x2715;</span>
-        ) : (
-          <span className="swap-icon">&#8644;</span>
-        )}
+        <div className={`player-shirt ${side}-shirt`}>
+          {p.player?.shirtNumber || nativePos}
+          {efficiency < 1.0 && <div className="penalty-indicator" title={`Yanlış Mevki: %${Math.round(efficiency * 100)} Verim`}>🔻</div>}
+          {missingInfo && <div className="missing-indicator" title={missingInfo.type}>{missingIcon}</div>}
+        </div>
+        <div className="player-name-label">
+          {p.player?.shortName || p.player?.name}
+        </div>
       </div>
     );
   };
 
   return (
-    <div className="workshop-col">
-      <div className="col-header">{icon} {title}</div>
-      <div className="squad-section">
-        <div className="squad-label">İlk 11 ({starters.length}/11)</div>
-        <div className="player-list-mini">
-          {starters.map(p => renderPlayer(p, 'starter'))}
+    <div className="pitch-container">
+      <h3 style={{fontSize: '1rem', marginBottom: 10}}>{title} ({starters.length}/11)</h3>
+      <div className={`football-pitch ${swapMode?.fromGroup === 'starter' ? 'formation-mode' : ''}`}>
+        <div className="pitch-penalty-top" />
+        <div className="pitch-penalty-bottom" />
+        
+        {/* Forwards */}
+        <div className="pitch-zone zone-f" onClick={() => handleZoneClick('F')} title={swapMode?.fromGroup === 'starter' ? "Buraya Taşı (Forvet)" : ""}>
+          {zones['F'].map(p => renderPlayerCard(p, 'starter'))}
         </div>
-
-        <div className="squad-label" style={{ marginTop: '16px' }}>Yedek Kulübesi ({subs.length}/9)</div>
-        <div className="player-list-mini">
-          {subs.map(p => renderPlayer(p, 'sub'))}
+        {/* Midfielders */}
+        <div className="pitch-zone zone-m" onClick={() => handleZoneClick('M')} title={swapMode?.fromGroup === 'starter' ? "Buraya Taşı (Orta Saha)" : ""}>
+          {zones['M'].map(p => renderPlayerCard(p, 'starter'))}
         </div>
-
-        <div className="squad-label" style={{ marginTop: '16px', color: 'var(--text-tertiary)' }}>Kadro Dışı ({reserves.length})</div>
-        <div className="player-list-mini">
-          {reserves.map(p => renderPlayer(p, 'sub reserve'))}
+        {/* Defenders */}
+        <div className="pitch-zone zone-d" onClick={() => handleZoneClick('D')} title={swapMode?.fromGroup === 'starter' ? "Buraya Taşı (Defans)" : ""}>
+          {zones['D'].map(p => renderPlayerCard(p, 'starter'))}
+        </div>
+        {/* Goalkeeper */}
+        <div className="pitch-zone zone-g" onClick={() => handleZoneClick('G')} title={swapMode?.fromGroup === 'starter' ? "Buraya Taşı (Kaleci)" : ""}>
+          {zones['G'].map(p => renderPlayerCard(p, 'starter'))}
+        </div>
+      </div>
+      
+      <div className="bench-container">
+        <h4 style={{fontSize: '0.8rem', color: 'var(--text-secondary)'}}>Yedekler & Kadro Dışı ({bench.length})</h4>
+        <div className="bench-grid">
+          {bench.map(p => {
+             const isSelected = swapMode?.playerOut?.player?.id === p.player?.id;
+             const isBlocked = swapMode?.fromGroup === 'bench' && !isSelected;
+             
+             const missingInfo = missingPlayers?.find(mp => mp.player?.id === p.player?.id);
+             const missingIcon = missingInfo?.type === 'injured' || missingInfo?.type === 'doubtful' ? '🚑' : missingInfo?.type === 'suspended' ? '🟥' : '⚠️';
+             
+             return (
+               <div 
+                 key={p.player?.id}
+                 className={`bench-player ${isSelected ? 'selected' : ''} ${isBlocked ? 'swap-blocked' : ''}`}
+                 onClick={(e) => handlePlayerClick(e, p)}
+                 title={missingInfo ? missingInfo.type : ''}
+               >
+                 <span style={{fontWeight: 700, color: 'var(--text-secondary)'}}>{(p.player?.position || '?').toUpperCase()[0]}</span>
+                 <span>{p.player?.shortName || p.player?.name} {missingInfo && missingIcon}</span>
+               </div>
+             )
+          })}
         </div>
       </div>
     </div>

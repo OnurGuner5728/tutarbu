@@ -3,6 +3,8 @@
  * Oyuncu kalitesi, kadro etkisi, sakatlık etkisi, güçlü/güçsüze gol atma.
  */
 
+const { getPositionalEfficiency } = require('../engine/math-utils');
+
 /**
  * Builds a map of { [playerId]: avgMinutesPerMatch } from recent match incidents.
  *
@@ -427,7 +429,14 @@ function calculatePlayerMetrics(data, side, dynamicAvgs) {
   let starterValue = 0, subValue = 0, otherValue = 0;
   for (const p of allPlayers) {
     const pid = p.player?.id;
-    const val = p.player?.proposedMarketValue || 0;
+    let val = p.player?.proposedMarketValue || 0;
+    
+    // Uygulanan pozisyon cezası
+    const nativePos = (p.player?.position || '').toUpperCase()[0] || '';
+    const assignedPos = (p.assignedPosition || nativePos).toUpperCase()[0] || '';
+    const efficiency = getPositionalEfficiency(nativePos, assignedPos);
+    val *= efficiency;
+
     if (pid && starterPlayerIds.has(pid)) {
       starterValue += val;
     } else if (pid && subPlayerIds.has(pid)) {

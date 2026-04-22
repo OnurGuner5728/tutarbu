@@ -3,7 +3,7 @@
  * Takım defans metrikleri — tamamı SofaScore API verisinden hesaplanır.
  */
 
-const { extractTeamStats } = require('./team-attack');
+const { extractTeamStats } = require('../engine/math-utils');
 
 /**
  * @param {object} data - fetchAllMatchData() çıktısı

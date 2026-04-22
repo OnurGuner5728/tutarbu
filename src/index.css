@@ -1507,3 +1507,220 @@ body {
   .score-hero { justify-content: center; }
   .prediction-grid { padding: 12px; }
 }
+
+
+/* ═══════════════════════════════════════════
+   WORKSHOP VISUAL PITCH
+   ═══════════════════════════════════════════ */
+.pitch-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  align-items: center;
+  width: 100%;
+  margin-bottom: 20px;
+}
+
+.football-pitch {
+  width: 100%;
+  max-width: 400px;
+  height: 550px;
+  background: linear-gradient(180deg, #2b7a3b 0%, #1c5225 100%);
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-radius: 8px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
+  padding: 20px 0;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+
+/* Field lines */
+.football-pitch::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.3);
+  transform: translateY(-50%);
+  z-index: 1;
+}
+.football-pitch::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 80px;
+  height: 80px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1;
+}
+
+/* Penalty areas */
+.pitch-penalty-top {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 160px;
+  height: 80px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top: none;
+  z-index: 1;
+}
+.pitch-penalty-bottom {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 160px;
+  height: 80px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-bottom: none;
+  z-index: 1;
+}
+
+.pitch-zone {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 15px;
+  width: 100%;
+  min-height: 80px;
+}
+
+.pitch-player {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+  transition: transform 0.2s;
+  width: 60px;
+}
+.pitch-player:hover {
+  transform: scale(1.1);
+}
+.pitch-player.selected {
+  filter: drop-shadow(0 0 10px var(--accent-cyan));
+  transform: scale(1.15);
+}
+.pitch-player.swap-blocked {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.player-shirt {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--card-bg);
+  border: 2px solid var(--text-secondary);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-weight: 700;
+  font-size: 0.8rem;
+  color: white;
+  margin-bottom: 4px;
+  position: relative;
+}
+
+.player-shirt.home-shirt { border-color: var(--accent-cyan); background: rgba(0, 242, 255, 0.2); }
+.player-shirt.away-shirt { border-color: var(--accent-purple); background: rgba(188, 19, 254, 0.2); }
+
+.penalty-indicator {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  background: rgba(255, 0, 0, 0.9);
+  border-radius: 50%;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 0.6rem;
+  border: 1px solid white;
+}
+
+.missing-indicator {
+  position: absolute;
+  bottom: -4px;
+  right: -4px;
+  background: white;
+  border-radius: 50%;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 0.6rem;
+}
+
+.player-name-label {
+  background: rgba(0, 0, 0, 0.7);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.65rem;
+  color: white;
+  white-space: nowrap;
+  max-width: 60px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
+}
+
+.bench-container {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  padding: 15px;
+}
+.bench-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 10px;
+}
+.bench-player {
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--glass-border);
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s;
+}
+.bench-player:hover { background: rgba(255, 255, 255, 0.1); }
+.bench-player.selected {
+  border-color: var(--accent-cyan);
+  background: rgba(0, 242, 255, 0.1);
+}
+.bench-player.swap-blocked {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Formation Mode Highlights */
+.football-pitch.formation-mode .pitch-zone {
+  cursor: crosshair;
+  background: rgba(0, 242, 255, 0.05);
+  border-radius: 8px;
+  transition: background 0.2s;
+}
+.football-pitch.formation-mode .pitch-zone:hover {
+  background: rgba(0, 242, 255, 0.15);
+  box-shadow: 0 0 10px rgba(0, 242, 255, 0.2);
+}

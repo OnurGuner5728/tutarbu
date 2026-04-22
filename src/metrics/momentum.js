@@ -3,7 +3,7 @@
  * Baskı indeksi, baskı altında gol, topla oynama korelasyonu, pas/cross başarısı.
  */
 
-const { extractTeamStats } = require('./team-attack');
+const { extractTeamStats } = require('../engine/math-utils');
 
 function calculateMomentumMetrics(data, side) {
   const isHome = side === 'home';

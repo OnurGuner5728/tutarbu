@@ -52,7 +52,16 @@ function getMetricAuditSummary(data, metrics) {
     baselineTraces: [],
     simWarnings: [],
     nullMetrics: [],
-    criticalMissingMetrics: []
+    criticalMissingMetrics: [],
+    missingCategories: {
+      lineup: 0,
+      incident: 0,
+      shotmap: 0,
+      stats: 0,
+      other: 0
+    },
+    isHighRisk: false,
+    fallbackThresholdsTriggered: 0
   };
 
   // 1. Detect Global Fallbacks
@@ -60,6 +69,12 @@ function getMetricAuditSummary(data, metrics) {
   if (primaryReason) {
     summary.globalFallbacks.push(primaryReason);
   }
+
+  // Initial detection of missing core API responses
+  if (!data.lineups || data.lineups.isFallback) summary.missingCategories.lineup++;
+  if (!data.homeRecentMatchDetails?.some(m => m.incidents)) summary.missingCategories.incident++;
+  if (!data.homeRecentMatchDetails?.some(m => m.shotmap)) summary.missingCategories.shotmap++;
+  if (!data.homeRecentMatchDetails?.some(m => m.stats)) summary.missingCategories.stats++;
 
   // 2. Flatten all sided and shared metrics for analysis
   const flat = {};
@@ -89,6 +104,13 @@ function getMetricAuditSummary(data, metrics) {
         summary.criticalMissingCount++;
         summary.criticalMissingMetrics.push(id);
       }
+      
+      // Categorize missing metric logically
+      if (['M015', 'M016', 'M033'].includes(id)) summary.missingCategories.shotmap++;
+      else if (['M003', 'M005', 'M039', 'M040'].includes(id)) summary.missingCategories.incident++;
+      else if (['M066', 'M067'].includes(id)) summary.missingCategories.lineup++;
+      else if (['M013', 'M014', 'M025', 'M034', 'M035', 'M150', 'M152'].includes(id)) summary.missingCategories.stats++;
+      else summary.missingCategories.other++;
     } else {
       summary.computedMetrics++;
     }
@@ -97,6 +119,17 @@ function getMetricAuditSummary(data, metrics) {
   // Deduplicate
   summary.nullMetrics = [...new Set(summary.nullMetrics)].sort();
   summary.criticalMissingMetrics = [...new Set(summary.criticalMissingMetrics)].sort();
+
+  // 4. Calculate Risk Factor
+  if (summary.globalFallbacks.length > 0) summary.fallbackThresholdsTriggered++;
+  if (summary.criticalMissingCount > 5) summary.fallbackThresholdsTriggered++;
+  if (summary.nullCount > 20) summary.fallbackThresholdsTriggered++;
+  if (summary.missingCategories.shotmap > 0 && summary.missingCategories.stats > 0) summary.fallbackThresholdsTriggered++;
+
+  if (summary.fallbackThresholdsTriggered >= 2) {
+    summary.isHighRisk = true;
+    summary.simWarnings.push("HIGH RISK: Multiple fallback thresholds triggered due to poor API coverage.");
+  }
 
   return summary;
 }

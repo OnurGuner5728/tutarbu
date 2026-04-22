@@ -64,6 +64,7 @@ const BLOCK_QF_MAP = {
  * @returns {{ GK: number, DEF: number, MID: number, ATK: number, total: number }}
  */
 function computePositionMVBreakdown(squadData) {
+  const { getPositionalEfficiency } = require('./math-utils');
   const players = squadData?.players || [];
   const breakdown = { GK: 0, DEF: 0, MID: 0, ATK: 0, total: 0 };
 
@@ -72,16 +73,24 @@ function computePositionMVBreakdown(squadData) {
     if (!mv) continue;
     // SofaScore pozisyon kodu: ilk harf belirleyici
     const pos = (entry.player?.position || '').toUpperCase()[0] || '';
-    breakdown.total += mv;
+    
+    // Uygulanan pozisyon (eğer workshop'ta değiştirildiyse), yoksa kendi mevkisi
+    const assignedPos = (entry.assignedPosition || pos).toUpperCase()[0] || '';
+    
+    // Verim cezası (Mevkisi dışında oynatılıyorsa)
+    const efficiency = getPositionalEfficiency(pos, assignedPos);
+    
+    const effectiveMv = mv * efficiency;
+    breakdown.total += effectiveMv;
 
-    if (pos === 'G') {
-      breakdown.GK += mv;
-    } else if (pos === 'D') {
-      breakdown.DEF += mv;
-    } else if (pos === 'M') {
-      breakdown.MID += mv;
-    } else if (pos === 'F') {
-      breakdown.ATK += mv;
+    if (assignedPos === 'G') {
+      breakdown.GK += effectiveMv;
+    } else if (assignedPos === 'D') {
+      breakdown.DEF += effectiveMv;
+    } else if (assignedPos === 'M') {
+      breakdown.MID += effectiveMv;
+    } else if (assignedPos === 'F') {
+      breakdown.ATK += effectiveMv;
     }
     // Bilinmeyen pozisyon: total'e eklendi ancak mevki grubuna dahil edilmedi
   }

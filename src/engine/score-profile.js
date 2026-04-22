@@ -13,9 +13,6 @@
 
 const fs = require('fs');
 const path = require('path');
-
-const SCORE_CAL_FILE = path.join(__dirname, 'score-calibration.json');
-
 // ─── Math Helpers ─────────────────────────────────────────────────
 
 /**
@@ -435,103 +432,6 @@ function blendScoreDistribution(opts) {
   };
 }
 
-// ─── Skor Kalibrasyonu ───────────────────────────────────────────
-
-/**
- * Backtest verisinden skor-spesifik çarpanlar öğren.
- * Shrinkage ve clamp sınırları örneklem boyutundan türetilir.
- * 
- * @param {object[]} matches - Her biri: { predictedScoreDist, actualScore }
- * @returns {object} { "1-0": 0.95, "2-1": 1.2, ... }
- */
-function trainScoreCalibration(matches) {
-  const predSums = {};
-  const actualCounts = {};
-
-  for (const m of matches) {
-    const actual = m.actualScore;
-    actualCounts[actual] = (actualCounts[actual] || 0) + 1;
-
-    if (m.predictedScoreDist) {
-      for (const [score, prob] of Object.entries(m.predictedScoreDist)) {
-        predSums[score] = (predSums[score] || 0) + prob;
-      }
-    }
-  }
-
-  const n = matches.length;
-  // Shrinkage: örneklem boyutunun karekökü × 2 — veriden türetilmiş
-  // n=100 → shrinkage=20, n=300 → shrinkage=35, n=1000 → shrinkage=63
-  const shrinkage = Math.ceil(Math.sqrt(n) * 2);
-  
-  const multipliers = {};
-
-  const allScores = new Set([...Object.keys(predSums), ...Object.keys(actualCounts)]);
-  for (const score of allScores) {
-    const predRate = (predSums[score] || 0) / n;
-    const actualRate = (actualCounts[score] || 0) / n;
-    const scoreCount = actualCounts[score] || 0;
-    
-    // Minimum tahmin oranı: 1/n (en az 1 maçlık resolution)
-    if (predRate <= 1 / n) continue;
-    
-    const rawMult = actualRate / predRate;
-    // Shrinkage: 1.0'a doğru çek
-    const sampleWeight = scoreCount / (scoreCount + shrinkage);
-    const mult = 1.0 * (1 - sampleWeight) + rawMult * sampleWeight;
-    
-    // Clamp: örneklem boyutundan türetilmiş sınırlar
-    // n büyükse geniş sapma izni, küçükse dar
-    // scoreCount=1 → max 1.5, scoreCount=30 → max ~3.4
-    const clampMax = 1 + Math.sqrt(scoreCount + 1);
-    const clampMin = 1 / clampMax;
-    multipliers[score] = Math.max(clampMin, Math.min(clampMax, mult));
-  }
-
-  return multipliers;
-}
-
-/**
- * Skor dağılımına kalibrasyon çarpanlarını uygula.
- */
-function applyScoreCalibration(scores, multipliers) {
-  if (!multipliers || Object.keys(multipliers).length === 0) return scores;
-  
-  let totalProb = 0;
-  for (const s of scores) {
-    const key = `${s.home}-${s.away}`;
-    const mult = multipliers[key] ?? 1.0;
-    s.prob *= mult;
-    totalProb += s.prob;
-  }
-
-  if (totalProb > 0) {
-    for (const s of scores) s.prob /= totalProb;
-  }
-
-  scores.sort((a, b) => b.prob - a.prob);
-  return scores;
-}
-
-/**
- * Skor kalibrasyon parametrelerini dosyadan yükle.
- */
-function loadScoreCalibration() {
-  if (!fs.existsSync(SCORE_CAL_FILE)) return null;
-  try {
-    return JSON.parse(fs.readFileSync(SCORE_CAL_FILE, 'utf8'));
-  } catch (err) {
-    console.error('[score-profile] loadScoreCalibration failed:', err.message);
-    return null;
-  }
-}
-
-/**
- * Skor kalibrasyon parametrelerini dosyaya kaydet.
- */
-function saveScoreCalibration(params) {
-  fs.writeFileSync(SCORE_CAL_FILE, JSON.stringify(params, null, 2), 'utf8');
-}
 
 // ─── Exports ─────────────────────────────────────────────────────
 
@@ -541,9 +441,4 @@ module.exports = {
   blendScoreDistribution,
   negBinomPMF,
   estimateR,
-  trainScoreCalibration,
-  applyScoreCalibration,
-  loadScoreCalibration,
-  saveScoreCalibration,
-  SCORE_CAL_FILE,
 };

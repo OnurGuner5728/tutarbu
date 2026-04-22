@@ -197,54 +197,124 @@ async function fetchAllMatchData(eventId) {
   ]);
 
   // --- FALLBACK LINEUP GENERATOR ---
-  function buildFallbackLineup(squadPlayers) {
+  function buildFallbackLineup(squadPlayers, recentMatchDetails, teamId) {
     if (!squadPlayers?.players) return { players: [] };
     
+    // Create pool and default to isReserve: true unless explicitly assigned
     const pool = squadPlayers.players.map(p => ({
       player: p.player,
       position: p.player?.position || 'M',
       shirtNumber: p.player?.shirtNumber || '',
       substitute: false,
+      isReserve: true
     }));
 
     if (pool.length === 0) return { players: [] };
 
-    const byPos = { G: [], D: [], M: [], F: [] };
-    for (const p of pool) { 
-      const pos = (p.position || 'M').toUpperCase()[0];
-      if (byPos[pos]) byPos[pos].push(p); 
-      else byPos['M'].push(p);
-    }
-
-    const starting = [];
-    const usedIdx = new Set();
-    
-    function pickN(posArr, n) {
-      let picked = 0;
-      for (const p of posArr) { 
-        if (picked >= n) break; 
-        if (!usedIdx.has(p.player?.id)) { 
-          starting.push({ ...p, substitute: false }); 
-          usedIdx.add(p.player?.id); 
-          picked++; 
-        } 
+    let lastLineupPlayers = null;
+    if (recentMatchDetails && recentMatchDetails.length > 0) {
+      for (const match of recentMatchDetails) {
+        if (match.lineups) {
+          const isHome = match.homeTeamId === teamId || match.homeTeam?.id === teamId;
+          const teamLineup = isHome ? match.lineups.home : match.lineups.away;
+          // Fallback if homeTeamId wasn't strictly checked
+          const actualLineup = teamLineup || (match.homeTeam?.name?.includes(squadPlayers.team?.name) ? match.lineups.home : match.lineups.away);
+          if (actualLineup && actualLineup.players && actualLineup.players.length > 0) {
+            lastLineupPlayers = actualLineup.players;
+            break;
+          }
+        }
       }
     }
 
-    pickN(byPos.G, 1); 
-    pickN(byPos.D, 4); 
-    pickN(byPos.M, 3); 
-    pickN(byPos.F, 3);
+    const starting = [];
+    const subs = [];
+    const usedIdx = new Set();
 
-    const subs = pool.filter(p => !usedIdx.has(p.player?.id)).slice(0, 11).map(p => ({ ...p, substitute: true }));
-    return { players: [...starting, ...subs], formation: '4-3-3', isFallback: true };
+    if (lastLineupPlayers) {
+      // Use previous match lineup
+      for (const p of lastLineupPlayers) {
+        const poolPlayer = pool.find(sp => sp.player?.id === p.player?.id);
+        if (poolPlayer) {
+          if (!p.substitute) {
+            starting.push({ ...poolPlayer, substitute: false, isReserve: false });
+          } else {
+            subs.push({ ...poolPlayer, substitute: true, isReserve: false });
+          }
+          usedIdx.add(poolPlayer.player.id);
+        }
+      }
+    }
+
+    // If starting 11 is not complete from previous match, fill remaining using position fallback
+    if (starting.length < 11) {
+      const byPos = { G: [], D: [], M: [], F: [] };
+      for (const p of pool) { 
+        if (!usedIdx.has(p.player.id)) {
+          const pos = (p.position || 'M').toUpperCase()[0];
+          if (byPos[pos]) byPos[pos].push(p); 
+          else byPos['M'].push(p);
+        }
+      }
+
+      function pickN(posArr, n) {
+        let picked = 0;
+        for (const p of posArr) { 
+          if (starting.length >= 11) break;
+          if (picked >= n) break; 
+          if (!usedIdx.has(p.player?.id)) { 
+            starting.push({ ...p, substitute: false, isReserve: false }); 
+            usedIdx.add(p.player?.id); 
+            picked++; 
+          } 
+        }
+      }
+
+      // Check how many we already have by position
+      const currentG = starting.filter(p => (p.position || 'M').toUpperCase()[0] === 'G').length;
+      const currentD = starting.filter(p => (p.position || 'M').toUpperCase()[0] === 'D').length;
+      const currentM = starting.filter(p => (p.position || 'M').toUpperCase()[0] === 'M').length;
+      const currentF = starting.filter(p => (p.position || 'M').toUpperCase()[0] === 'F').length;
+
+      pickN(byPos.G, Math.max(0, 1 - currentG)); 
+      pickN(byPos.D, Math.max(0, 4 - currentD)); 
+      pickN(byPos.M, Math.max(0, 3 - currentM)); 
+      pickN(byPos.F, Math.max(0, 3 - currentF));
+      
+      // If still less than 11, just pick anyone
+      if (starting.length < 11) {
+        for (const p of pool) {
+          if (starting.length >= 11) break;
+          if (!usedIdx.has(p.player?.id)) {
+            starting.push({ ...p, substitute: false, isReserve: false }); 
+            usedIdx.add(p.player?.id);
+          }
+        }
+      }
+    }
+
+    // Assign up to 9 remaining as substitutes if not already populated from previous match
+    if (subs.length === 0) {
+      const remainingForSubs = pool.filter(p => !usedIdx.has(p.player?.id)).slice(0, 9);
+      for (const p of remainingForSubs) {
+        subs.push({ ...p, substitute: true, isReserve: false });
+        usedIdx.add(p.player.id);
+      }
+    }
+
+    const reserves = pool.filter(p => !usedIdx.has(p.player?.id)).map(p => ({ ...p, substitute: true, isReserve: true }));
+
+    return { players: [...starting, ...subs, ...reserves], formation: '4-3-3', isFallback: true };
   }
 
   function normalizeStarters(lineup) {
     if (!lineup || !lineup.players) return lineup;
     let starterCount = 0;
     const players = lineup.players.map(p => {
-      if (!p.substitute) {
+      // Determine if a player was neither starter nor sub based on the source data.
+      // If it's a squad list without starter distinction, they might all be `substitute: false`.
+      const isActuallyReserve = p.isReserve || false;
+      if (!p.substitute && !isActuallyReserve) {
         if (starterCount >= 11) {
           return { ...p, substitute: true };
         }
@@ -257,20 +327,20 @@ async function fetchAllMatchData(eventId) {
 
   const lineupsSafe = lineups || {};
   if (!lineupsSafe.home || !lineupsSafe.home.players || lineupsSafe.home.players.length === 0) {
-    lineupsSafe.home = buildFallbackLineup(homePlayers); lineupsSafe.isFallback = true;
+    lineupsSafe.home = buildFallbackLineup(homePlayers, homeRecentMatchDetails, homeTeamId); lineupsSafe.isFallback = true;
   } else {
     lineupsSafe.home = normalizeStarters(lineupsSafe.home);
   }
   if (!lineupsSafe.away || !lineupsSafe.away.players || lineupsSafe.away.players.length === 0) {
-    lineupsSafe.away = buildFallbackLineup(awayPlayers); lineupsSafe.isFallback = true;
+    lineupsSafe.away = buildFallbackLineup(awayPlayers, awayRecentMatchDetails, awayTeamId); lineupsSafe.isFallback = true;
   } else {
     lineupsSafe.away = normalizeStarters(lineupsSafe.away);
   }
 
   // 9. Oyuncu Sezon İstatistikleri (Ev ve Deplasman Paralel)
   const [homePResult, awayPResult] = await Promise.all([
-    fetchPlayerStats(lineups?.home?.players, tournamentId, seasonId),
-    fetchPlayerStats(lineups?.away?.players, tournamentId, seasonId),
+    fetchPlayerStats(lineupsSafe?.home?.players, tournamentId, seasonId),
+    fetchPlayerStats(lineupsSafe?.away?.players, tournamentId, seasonId),
   ]);
   const { stats: homePlayerStats, log: homePlayerLog } = homePResult;
   const { stats: awayPlayerStats, log: awayPlayerLog } = awayPResult;
@@ -373,7 +443,7 @@ async function fetchAllMatchData(eventId) {
     refereeId,
 
     // Maç seviyesi
-    lineups,
+    lineups: lineupsSafe,
     h2h,
     h2hEvents,
     teamH2H,

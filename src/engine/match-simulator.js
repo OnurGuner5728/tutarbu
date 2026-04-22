@@ -370,8 +370,8 @@ function calculateUnitImpact(blockId, metrics, selected, audit, dynamicAvgs, bas
   // normMinRatio = min takım gol/maç ÷ lig ort., normMaxRatio = max takım ÷ lig ort.
   // Veri yoksa 1.0 kimliği (normalizasyon uygulanmaz — identity clamp).
   // İKİ MOTOR (match-simulator + simulatorEngine) AYNI BU DEĞERLERİ KULLANIR.
-  const nMin = (baseline && baseline.normMinRatio != null && baseline.normMinRatio > 0) ? baseline.normMinRatio : 1.0;
-  const nMax = (baseline && baseline.normMaxRatio != null && baseline.normMaxRatio > 0) ? baseline.normMaxRatio : 1.0;
+  const nMin = (baseline && baseline.normMinRatio != null && baseline.normMinRatio > 0) ? baseline.normMinRatio : 0.5;
+  const nMax = (baseline && baseline.normMaxRatio != null && baseline.normMaxRatio > 0) ? baseline.normMaxRatio : 2.0;
 
   let totalWeight = 0;
   let weightedFactor = 0;
@@ -391,7 +391,11 @@ function calculateUnitImpact(blockId, metrics, selected, audit, dynamicAvgs, bas
       continue;
     }
     // normalized = 1.0 at league average; clamp sınırları liğin kendi min/max takım dağılımı.
-    let normalized = clamp(val / leagueAvg, nMin, nMax);
+    // DİNAMİK VARYANS BÜYÜTECİ: lig volatilitesine göre farklılıkları matematiksel olarak belirginleştir
+    const amplify = baseline.leagueGoalVolatility ? Math.max(1.0, baseline.leagueGoalVolatility) : 1.2;
+    const rawRatio = val / leagueAvg;
+    const variance = rawRatio - 1.0;
+    let normalized = clamp(1.0 + (variance * amplify), nMin, nMax);
 
     if (sign === -1) normalized = 2.0 - normalized;
     weightedFactor += normalized * weight;
@@ -406,7 +410,7 @@ function calculateUnitImpact(blockId, metrics, selected, audit, dynamicAvgs, bas
   return result;
 }
 
-function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups, weatherMetrics, baseline, rng, audit, homeSubQuality, awaySubQuality, dynamicAvgs, homeAdvantage, dynamicTimeWindows, lambdaAnchorHome, lambdaAnchorAway }) {
+function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups, weatherMetrics, baseline, rng, audit, homeSubQuality, awaySubQuality, dynamicAvgs, homeAdvantage, dynamicTimeWindows }) {
   const r = rng || Math.random;
   const { goalMult: weatherGoalMult, errorMult: weatherErrorMult } = computeWeatherMultipliers(weatherMetrics || {});
   const sel = selectedMetrics instanceof Set ? selectedMetrics : new Set(selectedMetrics || []);
@@ -449,66 +453,8 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
   const hProb = computeProbBases(homeMetrics, sel, homeUnits, baseline, audit, _simQF.home);
   const aProb = computeProbBases(awayMetrics, sel, awayUnits, baseline, audit, _simQF.away);
 
-  // ── Lambda Anchor: MC beklenen golü Poisson lambda'ya kilitle ────────────────
-  // Poisson (Dixon-Coles + xG + rakip kalite + homeAdvantage + behavMod) en güvenilir kaynak.
-  // MC ise shots × onTarget × conv + dampedFlow zincirinden gol üretir → rakip kaliteyi eksik modeller.
-  //
-  // Anchor mantığı: shotsPerMin'i scale et → MC beklenen gol = Poisson lambda.
-  // KRİTİK: Lambda zaten homeAdvantage içerdiği için, anchor aktifse homeAdvantage
-  // bloğunu ATLAMALIYIZ — aksi halde çift sayım olur (MC lambda'dan ~sqrt(homeAdv) fazla üretir).
-  //
-  // dampedFlow (atkPower/oppDefPower) ek davranışsal dinamik — simülasyon sırasında
-  // momentum/morale ile değişir; bunu anchor'da öngöremeyiz ama küçük bir sapma getirir (%10-30).
-  // Lambda null ise scale uygulanmaz, homeAdvantage bloğu normal çalışır.
-  // dampedFlow'un başlangıç etkisi: (atkPower/oppDefPower)^blockRate
-  // Takım birimlerinden güçleri türet (getAttackPower/getDefensePower ilk dakika değerleri).
-  // Simülasyonda momentum/morale/urgency evrimleştiğinde sapma olur ama başlangıç yaklaşık iyi.
-  const geo3Quick = (a, b, c) => Math.cbrt(Math.max(a, 0.01) * Math.max(b, 0.01) * Math.max(c, 0.01));
-  const geo2Quick = (a, b) => Math.sqrt(Math.max(a, 0.01) * Math.max(b, 0.01));
-
-  const _estAtkPower = (u) => {
-    const atkUnit = geo3Quick(u.BITIRICILIK, u.YARATICILIK, u.SUT_URETIMI);
-    const formUnit = geo2Quick(u.FORM_KISA, u.FORM_UZUN);
-    return clamp(atkUnit * formUnit, SIM_CONFIG.LIMITS.POWER.MIN, SIM_CONFIG.LIMITS.POWER.MAX);
-  };
-  const _estDefPower = (u) => {
-    const defUnit = geo3Quick(u.SAVUNMA_DIRENCI, u.SAVUNMA_AKSIYONU, u.GK_REFLEKS);
-    const orgUnit = geo2Quick(u.DISIPLIN, u.GK_ALAN_HAKIMIYETI);
-    return clamp(defUnit * orgUnit, SIM_CONFIG.LIMITS.POWER.MIN, SIM_CONFIG.LIMITS.POWER.MAX);
-  };
-
-  const _homeAtkPower = _estAtkPower(homeUnits);
-  const _awayAtkPower = _estAtkPower(awayUnits);
-  const _homeDefPower = _estDefPower(homeUnits);
-  const _awayDefPower = _estDefPower(awayUnits);
-
-  const _applyLambdaAnchor = (prob, lambdaTarget, atkPower, oppDefPower) => {
-    if (lambdaTarget == null || lambdaTarget <= 0) return false;
-    const mcExp = prob.shotsPerMin * 90 * prob.onTargetRate * prob.goalConvRate;
-    if (mcExp <= 0 || !isFinite(mcExp)) return false;
-    // Simülasyondaki beklenen dampedFlow: (atkPower/oppDefPower)^blockRate
-    // Bu, shotProb = shotsPerMin × dampedFlow çarpımından gelen ek multiplier.
-    // Lambda anchor'ı bunu önceden kompanse etmelidir → scale / expectedDampedFlow
-    // Sıfıra bölme ve saturasyon: EPS ve baseline CV-bazlı (sabit 0.3/0.25/0.01 kaldırıldı).
-    const _anchorEPS = (baseline?.leagueAvgGoals || 1) / 1000;
-    const rawFlow = atkPower / Math.max(oppDefPower, _anchorEPS);
-    const blockRate = prob.blockRate ?? _anchorEPS;
-    const expectedDampedFlow = Math.pow(Math.max(rawFlow, _anchorEPS), blockRate);
-    const scale = lambdaTarget / (mcExp * expectedDampedFlow);
-    // Clamp: lig CV'si ile genişlet. Vol/avg ile asimetrik bant.
-    const _cvBL = (baseline?.leagueGoalVolatility != null && baseline?.leagueAvgGoals > 0)
-      ? baseline.leagueGoalVolatility / baseline.leagueAvgGoals : null;
-    const _scaleMin = _cvBL != null ? _anchorEPS / (1 + _cvBL) : _anchorEPS;
-    const _scaleMax = _cvBL != null ? (1 + _cvBL) / _anchorEPS : 1 / _anchorEPS;
-    prob.shotsPerMin *= clamp(scale, _scaleMin, _scaleMax);
-    return true;
-  };
-  const _homeAnchored = _applyLambdaAnchor(hProb, lambdaAnchorHome, _homeAtkPower, _awayDefPower);
-  const _awayAnchored = _applyLambdaAnchor(aProb, lambdaAnchorAway, _awayAtkPower, _homeDefPower);
-
-  // Ev sahibi avantajı: Sadece anchor UYGULANMADIYSA devreye gir (çift sayımı önle).
-  // Lambda zaten homeAdvantage × dcBase × behavMod içeriyor.
-  if (homeAdvantage != null && homeAdvantage !== 1.0 && !_homeAnchored && !_awayAnchored) {
+  // Ev sahibi avantajı doğrudan uygulanır (Anchor engeli kaldırıldı)
+  if (homeAdvantage != null && homeAdvantage !== 1.0) {
     const advBoost = Math.sqrt(homeAdvantage);
     hProb.shotsPerMin = hProb.shotsPerMin * advBoost;
     aProb.shotsPerMin = aProb.shotsPerMin / advBoost;
@@ -625,18 +571,90 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
     return name;
   }
 
-  const getEffectiveUnits = (side) => {
+  const getEffectiveUnits = (side, minute) => {
     const u = side === 'home' ? homeUnits : awayUnits;
     const s = side === 'home' ? state.home : state.away;
     const effective = { ...u };
     const rcMult = (1 - s.redCardPenalty);
-    effective.MOMENTUM_AKIŞI = clamp(u.MOMENTUM_AKIŞI * s.momentum * rcMult, SIM_CONFIG.LIMITS.MOMENTUM.MIN, SIM_CONFIG.LIMITS.MOMENTUM.MAX);
-    effective.ZİHİNSEL_DAYANIKLILIK = clamp(u.ZİHİNSEL_DAYANIKLILIK * s.morale * rcMult, SIM_CONFIG.LIMITS.MORALE.MIN, SIM_CONFIG.LIMITS.MORALE.MAX);
-    // GOL_IHTIYACI doğal sınır: unit [0.75,1.35] × urgency [1.0,2.35] → max ~3.17
+    
+    // Lig temposu (volatility) ve kadro derinliğine göre dinamik yorgunluk hızı
+    // Yüksek tempolu ligde dar kadrolar daha çabuk yorulur.
+    const leaguePace = baseline.leagueGoalVolatility || 1.0; 
+    const squadDepth = u.KADRO_DERINLIGI || 1.0;
+    const fragility = u.PSIKOLOJIK_KIRILGANLIK || 1.0;
+    const mentalToughness = u.ZİHİNSEL_DAYANIKLILIK || 1.0;
+    const leagueTeamCount = baseline.leagueTeamCount || 20; // Genelde 18-20
+
+    // Maçın hangi safhasında olduğumuzu lateBase (dinamik gol sonları dakikası) belirler
+    const matchProgress = minute / (lateBase || 90); 
+    
+    // Yorgunluk Çarpanı: Takımın yorgunluk eşiği kadro derinliği ve zihinsel dirence göre esner
+    const fatigueRate = (leaguePace * fragility) / (squadDepth * mentalToughness);
+    // Yorgunluk maç ilerledikçe artar, minimum sınır kırılganlıkla orantılıdır, ölçek için lig takım sayısı kullanılır
+    const fatigueFactor = Math.max(fragility / (squadDepth + mentalToughness), 1.0 - ((matchProgress * fatigueRate) / leagueTeamCount)); 
+
+    // ── HÜCUM GRUBU ──
+    effective.BITIRICILIK = u.BITIRICILIK * s.morale * rcMult * fatigueFactor;
+    effective.YARATICILIK = u.YARATICILIK * s.morale * rcMult * fatigueFactor;
+    effective.SUT_URETIMI = u.SUT_URETIMI * s.momentum * s.urgency * rcMult;
+    effective.HAVA_HAKIMIYETI = u.HAVA_HAKIMIYETI * fatigueFactor * rcMult;
+    effective.DURAN_TOP = u.DURAN_TOP * s.morale * rcMult;
+
+    // ── SAVUNMA GRUBU ──
+    effective.SAVUNMA_DIRENCI = u.SAVUNMA_DIRENCI * s.morale * fatigueFactor * rcMult;
+    effective.SAVUNMA_AKSIYONU = u.SAVUNMA_AKSIYONU * s.momentum * fatigueFactor * rcMult;
+    // Disiplin: takımın aciliyeti arttıkça kırılganlığa bağlı olarak düşer
+    const urgencyExcess = Math.max(0, s.urgency - 1.0);
+    const disciplineDrop = urgencyExcess * fragility * leaguePace; 
+    effective.DISIPLIN = u.DISIPLIN * rcMult * Math.max(fragility / squadDepth, 1.0 - disciplineDrop); 
+
+    // ── PSİKANALİZ GRUBU ──
+    const moraleMin = baseline.normMinRatio || 0.5;
+    const moraleMax = baseline.normMaxRatio || 2.0;
+    effective.ZİHİNSEL_DAYANIKLILIK = clamp(u.ZİHİNSEL_DAYANIKLILIK * s.morale * rcMult, moraleMin, moraleMax);
+    // Kırılganlık ters çalışır: Moral düştükçe ve kırmızı kart oldukça kırılganlık üstel artar
+    const moraleDeficit = Math.max(0, 1.0 - s.morale);
+    const cardImpact = s.redCardPenalty * (leaguePace / squadDepth); 
+    effective.PSIKOLOJIK_KIRILGANLIK = u.PSIKOLOJIK_KIRILGANLIK * (1.0 + moraleDeficit) * (1.0 + cardImpact);
     effective.GOL_IHTIYACI = u.GOL_IHTIYACI * s.urgency * rcMult;
-    effective.BITIRICILIK = u.BITIRICILIK * s.morale * rcMult;
-    effective.YARATICILIK = u.YARATICILIK * s.morale * rcMult;
-    effective.SAVUNMA_DIRENCI = u.SAVUNMA_DIRENCI * s.morale * rcMult;
+    // Turnuva baskısı: maç sonuna yaklaştıkça ligin temposu kadar artar
+    const pressureGrowth = matchProgress * leaguePace * fragility;
+    effective.TURNUVA_BASKISI = u.TURNUVA_BASKISI * (1.0 + pressureGrowth);
+
+    // ── BAĞLAM GRUBU ──
+    // Başlangıç etkisi dinamik earlyBase (ör. ilk 20 dk) içinde erir
+    const earlyPhaseRatio = minute / (earlyBase || 20);
+    effective.MAC_BASLANGICI = u.MAC_BASLANGICI * Math.max(0, 1.0 - earlyPhaseRatio);
+    
+    // Son dakika etkisi: lateBase geçildikten sonra aciliyete göre üstel fırlar
+    const latePhaseAmplifier = Math.max(1.0, Math.pow(minute / (lateBase || 75), urgencyExcess + 1.0));
+    effective.MAC_SONU = u.MAC_SONU * latePhaseAmplifier; 
+    
+    // Menajer taktiği, takımın aciliyet seviyesine göre sahaya daha çok yansır
+    effective.MENAJER_STRATEJISI = u.MENAJER_STRATEJISI * s.urgency;
+    
+    // Hakem kararları stadyum momentumundan (lig volatilitesi oranında) etkilenir
+    const momentumExcess = s.momentum - 1.0;
+    effective.HAKEM_DINAMIKLERI = u.HAKEM_DINAMIKLERI * (1.0 + (momentumExcess * leaguePace)); 
+
+    // ── OPERASYONEL GRUP ──
+    effective.TAKTIKSEL_UYUM = u.TAKTIKSEL_UYUM * rcMult * fatigueFactor;
+    effective.BAGLANTI_OYUNU = u.BAGLANTI_OYUNU * s.momentum * rcMult * fatigueFactor;
+    // Kadro derinliği, yedekler oyuna girdikçe takımın base derinliğine ve lige göre artar
+    const subImpact = subsDone[side] * (leaguePace / (squadDepth * leagueTeamCount));
+    effective.KADRO_DERINLIGI = u.KADRO_DERINLIGI * (1.0 + subImpact);
+    // H2H Dominasyon tarihseldir, maç içi sabittir (tek istisna)
+    effective.H2H_DOMINASYON = u.H2H_DOMINASYON; 
+    const momMin = baseline.normMinRatio || 0.5;
+    const momMax = baseline.normMaxRatio || 2.5;
+    effective.MOMENTUM_AKIŞI = clamp(u.MOMENTUM_AKIŞI * s.momentum * rcMult, momMin, momMax);
+
+    // ── KALECİ GRUBU ──
+    // Kaleci yorulmaz ama morali (ve savunmanın çöküşü) etkiler
+    effective.GK_REFLEKS = u.GK_REFLEKS * s.morale; 
+    effective.GK_ALAN_HAKIMIYETI = u.GK_ALAN_HAKIMIYETI * s.morale;
+    effective.TOPLA_OYNAMA = u.TOPLA_OYNAMA * s.momentum * rcMult;
+
     return effective;
   };
 
@@ -845,28 +863,37 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
       const discUnit = isHome ? homeUnits.DISIPLIN : awayUnits.DISIPLIN;
 
       const yellowProb = clamp(attkProb.yellowPerMin / Math.max(discUnit, EPS), 0.0001, 0.05);
-      if (r() < yellowProb) {
-        const cardName = pickActivePlayer(isHome ? hPlayers : aPlayers, null, side) || 'Player';
-        const yellows = playerYellows[side];
-        yellows[cardName] = (yellows[cardName] || 0) + 1;
-        stats[side].yellowCards++;
-        const resilience = geo2(isHome ? homeUnits.DISIPLIN : awayUnits.DISIPLIN, isHome ? homeUnits.ZİHİNSEL_DAYANIKLILIK : awayUnits.ZİHİNSEL_DAYANIKLILIK);
-        const kadroDepth = isHome ? homeUnits.KADRO_DERINLIGI : awayUnits.KADRO_DERINLIGI;
-        const _rcPM = _rcMinPenalty ?? 0;
-        const _rcPX = _rcMaxPenalty ?? _rcPenMax;
-        const organicPenalty = clamp((1.0 / Math.max(kadroDepth, EPS) - 1.0) / Math.max(EPS, resilience), _rcPM, _rcPX);
-        if (yellows[cardName] >= 2 && !expelledPlayers[side].has(cardName)) {
+      const redProb = clamp(attkProb.redPerMin / Math.max(discUnit, EPS), 0, 0.002);
+      const resilience = geo2(isHome ? homeUnits.DISIPLIN : awayUnits.DISIPLIN, isHome ? homeUnits.ZİHİNSEL_DAYANIKLILIK : awayUnits.ZİHİNSEL_DAYANIKLILIK);
+      const kadroDepth = isHome ? homeUnits.KADRO_DERINLIGI : awayUnits.KADRO_DERINLIGI;
+      const _rcPM = _rcMinPenalty ?? 0;
+      const _rcPX = _rcMaxPenalty ?? _rcPenMax;
+      const organicPenalty = clamp((1.0 / Math.max(kadroDepth, EPS) - 1.0) / Math.max(EPS, resilience), _rcPM, _rcPX);
+
+      // Direct Red Card
+      if (r() < redProb) {
+        const cardName = pickActivePlayer(isHome ? hPlayers : aPlayers, null, side) || `Player ${Math.floor(r() * 11) + 1}`;
+        if (!expelledPlayers[side].has(cardName)) {
           expelledPlayers[side].add(cardName);
           stats[side].redCards++;
           state[side].redCardPenalty = clamp(state[side].redCardPenalty + organicPenalty, 0, _rcPenMax);
-          pushEvent({ minute, type: 'red_card', team: side, player: cardName, subtype: 'second_yellow' });
-        } else if (!expelledPlayers[side].has(cardName)) {
-          const redProb = clamp(attkProb.redPerMin / Math.max(discUnit, EPS), 0, 0.002);
-          if (r() < redProb) {
+          pushEvent({ minute, type: 'red_card', team: side, player: cardName, subtype: 'direct_red' });
+        }
+      } 
+      // Yellow Card
+      else if (r() < yellowProb) {
+        // Use a generic player ID 1-11 if lineups are missing to prevent every card going to the same "Player"
+        const cardName = pickActivePlayer(isHome ? hPlayers : aPlayers, null, side) || `Player ${Math.floor(r() * 11) + 1}`;
+        if (!expelledPlayers[side].has(cardName)) {
+          const yellows = playerYellows[side];
+          yellows[cardName] = (yellows[cardName] || 0) + 1;
+          stats[side].yellowCards++;
+          
+          if (yellows[cardName] >= 2) {
             expelledPlayers[side].add(cardName);
             stats[side].redCards++;
             state[side].redCardPenalty = clamp(state[side].redCardPenalty + organicPenalty, 0, _rcPenMax);
-            pushEvent({ minute, type: 'red_card', team: side, player: cardName });
+            pushEvent({ minute, type: 'red_card', team: side, player: cardName, subtype: 'second_yellow' });
           } else {
             pushEvent({ minute, type: 'yellow_card', team: side, player: cardName });
           }
@@ -891,7 +918,7 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
     minuteLog.push({
       minute,
       events: minuteEvents,
-      behavioralState: { home: getEffectiveUnits('home'), away: getEffectiveUnits('away') },
+      behavioralState: { home: getEffectiveUnits('home', minute), away: getEffectiveUnits('away', minute) },
       possession: { home: Math.round(currentHomePos), away: 100 - Math.round(currentHomePos) }
     });
   }
@@ -907,77 +934,39 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
 }
 
 function simulateMultipleRuns(params) {
-  const { runs = 1000, lambdaAnchorHome, lambdaAnchorAway, rng } = params;
+  const { runs = 1000, rng } = params;
   const r = rng || Math.random;
   let bestSampleRun = null;
   let bestSampleDist = Infinity;
   const candidateRuns = [];
 
-  // Ham MC sonuçları — her run'ın (hg, ag) ikilisi saklanır; lambda anchor renormalization için
-  const rawRuns = new Array(runs);
-  let rawHomeSum = 0, rawAwaySum = 0;
+  let homeWins = 0, draws = 0, awayWins = 0;
+  let over15 = 0, over25 = 0, btts = 0;
+  let totalGoals = 0, totalHomeGoals = 0, totalAwayGoals = 0;
+  const scoreMap = {};
 
   for (let i = 0; i < runs; i++) {
     const run = simulateSingleRun(params);
     const hg = run.result.homeGoals;
     const ag = run.result.awayGoals;
-    rawRuns[i] = { hg, ag, winner: run.result.winner };
-    rawHomeSum += hg;
-    rawAwaySum += ag;
-    if (i === 0 || i % 50 === 0) candidateRuns.push(run);
-  }
-
-  // ── Lambda-Anchored Post-Hoc Renormalization ──────────────────────────────
-  // MC evrim döngüsü (morale/urgency/dampedFlow) home λ'yı sistematik olarak
-  // aşağı çekiyor. Çözüm: Her run'ın gol sayılarını Poisson(target_λ × raw/raw_avg)
-  // ile yeniden örnekle → ortalama lambda anchor'a kilitlenir, bireysel varyans korunur.
-  //
-  // Yalnız lambda anchor verisi varsa çalışır (Poisson λ'dan gelir).
-  const rawAvgHome = rawHomeSum / runs;
-  const rawAvgAway = rawAwaySum / runs;
-  const scaleH = (lambdaAnchorHome != null && lambdaAnchorHome > 0 && rawAvgHome > 0)
-    ? lambdaAnchorHome / rawAvgHome : null;
-  const scaleA = (lambdaAnchorAway != null && lambdaAnchorAway > 0 && rawAvgAway > 0)
-    ? lambdaAnchorAway / rawAvgAway : null;
-
-  // Poisson sampling — Knuth algorithm
-  const poissonSample = (lambda) => {
-    if (lambda <= 0) return 0;
-    const L = Math.exp(-lambda);
-    let k = 0;
-    let p = 1;
-    do {
-      k++;
-      p *= r();
-    } while (p > L);
-    return k - 1;
-  };
-
-  let homeWins = 0, draws = 0, awayWins = 0;
-  let over15 = 0, over25 = 0, btts = 0;
-  let totalGoals = 0, totalHomeGoals = 0, totalAwayGoals = 0;
-  const scoreMap = {};
-  const adjustedRuns = new Array(runs);
-
-  for (let i = 0; i < runs; i++) {
-    const { hg: rawHg, ag: rawAg } = rawRuns[i];
-    // Her run'ın hedef lambdası: bireysel run'ın sapması (raw/avg) × anchor ortalaması.
-    // scale null ise raw değeri kullan (anchor verisi yok → MC olduğu gibi).
-    const hg = scaleH != null ? poissonSample(rawHg * scaleH) : rawHg;
-    const ag = scaleA != null ? poissonSample(rawAg * scaleA) : rawAg;
-    adjustedRuns[i] = { hg, ag };
+    
     const total = hg + ag;
     if (hg > ag) homeWins++;
     else if (ag > hg) awayWins++;
     else draws++;
+    
     if (total > 1.5) over15++;
     if (total > 2.5) over25++;
     if (hg > 0 && ag > 0) btts++;
+    
     totalGoals += total;
     totalHomeGoals += hg;
     totalAwayGoals += ag;
+    
     const key = `${hg}-${ag}`;
-    scoreMap[key] = (scoreMap[key] || ND.COUNTER_INIT) + 1;
+    scoreMap[key] = (scoreMap[key] || 0) + 1;
+
+    if (i === 0 || i % 50 === 0) candidateRuns.push(run);
   }
 
   const avgHome = totalHomeGoals / runs;
@@ -1002,9 +991,7 @@ function simulateMultipleRuns(params) {
       avgAwayGoals: +avgAway.toFixed(2),
       topScore: sortedScores[0]?.[0] ?? null,
       scoreFrequency: sortedScores.slice(0, 10).reduce((acc, [score, cnt]) => { acc[score] = pct(cnt); return acc; }, {}),
-      lambdaAnchored: scaleH != null && scaleA != null,
-      scaleH: scaleH != null ? +scaleH.toFixed(3) : null,
-      scaleA: scaleA != null ? +scaleA.toFixed(3) : null,
+      lambdaAnchored: false,
     },
     sampleRun: bestSampleRun
   };

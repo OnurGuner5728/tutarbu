@@ -1,11 +1,12 @@
 const express = require('express');
 const cors = require('cors');
-const { fetchAllMatchData } = require('./services/data-fetcher');
+const { fetchAllMatchData, fetchPlayerStatsForPlayers } = require('./services/data-fetcher');
 const { calculateAllMetrics } = require('./engine/metric-calculator');
 const { generatePrediction } = require('./engine/prediction-generator');
 const { getDynamicBaseline } = require('./engine/dynamic-baseline');
 const { METRIC_METADATA } = require('./engine/metric-metadata');
 const { computePositionMVBreakdown } = require('./engine/quality-factors');
+const playwrightClient = require('./services/playwright-client');
 
 function createRNG(seed) {
   if (seed == null) return Math.random;
@@ -22,6 +23,48 @@ function createRNG(seed) {
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+
+// Helper Function for Shared API Logic
+function enrichMatchResponse(prediction, metrics, baseline, data, reqQuery) {
+  if (reqQuery.debug === '1') {
+    prediction._debug = {
+      providerAudit: {
+        total: (data._apiLog || []).length,
+        failed: (data._apiLog || []).filter(l => !l.success).length,
+        providers: (data._apiLog || []).map(l => ({
+          provider: l.endpoint,
+          status: l.status || (l.success ? 'fulfilled' : 'rejected'),
+          elapsedMs: l.elapsedMs || 0,
+          isCritical: l.isCritical || false
+        }))
+      },
+      metricAudit: metrics.metricAudit
+    };
+  }
+
+  prediction.leagueBaseline = baseline;
+  
+  const enrichedTraces = {};
+  if (metrics.leagueAvgTraces) {
+    Object.entries(metrics.leagueAvgTraces).forEach(([id, trace]) => {
+      const meta = METRIC_METADATA[id];
+      enrichedTraces[id] = {
+        name: meta?.name || id,
+        description: meta?.description || 'Dinamik hesaplanmış lig ortalaması.',
+        role: meta?.simulationRole?.[0] || 'Genel simülasyon dengesi',
+        trace: trace
+      };
+    });
+  }
+
+  prediction.metadata = {
+    ...(prediction.metadata || {}),
+    dynamicLeagueAvgs: metrics.dynamicLeagueAvgs,
+    leagueAvgTraces: enrichedTraces,
+    dynamicHomeAdvantage: metrics.dynamicHomeAdvantage
+  };
+  return prediction;
+}
 
 // Production'da CORS_ORIGIN env variable ile kısıtlanmalı.
 // Örnek: CORS_ORIGIN=https://tutarbu.com node server.js
@@ -62,11 +105,21 @@ function rateLimitMiddleware(req, res, next) {
   next();
 }
 
+// 🛡️ Rate Limit Temizlik Interval'i (Memory Leak Fix)
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, rec] of rateLimitStore) {
+    if (now > rec.resetAt) {
+      rateLimitStore.delete(ip);
+    }
+  }
+}, 15 * 60 * 1000);
+
 app.use(rateLimitMiddleware);
 
 // Match data cache (5 dakika TTL, max 100 girdi)
 const matchDataCache = new Map();
-const MATCH_CACHE_TTL = 0; // Disabled to prevent stale workshop data
+const MATCH_CACHE_TTL = 5 * 60 * 1000; // 5 dakika
 const MAX_CACHE_SIZE = 100;
 
 function getCachedMatchData(eventId) {
@@ -97,7 +150,6 @@ app.get('/api/matches', async (req, res) => {
   const targetDate = req.query.date || new Date().toISOString().split('T')[0];
   try {
     console.log(`[API] Fetching real match list for ${targetDate} via Playwright...`);
-    const playwrightClient = require('./services/playwright-client');
     const data = await playwrightClient.getScheduledEvents(targetDate);
     
     if (!data || !Array.isArray(data.events) || data.events.length === 0) {
@@ -195,47 +247,11 @@ app.post('/api/predict/:eventId', async (req, res) => {
     const rng = createRNG(req.query.seed);
 
     // 5. Generate Report
-    const prediction = generatePrediction(metrics, data, baseline, metrics.metricAudit, rng);
+    let prediction = generatePrediction(metrics, data, baseline, metrics.metricAudit, rng);
 
-    // Phase 1 Observation: Debug Payload
-    if (req.query.debug === '1') {
-      prediction._debug = {
-        providerAudit: {
-          total: (data._apiLog || []).length,
-          failed: (data._apiLog || []).filter(l => !l.success).length,
-          providers: (data._apiLog || []).map(l => ({
-            provider: l.endpoint,
-            status: l.status || (l.success ? 'fulfilled' : 'rejected'),
-            elapsedMs: l.elapsedMs || 0,
-            isCritical: l.isCritical || false
-          }))
-        },
-        metricAudit: metrics.metricAudit
-      };
-    }
+    // Common response enrichment (DRY Refactor)
+    prediction = enrichMatchResponse(prediction, metrics, baseline, data, req.query);
 
-    prediction.leagueBaseline = baseline;
-    
-    // Enrich traces with human readable metadata
-    const enrichedTraces = {};
-    if (metrics.leagueAvgTraces) {
-      Object.entries(metrics.leagueAvgTraces).forEach(([id, trace]) => {
-        const meta = METRIC_METADATA[id];
-        enrichedTraces[id] = {
-          name: meta?.name || id,
-          description: meta?.description || 'Dinamik hesaplanmış lig ortalaması.',
-          role: meta?.simulationRole?.[0] || 'Genel simülasyon dengesi',
-          trace: trace
-        };
-      });
-    }
-
-    prediction.metadata = {
-      ...(prediction.metadata || {}),
-      dynamicLeagueAvgs: metrics.dynamicLeagueAvgs,
-      leagueAvgTraces: enrichedTraces,
-      dynamicHomeAdvantage: metrics.dynamicHomeAdvantage
-    };
     res.json(prediction);
   } catch (err) {
     console.error(`[API ERROR] predict/${eventId}: ${err.message}`);
@@ -279,8 +295,6 @@ app.post('/api/workshop/:eventId', async (req, res) => {
     const data = structuredClone(cachedData);
 
     if (modifiedLineup) {
-      const { fetchPlayerStatsForPlayers } = require('./services/data-fetcher');
-
       for (const side of ['home', 'away']) {
         if (!modifiedLineup[side]) continue;
 
@@ -327,47 +341,11 @@ app.post('/api/workshop/:eventId', async (req, res) => {
     const metrics = calculateAllMetrics(data);
     const baseline = getDynamicBaseline(data);
     const rng = createRNG(req.query.seed);
-    const prediction = generatePrediction(metrics, data, baseline, metrics.metricAudit, rng);
+    let prediction = generatePrediction(metrics, data, baseline, metrics.metricAudit, rng);
 
-    // Phase 1 Observation: Debug Payload
-    if (req.query.debug === '1') {
-      prediction._debug = {
-        providerAudit: {
-          total: (data._apiLog || []).length,
-          failed: (data._apiLog || []).filter(l => !l.success).length,
-          providers: (data._apiLog || []).map(l => ({
-            provider: l.endpoint,
-            status: l.status || (l.success ? 'fulfilled' : 'rejected'),
-            elapsedMs: l.elapsedMs || 0,
-            isCritical: l.isCritical || false
-          }))
-        },
-        metricAudit: metrics.metricAudit
-      };
-    }
+    // Common response enrichment (DRY Refactor)
+    prediction = enrichMatchResponse(prediction, metrics, baseline, data, req.query);
 
-    prediction.leagueBaseline = baseline;
-
-    // Enrich traces with human readable metadata
-    const enrichedTraces = {};
-    if (metrics.leagueAvgTraces) {
-      Object.entries(metrics.leagueAvgTraces).forEach(([id, trace]) => {
-        const meta = METRIC_METADATA[id];
-        enrichedTraces[id] = {
-          name: meta?.name || id,
-          description: meta?.description || 'Dinamik hesaplanmış lig ortalaması.',
-          role: meta?.simulationRole?.[0] || 'Genel simülasyon dengesi',
-          trace: trace
-        };
-      });
-    }
-
-    prediction.metadata = {
-      ...(prediction.metadata || {}),
-      dynamicLeagueAvgs: metrics.dynamicLeagueAvgs,
-      leagueAvgTraces: enrichedTraces,
-      dynamicHomeAdvantage: metrics.dynamicHomeAdvantage
-    };
     res.json(prediction);
   } catch (err) {
     console.error(`[API ERROR] workshop/${eventId}: ${err.message}`);

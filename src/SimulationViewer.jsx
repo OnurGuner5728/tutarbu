@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import BehavioralGrid from './components/BehavioralGrid';
-import { createEngine } from './engine/simulatorEngine';
 
 // ── Event display config ─────────────────────────────────────────────────────
 const EVENT_ICONS = {
@@ -552,7 +551,7 @@ function AuditPanel({ metadata, homeTeam, awayTeam, metricsData }) {
 
 // ── Main SimulationViewer ─────────────────────────────────────────────────────
 export default function SimulationViewer({ 
-  simulation, engineData, homeTeam, awayTeam, isMultiRun, multiRunResult, onMinuteChange, metadata,
+  simulation, homeTeam, awayTeam, isMultiRun, multiRunResult, onMinuteChange, metadata,
   showAudit, metricsData 
 }) {
   const [currentMinute, setCurrentMinute] = useState(0);
@@ -560,93 +559,87 @@ export default function SimulationViewer({
   const [speed, setSpeed] = useState(2);
   const [goalFlash, setGoalFlash] = useState(false);
 
-  // Client-side simulation state
-  const [allEvents, setAllEvents] = useState([]);
-  const [currentBehavioralState, setCurrentBehavioralState] = useState(null);
-  const [currentPoss, setCurrentPoss] = useState({ home: 50, away: 50 });
-  const [liveGoals, setLiveGoals] = useState({ home: 0, away: 0 });
-  const [liveStats, setLiveStats] = useState({
-    home: { shots: 0, shotsOnTarget: 0, corners: 0, yellowCards: 0, redCards: 0, goals: 0 },
-    away: { shots: 0, shotsOnTarget: 0, corners: 0, yellowCards: 0, redCards: 0, goals: 0 },
-  });
+  // MinuteLog array from the backend simulation
+  const minuteLog = simulation?.minuteLog || [];
 
-  const engineRef = useRef(null);
   const intervalRef = useRef(null);
   const eventLogRef = useRef(null);
-  const prevEngineDataRef = useRef(null);
-  const lastGoalRef = useRef(null);
 
-  // ── Build or rebuild client-side engine when engineData changes ──────────────
+  // ── Reset state when simulation changes ──────────────
   useEffect(() => {
-    if (!engineData || engineData === prevEngineDataRef.current) return;
-    prevEngineDataRef.current = engineData;
-
-    // Reset all state
-    engineRef.current = createEngine(engineData);
     setCurrentMinute(0);
-    setAllEvents([]);
-    setCurrentBehavioralState(null);
-    setCurrentPoss({ home: 50, away: 50 });
-    setLiveGoals({ home: 0, away: 0 });
-    setLiveStats({
-      home: { shots: 0, shotsOnTarget: 0, corners: 0, yellowCards: 0, redCards: 0, goals: 0 },
-      away: { shots: 0, shotsOnTarget: 0, corners: 0, yellowCards: 0, redCards: 0, goals: 0 },
-    });
     setIsPlaying(false);
     setGoalFlash(false);
     if (onMinuteChange) onMinuteChange(0);
-  }, [engineData, onMinuteChange]);
+  }, [simulation, onMinuteChange]);
 
   // ── Playback timer ───────────────────────────────────────────────────────────
   useEffect(() => {
     clearInterval(intervalRef.current);
-    if (!isPlaying || !engineRef.current) return;
+    if (!isPlaying || minuteLog.length === 0) return;
 
     intervalRef.current = setInterval(() => {
-      const engine = engineRef.current;
-      if (!engine || engine.isDone()) {
-        setIsPlaying(false);
-        return;
-      }
-
-      const tick = engine.step();
-      if (!tick) { setIsPlaying(false); return; }
-
-      setCurrentMinute(tick.minute);
-      setAllEvents(prev => [...prev, ...tick.events]);
-      setCurrentBehavioralState(tick.behavioralState);
-      setCurrentPoss(tick.possession);
-      setLiveGoals({ ...tick.goals });
-
-      // Recompute stats from cumulative events (simpler & consistent)
-      setLiveStats(prev => {
-        const home = { ...prev.home };
-        const away = { ...prev.away };
-        for (const ev of tick.events) {
-          const s = ev.team === 'home' ? home : away;
-          if (!s) continue;
-          if (ev.type === 'shot_off_target' || ev.type === 'shot_blocked') s.shots++;
-          else if (ev.type === 'shot_on_target') { s.shots++; s.shotsOnTarget++; }
-          else if (ev.type === 'goal') { s.shots++; s.shotsOnTarget++; s.goals++; }
-          else if (ev.type === 'corner') s.corners++;
-          else if (ev.type === 'yellow_card') s.yellowCards++;
-          else if (ev.type === 'red_card') s.redCards++;
+      setCurrentMinute(prev => {
+        const nextMin = prev + 1;
+        if (nextMin > 95 || nextMin > minuteLog.length) {
+          setIsPlaying(false);
+          return prev;
         }
-        return { home, away };
+
+        if (onMinuteChange) onMinuteChange(nextMin);
+
+        // Check for goal flash
+        const tick = minuteLog.find(log => log.minute === nextMin);
+        if (tick && tick.events.some(e => e.type === 'goal')) {
+          setGoalFlash(true);
+          setTimeout(() => setGoalFlash(false), 1200);
+        }
+
+        return nextMin;
       });
-
-      if (onMinuteChange) onMinuteChange(tick.minute);
-
-      // Goal flash
-      const hasGoal = tick.events.some(e => e.type === 'goal');
-      if (hasGoal) {
-        setGoalFlash(true);
-        setTimeout(() => setGoalFlash(false), 1200);
-      }
-    }, 1000 / speed);
+    }, 1000 / Math.max(1, speed));
 
     return () => clearInterval(intervalRef.current);
-  }, [isPlaying, speed, onMinuteChange]);
+  }, [isPlaying, speed, onMinuteChange, minuteLog]);
+
+  // Compute live data up to current minute
+  const liveData = useMemo(() => {
+    const allEvents = [];
+    let bState = null;
+    let poss = { home: 50, away: 50 };
+    const liveGoals = { home: 0, away: 0 };
+    const liveStats = {
+      home: { shots: 0, shotsOnTarget: 0, corners: 0, yellowCards: 0, redCards: 0, goals: 0 },
+      away: { shots: 0, shotsOnTarget: 0, corners: 0, yellowCards: 0, redCards: 0, goals: 0 },
+    };
+
+    for (const log of minuteLog) {
+      if (log.minute > currentMinute) break;
+      
+      allEvents.push(...log.events);
+      bState = log.behavioralState;
+      poss = log.possession;
+
+      for (const ev of log.events) {
+        const s = ev.team === 'home' ? liveStats.home : liveStats.away;
+        if (!s) continue;
+        if (ev.type === 'shot_off_target' || ev.type === 'shot_blocked') s.shots++;
+        else if (ev.type === 'shot_on_target') { s.shots++; s.shotsOnTarget++; }
+        else if (ev.type === 'goal') { 
+          s.shots++; s.shotsOnTarget++; s.goals++; 
+          if (ev.team === 'home') liveGoals.home++;
+          else liveGoals.away++;
+        }
+        else if (ev.type === 'corner') s.corners++;
+        else if (ev.type === 'yellow_card') s.yellowCards++;
+        else if (ev.type === 'red_card') s.redCards++;
+      }
+    }
+
+    return { allEvents, bState, poss, liveGoals, liveStats };
+  }, [minuteLog, currentMinute]);
+
+  const { allEvents, bState: currentBehavioralState, poss: currentPoss, liveGoals, liveStats } = liveData;
 
   // ── Auto-scroll event log ────────────────────────────────────────────────────
   useEffect(() => {
@@ -664,70 +657,22 @@ export default function SimulationViewer({
     awayPoss: currentPoss.away,
   }), [liveStats, liveGoals, currentPoss]);
 
-  // ── Handle seek (rerun engine from start to target minute) ───────────────────
+  // ── Handle seek (jump to target minute) ───────────────────
   const handleProgressClick = useCallback((e) => {
-    if (!engineData) return;
+    if (!minuteLog || minuteLog.length === 0) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
     const targetMinute = Math.round(ratio * 95);
 
-    // Rebuild engine and fast-forward
-    const newEngine = createEngine(engineData);
-    engineRef.current = newEngine;
-
-    const events = [];
-    let bstate = null;
-    let poss = { home: 50, away: 50 };
-    let goals = { home: 0, away: 0 };
-    const stats = {
-      home: { shots: 0, shotsOnTarget: 0, corners: 0, yellowCards: 0, redCards: 0, goals: 0 },
-      away: { shots: 0, shotsOnTarget: 0, corners: 0, yellowCards: 0, redCards: 0, goals: 0 },
-    };
-
-    while (!newEngine.isDone() && newEngine.getMinute() < targetMinute) {
-      const tick = newEngine.step();
-      if (!tick) break;
-      events.push(...tick.events);
-      bstate = tick.behavioralState;
-      poss = tick.possession;
-      goals = { ...tick.goals };
-      for (const ev of tick.events) {
-        const s = ev.team === 'home' ? stats.home : (ev.team === 'away' ? stats.away : null);
-        if (!s) continue;
-        if (ev.type === 'shot_off_target' || ev.type === 'shot_blocked') s.shots++;
-        else if (ev.type === 'shot_on_target') { s.shots++; s.shotsOnTarget++; }
-        else if (ev.type === 'goal') { s.shots++; s.shotsOnTarget++; s.goals++; }
-        else if (ev.type === 'corner') s.corners++;
-        else if (ev.type === 'yellow_card') s.yellowCards++;
-        else if (ev.type === 'red_card') s.redCards++;
-      }
-    }
-
     setCurrentMinute(targetMinute);
-    setAllEvents(events);
-    setCurrentBehavioralState(bstate);
-    setCurrentPoss(poss);
-    setLiveGoals(goals);
-    setLiveStats(stats);
-    setIsPlaying(false);
     if (onMinuteChange) onMinuteChange(targetMinute);
-  }, [engineData, onMinuteChange]);
+  }, [minuteLog, onMinuteChange]);
 
   const handleReset = () => {
-    if (engineData) {
-      engineRef.current = createEngine(engineData);
-    }
     setCurrentMinute(0);
-    setAllEvents([]);
-    setCurrentBehavioralState(null);
-    setCurrentPoss({ home: 50, away: 50 });
-    setLiveGoals({ home: 0, away: 0 });
-    setLiveStats({
-      home: { shots: 0, shotsOnTarget: 0, corners: 0, yellowCards: 0, redCards: 0, goals: 0 },
-      away: { shots: 0, shotsOnTarget: 0, corners: 0, yellowCards: 0, redCards: 0, goals: 0 },
-    });
     setIsPlaying(false);
     setGoalFlash(false);
+    if (onMinuteChange) onMinuteChange(0);
   };
 
   // ── Multi-run view ────────────────────────────────────────────────────────────
@@ -756,7 +701,7 @@ export default function SimulationViewer({
     );
   }
 
-  if (!engineData) {
+  if (!simulation || minuteLog.length === 0) {
     return (
       <div style={{ background: 'var(--glass-bg, rgba(255,255,255,0.05))', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 320, gap: 12, fontFamily: 'inherit', color: 'var(--text-secondary)' }}>
         <div style={{ fontSize: 46 }}>⚽</div>
