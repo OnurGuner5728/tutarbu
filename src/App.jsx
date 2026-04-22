@@ -882,8 +882,8 @@ export default function App() {
                               pB.isReserve = tempRes;
                               pB.assignedPosition = tempAssigned;
                               
-                              currentPlayers[idxA] = pA;
-                              currentPlayers[idxB] = pB;
+                              currentPlayers[idxA] = pB;
+                              currentPlayers[idxB] = pA;
                               
                               setModifiedLineup(prev => ({ ...prev, [side]: currentPlayers }));
                             }
@@ -1285,6 +1285,15 @@ function VisualPitch({ title, players, side, swapMode, onSwapMode, onSwap, onMov
         if (dist === 3) efficiency = 0.10;
       }
     }
+    
+    // Calculate dynamic power
+    let basePower = 65;
+    if (p.player?.statistics?.rating) {
+      basePower = p.player.statistics.rating * 10;
+    } else if (p.player?.proposedMarketValue) {
+      basePower = 65 + (p.player.proposedMarketValue / 1000000) * 0.5;
+    }
+    const finalPower = Math.min(99, Math.max(40, Math.round(basePower * efficiency)));
 
     return (
       <div 
@@ -1297,6 +1306,20 @@ function VisualPitch({ title, players, side, swapMode, onSwapMode, onSwap, onMov
           {p.player?.shirtNumber || nativePos}
           {efficiency < 1.0 && <div className="penalty-indicator" title={`Yanlış Mevki: %${Math.round(efficiency * 100)} Verim`}>🔻</div>}
           {missingInfo && <div className="missing-indicator" title={missingInfo.type}>{missingIcon}</div>}
+        </div>
+        <div className="player-power-badge" style={{
+          position: 'absolute',
+          top: '-10px',
+          background: finalPower >= 85 ? '#00ff88' : finalPower >= 70 ? '#00f2ff' : finalPower >= 60 ? '#f1c40f' : '#ff5252',
+          color: '#000',
+          fontSize: '0.65rem',
+          fontWeight: '900',
+          padding: '1px 4px',
+          borderRadius: '4px',
+          boxShadow: '0 2px 5px rgba(0,0,0,0.5)',
+          zIndex: 3
+        }}>
+          {finalPower}
         </div>
         <div className="player-name-label">
           {p.player?.shortName || p.player?.name}
@@ -1340,6 +1363,15 @@ function VisualPitch({ title, players, side, swapMode, onSwapMode, onSwap, onMov
              const missingInfo = missingPlayers?.find(mp => mp.player?.id === p.player?.id);
              const missingIcon = missingInfo?.type === 'injured' || missingInfo?.type === 'doubtful' ? '🚑' : missingInfo?.type === 'suspended' ? '🟥' : '⚠️';
              
+             // Calculate power for bench
+             let benchPower = 65;
+             if (p.player?.statistics?.rating) {
+               benchPower = p.player.statistics.rating * 10;
+             } else if (p.player?.proposedMarketValue) {
+               benchPower = 65 + (p.player.proposedMarketValue / 1000000) * 0.5;
+             }
+             const finalBenchPower = Math.min(99, Math.max(40, Math.round(benchPower)));
+             
              return (
                <div 
                  key={p.player?.id}
@@ -1349,6 +1381,17 @@ function VisualPitch({ title, players, side, swapMode, onSwapMode, onSwap, onMov
                >
                  <span style={{fontWeight: 700, color: 'var(--text-secondary)'}}>{(p.player?.position || '?').toUpperCase()[0]}</span>
                  <span>{p.player?.shortName || p.player?.name} {missingInfo && missingIcon}</span>
+                 <span style={{
+                   marginLeft: 'auto',
+                   background: finalBenchPower >= 85 ? 'rgba(0,255,136,0.2)' : finalBenchPower >= 70 ? 'rgba(0,242,255,0.2)' : 'rgba(255,255,255,0.1)',
+                   color: finalBenchPower >= 85 ? '#00ff88' : finalBenchPower >= 70 ? '#00f2ff' : '#ccc',
+                   padding: '2px 6px',
+                   borderRadius: '4px',
+                   fontSize: '0.7rem',
+                   fontWeight: 700
+                 }}>
+                   {finalBenchPower}
+                 </span>
                </div>
              )
           })}
