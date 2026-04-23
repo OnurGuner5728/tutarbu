@@ -5,7 +5,7 @@
  * Hiçbir sabit fallback değer kullanılmaz; veri yoksa null döner.
  */
 
-const MIN_EVENTS_REQUIRED = 3; // Güvenilir analiz için minimum maç sayısı
+const MIN_EVENTS_REQUIRED = 15; // Güvenilir analiz için minimum maç sayısı (Gürültüyü azaltmak için 3'ten 15'e çıkarıldı)
 
 function calculateRefereeMetrics(data) {
   const refereeStats = data.refereeStats;
@@ -388,9 +388,9 @@ function calculateRefereeMetrics(data) {
   const recentSeverity = M117;
   const careerSeverity = M120;
   if (recentSeverity != null && careerSeverity != null) {
-    // Ağırlık: örneklem sayısına orantılı (son maç sayısı / kariyer maç sayısı).
+    // Ağırlık: Kariyer verisi istatistiksel gürültüyü azaltmak için 3x ağırlıklandırılır.
     const _recN = refLastEventsCount ?? 0;
-    const _carN = careerGames ?? 0;
+    const _carN = (careerGames ?? 0) * 3;
     const _bTot = _recN + _carN;
     M122 = _bTot > 0
       ? Math.round(recentSeverity * (_recN / _bTot) + careerSeverity * (_carN / _bTot))

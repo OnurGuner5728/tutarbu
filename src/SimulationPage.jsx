@@ -39,7 +39,7 @@ function getLastRunSummary(simulation, homeTeam, awayTeam) {
   return `Son koşu: ${homeGoals}-${awayGoals} (${outcome})`;
 }
 
-function SimulationPage({ prediction, selectedMatch }) {
+function SimulationPage({ prediction, selectedMatch, modifiedLineup }) {
   const [selectedMetrics, setSelectedMetrics] = useState(() => new Set(ALL_METRIC_IDS));
   const [simulation, setSimulation] = useState(null);
   const [engineData, setEngineData] = useState(null);
@@ -98,6 +98,7 @@ function SimulationPage({ prediction, selectedMatch }) {
       const body = {
         selectedMetrics: Array.from(selectedMetrics),
         runs: runMode === 'multi' ? runCount : 1,
+        modifiedLineup: (modifiedLineup?.home || modifiedLineup?.away) ? modifiedLineup : undefined,
       };
       const res = await fetch(`/api/simulate/${selectedMatch.id}`, {
         method: 'POST',

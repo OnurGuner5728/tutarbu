@@ -311,21 +311,35 @@ function calculateContextualMetrics(data) {
     return { def, mid, fwd };
   }
 
-  // ── M068: Formasyon Uyumu — Taktik Baskı Endeksi ──
-  // İki takımın formasyon yapısını sayısallaştırarak hangisinin taktik baskı
-  // üstünlüğüne sahip olduğunu ölçer (0–100 skala, 50 = denge).
+  // ── M068: Taktik Hakimiyet Endeksi (Gerçek Takım Verileri) ──
+  // Eski yöntemdeki statik formasyon sayımını (4-3-3 vs 4-4-2) gerçek
+  // pas başarı oranları ve genel ratinglerle harmanlar.
   let M068 = null;
   const homeFormation = parseFormation(data.lineups?.home?.formation);
   const awayFormation = parseFormation(data.lineups?.away?.formation);
+  
+  const getTeamControlProxy = (playerStats) => {
+    if (!playerStats || playerStats.length === 0) return null;
+    let sumPass = 0, sumRating = 0, count = 0;
+    for (const p of playerStats) {
+      const stats = p.statistics || p.seasonStats?.statistics;
+      if (stats) {
+        sumPass += stats.accuratePassesPercentage || 0;
+        sumRating += stats.rating || 0;
+        count++;
+      }
+    }
+    return count > 0 ? { pass: sumPass / count, rating: sumRating / count } : null;
+  };
+
+  const homeControl = getTeamControlProxy(data.homePlayerStats);
+  const awayControl = getTeamControlProxy(data.awayPlayerStats);
 
   if (homeFormation !== null && awayFormation !== null) {
-    // Pozisyon bazlı farklar: pozitif değer ev sahibi lehine
-    const DF_diff = homeFormation.def - awayFormation.def;   // savunma fazlası/eksiği
-    const MID_diff = homeFormation.mid - awayFormation.mid;   // orta saha hakimiyeti
-    const FWD_diff = homeFormation.fwd - awayFormation.fwd;   // hücum baskısı
+    const DF_diff = homeFormation.def - awayFormation.def;
+    const MID_diff = homeFormation.mid - awayFormation.mid;
+    const FWD_diff = homeFormation.fwd - awayFormation.fwd;
 
-    // Ağırlıklar lig CV'sinden (sabit 1.5/0.8 kaldırıldı).
-    // Volatil lig → hücum daha değerli, stabil lig → savunma daha önemli.
     const _ctxRows = data.standingsTotal?.standings?.[0]?.rows || [];
     let _fwdW = 1, _dfW = 1;
     if (_ctxRows.length >= 8) {
@@ -338,14 +352,31 @@ function calculateContextualMetrics(data) {
         _dfW = 1 - ctxCV;
       }
     }
-    const rawScore = (FWD_diff * _fwdW + MID_diff * 1.0 - DF_diff * _dfW) / 3;
+    
+    // Formasyon yapısal skoru
+    const formScore = (FWD_diff * _fwdW + MID_diff * 1.5 - DF_diff * _dfW) / 3.5;
+    
+    // Pas ve Rating bazlı oyun kontrol skoru
+    let statScore = 0;
+    if (homeControl && awayControl) {
+      const passDiff = homeControl.pass - awayControl.pass; // e.g., 85% - 80% = +5
+      const ratingDiff = homeControl.rating - awayControl.rating; // e.g., 7.1 - 6.8 = +0.3
+      statScore = (passDiff * 0.5) + (ratingDiff * 10);
+    }
 
-    // normalize: [-X, +X] → [0, 100] aralığına, 50 = denge
-    // Teorik max fark ≈ ±5 (örn. "4-6-0" vs "0-0-4"), clamp ile güvenlik altında
-    M068 = clamp(50 + rawScore * 10, 0, 100);
+    // Blend: Formasyon farkı + İstatistiksel Kontrol
+    const rawScore = formScore * 5 + statScore;
+
+    M068 = clamp(50 + rawScore, 0, 100);
+    M068 = +M068.toFixed(2);
+  } else if (homeControl && awayControl) {
+    // Formasyon yok ama istatistik var
+    const passDiff = homeControl.pass - awayControl.pass;
+    const ratingDiff = homeControl.rating - awayControl.rating;
+    const statScore = (passDiff * 0.5) + (ratingDiff * 10);
+    M068 = clamp(50 + statScore, 0, 100);
     M068 = +M068.toFixed(2);
   }
-  // Formasyon yoksa M068 = null (sabit değer döndürme)
 
   // ── M075: Taktik Adaptasyon Skoru — Dinamik ──
   // Son maçlardaki sonuç dalgalanmasını, gol farkı varyansını ve ev sahibi

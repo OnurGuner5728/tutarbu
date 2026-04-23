@@ -139,16 +139,18 @@ process.on('exit', () => {
 });
 
 // ─── RATE LIMITER ─────────────────────────────────────────────
-let lastRequestTime = 0;
+let nextRequestTime = 0;
 const RATE_LIMIT_MS = 200; // Browsers are more trusted, 200ms interval is ok
 
 async function waitForRateLimit() {
   const now = Date.now();
-  const elapsed = now - lastRequestTime;
-  if (elapsed < RATE_LIMIT_MS) {
-    await new Promise(resolve => setTimeout(resolve, RATE_LIMIT_MS - elapsed));
+  if (now < nextRequestTime) {
+    const delay = nextRequestTime - now;
+    nextRequestTime += RATE_LIMIT_MS;
+    await new Promise(resolve => setTimeout(resolve, delay));
+  } else {
+    nextRequestTime = now + RATE_LIMIT_MS;
   }
-  lastRequestTime = Date.now();
 }
 
 // ─── FETCH METHOD ─────────────────────────────────────────────

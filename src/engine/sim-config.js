@@ -92,6 +92,41 @@ const SIM_CONFIG = {
   },
 };
 
+/**
+ * Dinamik Limit Hesaplayıcı:
+ * Sabit 0.5-2.0 sınırları yerine ligin kendi CV (Varyans Katsayısı)
+ * değerlerini kullanarak organik sınırlar oluşturur.
+ */
+function getDynamicLimits(baseline) {
+  const volAmp = baseline?.leagueGoalVolatility ? Math.max(1.0, baseline.leagueGoalVolatility) : 1.0;
+  
+  return {
+    POWER: {
+      MIN: baseline?.normMinRatio ? Math.min(0.5, baseline.normMinRatio) : 0.5,
+      MAX: baseline?.normMaxRatio ? Math.max(2.0, baseline.normMaxRatio) : 2.0
+    },
+    MOMENTUM: {
+      MIN: Math.max(0.1, 0.5 / volAmp),
+      MAX: Math.min(4.0, 2.0 * volAmp)
+    },
+    MORALE: {
+      MIN: Math.max(0.1, 0.4 / volAmp),
+      MAX: Math.min(3.0, 1.6 * volAmp)
+    },
+    POSSESSION: { MIN: 30, MAX: 70 }, // Fiziksel limit: futbolda 100% top kontrolü olmaz
+    PROBABILITY: SIM_CONFIG.LIMITS.PROBABILITY,
+    ON_TARGET: SIM_CONFIG.LIMITS.ON_TARGET,
+    BLOCK: SIM_CONFIG.LIMITS.BLOCK,
+    CORNER: SIM_CONFIG.LIMITS.CORNER,
+    CORNER_GOAL: SIM_CONFIG.LIMITS.CORNER_GOAL,
+    CARDS: SIM_CONFIG.LIMITS.CARDS,
+    LAMBDA: SIM_CONFIG.LIMITS.LAMBDA,
+    FORM_MORALE: SIM_CONFIG.LIMITS.FORM_MORALE,
+    RED_CARD_POWER_PENALTY_MAX: SIM_CONFIG.LIMITS.RED_CARD_POWER_PENALTY_MAX
+  };
+}
+
 module.exports = {
-  SIM_CONFIG: SIM_CONFIG
+  SIM_CONFIG,
+  getDynamicLimits
 };

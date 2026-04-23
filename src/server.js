@@ -70,7 +70,7 @@ function enrichMatchResponse(prediction, metrics, baseline, data, reqQuery) {
 // Örnek: CORS_ORIGIN=https://tutarbu.com node server.js
 const corsOrigin = process.env.CORS_ORIGIN || '*';
 app.use(cors({ origin: corsOrigin }));
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 
 // 🛡️ Custom Rate Limiting Middleware
 const rateLimitStore = new Map();
@@ -338,8 +338,48 @@ app.post('/api/workshop/:eventId', async (req, res) => {
       }
     }
 
+    // Ensure lineups are fully enriched before calculating metrics
+    const enrichPlayers = (playersArr, statsArr) => {
+      if (!playersArr || !statsArr) return playersArr;
+      return playersArr.map(p => {
+        if (!p.player) return p;
+        const st = statsArr.find(s => s.playerId === p.player.id || s.playerId === p.player.playerId);
+        if (st) {
+          return {
+            ...p,
+            player: {
+              ...p.player,
+              seasonStats: st.seasonStats || null,
+              statistics: st.seasonStats?.statistics || null
+            }
+          };
+        }
+        return p;
+      });
+    };
+
+    if (data.lineups?.home?.players) data.lineups.home.players = enrichPlayers(data.lineups.home.players, data.homePlayerStats);
+    if (data.lineups?.away?.players) data.lineups.away.players = enrichPlayers(data.lineups.away.players, data.awayPlayerStats);
+
     const metrics = calculateAllMetrics(data);
     const baseline = getDynamicBaseline(data);
+
+    // Inject league physical parameters into baseline
+    baseline.leagueGoalVolatility = metrics.meta?.leagueGoalVolatility ?? null;
+    baseline.leaguePointDensity   = metrics.meta?.leaguePointDensity   ?? null;
+    baseline.medianGoalRate       = metrics.meta?.medianGoalRate       ?? null;
+    baseline.leagueTeamCount      = metrics.meta?.leagueTeamCount      ?? null;
+    baseline.ptsCV                = metrics.meta?.ptsCV                ?? null;
+    baseline.normMinRatio         = metrics.meta?.normMinRatio         ?? null;
+    baseline.normMaxRatio         = metrics.meta?.normMaxRatio         ?? null;
+
+    // Inject Position-based Market Value Breakdown (PVKD)
+    const { computePositionMVBreakdown } = require('./engine/quality-factors');
+    baseline.homeMVBreakdown = computePositionMVBreakdown(data.homePlayers || []);
+    baseline.awayMVBreakdown = computePositionMVBreakdown(data.awayPlayers || []);
+    
+    console.log(`[API WORKSHOP] PVKD Enjeksiyonu başarılı. home: ${baseline.homeMVBreakdown?.total}, away: ${baseline.awayMVBreakdown?.total}`);
+
     const rng = createRNG(req.query.seed);
     let prediction = generatePrediction(metrics, data, baseline, metrics.metricAudit, rng);
 
@@ -437,7 +477,7 @@ app.post('/api/simulate/:eventId', async (req, res) => {
   }
   const numericEventId = parseInt(eventId, 10);
   try {
-    const { selectedMetrics = [], runs = 1 } = req.body;
+    const { selectedMetrics = [], runs = 1, modifiedLineup } = req.body;
     const { simulateMatch } = require('./engine/match-simulator');
 
     let cachedData = getCachedMatchData(eventId);
@@ -446,7 +486,15 @@ app.post('/api/simulate/:eventId', async (req, res) => {
       setCachedMatchData(eventId, cachedData);
     }
 
-    const metrics = calculateAllMetrics(cachedData);
+    // Modified lineup varsa cache'i korumak için deep clone al
+    const data = modifiedLineup ? structuredClone(cachedData) : cachedData;
+    if (modifiedLineup) {
+      if (modifiedLineup.home && data.lineups?.home) data.lineups.home.players = modifiedLineup.home;
+      if (modifiedLineup.away && data.lineups?.away) data.lineups.away.players = modifiedLineup.away;
+      console.log(`[API SIMULATE] Workshop lineup uygulandı.`);
+    }
+
+    const metrics = calculateAllMetrics(data);
 
     function flattenSide(side) {
       const result = {};
@@ -474,7 +522,24 @@ app.post('/api/simulate/:eventId', async (req, res) => {
     const homeMetrics = Object.assign(flattenSide(metrics.home), sharedFlat);
     const awayMetrics = Object.assign(flattenSide(metrics.away), sharedFlat);
 
-    const baseline = getDynamicBaseline(cachedData);
+    const baseline = getDynamicBaseline(data);
+    
+    // Inject league physical parameters into baseline for match-simulator
+    baseline.leagueGoalVolatility = metrics.meta?.leagueGoalVolatility ?? null;
+    baseline.leaguePointDensity   = metrics.meta?.leaguePointDensity   ?? null;
+    baseline.medianGoalRate       = metrics.meta?.medianGoalRate       ?? null;
+    baseline.leagueTeamCount      = metrics.meta?.leagueTeamCount      ?? null;
+    baseline.ptsCV                = metrics.meta?.ptsCV                ?? null;
+    baseline.normMinRatio         = metrics.meta?.normMinRatio         ?? null;
+    baseline.normMaxRatio         = metrics.meta?.normMaxRatio         ?? null;
+
+    // Inject Position-based Market Value Breakdown (PVKD) for Monte Carlo simulation
+    const { computePositionMVBreakdown } = require('./engine/quality-factors');
+    baseline.homeMVBreakdown = computePositionMVBreakdown(data.homePlayers);
+    baseline.awayMVBreakdown = computePositionMVBreakdown(data.awayPlayers);
+    
+    console.log(`[API SIMULATE] PVKD Enjeksiyonu başarılı. home: ${baseline.homeMVBreakdown?.total}, away: ${baseline.awayMVBreakdown?.total}`);
+
     const rng = createRNG(req.body.seed || req.query.seed);
 
     // Peer-enhanced averages: dynamicAvgs'da bulunmayan metrikler için
@@ -499,8 +564,8 @@ app.post('/api/simulate/:eventId', async (req, res) => {
       awayMetrics,
       selectedMetrics: new Set(selectedMetrics),
       runs,
-      lineups: cachedData.lineups,
-      weatherMetrics: cachedData.weatherMetrics,
+      lineups: data.lineups,
+      weatherMetrics: data.weatherMetrics,
       baseline,
       audit: metrics.metricAudit,
       rng,
@@ -515,7 +580,8 @@ app.post('/api/simulate/:eventId', async (req, res) => {
       const { computeProbBases } = require('./engine/match-simulator');
       const { computeAlpha, computeQualityFactors } = require('./engine/quality-factors');
       result.lineups = cachedData.lineups;
-      result.weatherMult = computeWeatherMultipliers(cachedData.weatherMetrics || {});
+      const baselineParams = result.baselineParams || {};
+      result.weatherMult = computeWeatherMultipliers(cachedData.weatherMetrics || {}, baselineParams.leagueGoalVolatility);
       const sel = new Set(selectedMetrics);
       // Mevki bazlı kalite faktörlerini hesapla — probBases için
       const _pbAlpha = computeAlpha(baseline.leagueGoalVolatility, baseline.leagueAvgGoals);

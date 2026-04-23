@@ -345,6 +345,31 @@ async function fetchAllMatchData(eventId) {
   const { stats: homePlayerStats, log: homePlayerLog } = homePResult;
   const { stats: awayPlayerStats, log: awayPlayerLog } = awayPResult;
 
+  // Enrich lineups and squad arrays with fetched statistics
+  const enrichPlayers = (playersArr, statsArr) => {
+    if (!playersArr || !statsArr) return playersArr;
+    return playersArr.map(p => {
+      if (!p.player) return p;
+      const st = statsArr.find(s => s.playerId === p.player.id);
+      if (st) {
+        return {
+          ...p,
+          player: {
+            ...p.player,
+            seasonStats: st.seasonStats || null,
+            statistics: st.seasonStats?.statistics || null
+          }
+        };
+      }
+      return p;
+    });
+  };
+
+  if (lineupsSafe.home?.players) lineupsSafe.home.players = enrichPlayers(lineupsSafe.home.players, homePlayerStats);
+  if (lineupsSafe.away?.players) lineupsSafe.away.players = enrichPlayers(lineupsSafe.away.players, awayPlayerStats);
+  if (homePlayers?.players) homePlayers.players = enrichPlayers(homePlayers.players, homePlayerStats);
+  if (awayPlayers?.players) awayPlayers.players = enrichPlayers(awayPlayers.players, awayPlayerStats);
+
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
   console.log(`[DataFetcher] Optimized fetch completed in ${elapsed}s`);
 

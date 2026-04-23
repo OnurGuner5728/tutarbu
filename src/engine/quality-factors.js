@@ -57,42 +57,47 @@ const BLOCK_QF_MAP = {
   GOL_IHTIYACI:           null,
 };
 
-/**
- * Oyuncu listesinden mevki bazlı piyasa değeri dağılımını hesaplar.
- * Pozisyon eşlemesi SofaScore API'ye göre: G=Kaleci, D=Defans, M=Orta, F=Forvet
- * @param {object} squadData - { players: [...] } — homePlayers veya awayPlayers
- * @returns {{ GK: number, DEF: number, MID: number, ATK: number, total: number }}
- */
 function computePositionMVBreakdown(squadData) {
   const { getPositionalEfficiency } = require('./math-utils');
+  const { calculateDynamicRating } = require('./player-rating-utils');
   const players = squadData?.players || [];
   const breakdown = { GK: 0, DEF: 0, MID: 0, ATK: 0, total: 0 };
 
   for (const entry of players) {
     const mv = entry.player?.proposedMarketValue ?? 0;
-    if (!mv) continue;
-    // SofaScore pozisyon kodu: ilk harf belirleyici
+    if (!entry.player) continue;
+    
+    // Dinamik rating hesapla (gerçek oyuncu verisi)
+    const ratingPower = calculateDynamicRating(entry.player); // 40-99 aralığında
+    
+    // Sadece MV (Piyasa Değeri) yerine MV ile Formu (Rating) harmanla
+    // MV çarpanı: 0M -> 1, 1M -> ~1.04, 10M -> ~2.0, 100M -> ~3.0
+    const mvMultiplier = mv > 0 ? Math.log10(mv / 100000 + 1) : 1;
+    
+    // Blended power: Rating'in karesi, yetenek ve formun baskın olmasını sağlar.
+    const blendedPower = Math.pow(ratingPower, 2) * mvMultiplier;
+
+    // SofaScore pozisyon kodu
     const pos = (entry.player?.position || '').toUpperCase()[0] || '';
     
-    // Uygulanan pozisyon (eğer workshop'ta değiştirildiyse), yoksa kendi mevkisi
+    // Uygulanan pozisyon (eğer workshop'ta değiştirildiyse)
     const assignedPos = (entry.assignedPosition || pos).toUpperCase()[0] || '';
     
-    // Verim cezası (Mevkisi dışında oynatılıyorsa)
+    // Verim cezası
     const efficiency = getPositionalEfficiency(pos, assignedPos);
     
-    const effectiveMv = mv * efficiency;
-    breakdown.total += effectiveMv;
+    const effectivePower = blendedPower * efficiency;
+    breakdown.total += effectivePower;
 
     if (assignedPos === 'G') {
-      breakdown.GK += effectiveMv;
+      breakdown.GK += effectivePower;
     } else if (assignedPos === 'D') {
-      breakdown.DEF += effectiveMv;
+      breakdown.DEF += effectivePower;
     } else if (assignedPos === 'M') {
-      breakdown.MID += effectiveMv;
+      breakdown.MID += effectivePower;
     } else if (assignedPos === 'F') {
-      breakdown.ATK += effectiveMv;
+      breakdown.ATK += effectivePower;
     }
-    // Bilinmeyen pozisyon: total'e eklendi ancak mevki grubuna dahil edilmedi
   }
 
   return breakdown;

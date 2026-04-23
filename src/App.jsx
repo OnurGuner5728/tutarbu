@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import DebugPage from './DebugPage';
 import SimulationPage from './SimulationPage';
+import { calculateDynamicRating } from './utils/player-rating';
 
 export default function App() {
   const [matches, setMatches] = useState([]);
@@ -1062,7 +1063,7 @@ export default function App() {
 
                 {/* ──── SIMULATION ──── */}
                 {activeTab === 'simulation' && (
-                  <SimulationPage prediction={prediction} selectedMatch={selectedMatch} />
+                  <SimulationPage prediction={prediction} selectedMatch={selectedMatch} modifiedLineup={modifiedLineup} />
                 )}
                 </>)}
               </div>
@@ -1287,12 +1288,7 @@ function VisualPitch({ title, players, side, swapMode, onSwapMode, onSwap, onMov
     }
     
     // Calculate dynamic power
-    let basePower = 65;
-    if (p.player?.statistics?.rating) {
-      basePower = p.player.statistics.rating * 10;
-    } else if (p.player?.proposedMarketValue) {
-      basePower = 65 + (p.player.proposedMarketValue / 1000000) * 0.5;
-    }
+    const basePower = calculateDynamicRating(p.player);
     const finalPower = Math.min(99, Math.max(40, Math.round(basePower * efficiency)));
 
     return (
@@ -1364,13 +1360,7 @@ function VisualPitch({ title, players, side, swapMode, onSwapMode, onSwap, onMov
              const missingIcon = missingInfo?.type === 'injured' || missingInfo?.type === 'doubtful' ? '🚑' : missingInfo?.type === 'suspended' ? '🟥' : '⚠️';
              
              // Calculate power for bench
-             let benchPower = 65;
-             if (p.player?.statistics?.rating) {
-               benchPower = p.player.statistics.rating * 10;
-             } else if (p.player?.proposedMarketValue) {
-               benchPower = 65 + (p.player.proposedMarketValue / 1000000) * 0.5;
-             }
-             const finalBenchPower = Math.min(99, Math.max(40, Math.round(benchPower)));
+             const finalBenchPower = calculateDynamicRating(p.player);
              
              return (
                <div 

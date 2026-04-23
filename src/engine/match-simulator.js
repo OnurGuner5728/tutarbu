@@ -6,7 +6,7 @@
 
 'use strict';
 
-const { SIM_CONFIG } = require('./sim-config');
+const { SIM_CONFIG, getDynamicLimits } = require('./sim-config');
 const { recordBaselineTrace, recordSimWarning } = require('./audit-helper');
 const { computeWeatherMultipliers } = require('../services/weather-service');
 const { BLOCK_QF_MAP, computeAlpha, computeQualityFactors } = require('./quality-factors');
@@ -412,10 +412,43 @@ function calculateUnitImpact(blockId, metrics, selected, audit, dynamicAvgs, bas
 
 function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups, weatherMetrics, baseline, rng, audit, homeSubQuality, awaySubQuality, dynamicAvgs, homeAdvantage, dynamicTimeWindows }) {
   const r = rng || Math.random;
-  const { goalMult: weatherGoalMult, errorMult: weatherErrorMult } = computeWeatherMultipliers(weatherMetrics || {});
+  const { goalMult: weatherGoalMult, errorMult: weatherErrorMult } = computeWeatherMultipliers(weatherMetrics || {}, baseline?.leagueGoalVolatility);
   const sel = selectedMetrics instanceof Set ? selectedMetrics : new Set(selectedMetrics || []);
   const hPlayers = lineups?.home?.players || lineups?.home || null;
   const aPlayers = lineups?.away?.players || lineups?.away || null;
+
+  // ── Sahada olan oyuncuları açıkça takip et ──────────────────────────────
+  // SofaScore verisindeki substitute/isReserve bayraklarına güvenmek yerine,
+  // simülasyon başında sadece ilk 11'i "sahada" olarak işaretle.
+  // Oyuncu değişikliklerinde bu set güncellenir.
+  // Bu sayede kadro dışı bir oyuncu asla gol atamaz veya kart göremez.
+  const getName = p => p?.player?.name || p?.name || '';
+  const onPitch = {
+    home: new Set(),
+    away: new Set()
+  };
+
+  // İlk 11'i belirle: substitute=false VE isReserve=false olan ilk 11 oyuncu
+  if (hPlayers) {
+    let count = 0;
+    for (const p of hPlayers) {
+      if (!p || p.substitute || p.isReserve) continue;
+      if (count >= 11) break;
+      const name = getName(p);
+      if (name) onPitch.home.add(name);
+      count++;
+    }
+  }
+  if (aPlayers) {
+    let count = 0;
+    for (const p of aPlayers) {
+      if (!p || p.substitute || p.isReserve) continue;
+      if (count >= 11) break;
+      const name = getName(p);
+      if (name) onPitch.away.add(name);
+      count++;
+    }
+  }
 
   // Sıfıra bölme epsilon — lig gol ortalamasından türetilir (veri yoksa 1/1000 güvenli).
   const EPS = (baseline?.leagueAvgGoals || 1) / 1000;
@@ -462,11 +495,12 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
 
   // Morale başlangıcı: FORM_KISA birimine göre. normLimits envelope'undan (dinamik).
   // Scale: lig CV'si (vol/avg) — volatil lig daha sert morale kayması.
-  const _mMin = (baseline.normMinRatio != null && baseline.normMinRatio > 0) ? baseline.normMinRatio : SIM_CONFIG.LIMITS.FORM_MORALE.MIN;
-  const _mMax = (baseline.normMaxRatio != null && baseline.normMaxRatio > 0) ? baseline.normMaxRatio : SIM_CONFIG.LIMITS.FORM_MORALE.MAX;
+  const DYN_LIMITS = getDynamicLimits ? getDynamicLimits(baseline) : SIM_CONFIG.LIMITS;
+  const _mMin = (baseline.normMinRatio != null && baseline.normMinRatio > 0) ? baseline.normMinRatio : DYN_LIMITS.FORM_MORALE.MIN;
+  const _mMax = (baseline.normMaxRatio != null && baseline.normMaxRatio > 0) ? baseline.normMaxRatio : DYN_LIMITS.FORM_MORALE.MAX;
   const _mScale = (baseline.leagueGoalVolatility != null && baseline.leagueAvgGoals > 0)
     ? baseline.leagueGoalVolatility / baseline.leagueAvgGoals
-    : SIM_CONFIG.LIMITS.FORM_MORALE.SCALE;
+    : DYN_LIMITS.FORM_MORALE.SCALE;
   const homeMoraleStart = clamp(1.0 + (homeUnits.FORM_KISA - 1.0) * _mScale, _mMin, _mMax);
   const awayMoraleStart = clamp(1.0 + (awayUnits.FORM_KISA - 1.0) * _mScale, _mMin, _mMax);
 
@@ -506,10 +540,25 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
     const urgencyStart = Math.max(0, lateBase - (lateBase - earlyBase) * Math.max(0, clamp(u.GOL_IHTIYACI, 1.0, _ihtMax) - 1.0));
     const urgency = (minute > urgencyStart) ? s.urgency : 1.0;
 
-    // Konfor freni: kazanılan fark takımın beklenen gol eşiğini geçince devreye girer
-    // comfortBrake = (ZİHİNSEL/FİŞİ) × (takımın beklenen gol/maç ÷ lig ortalaması gol/maç)
-    // → nötr nokta "1.0" değil, takımın kendi gol profili
-    // Bayern (2.5 gol/maç) önde olunca da basar; Atletico (0.9) geriler
+    // ── Dinamik Konfor Freni (comfortBrake) ──────────────────────────────────
+    // Fark açıldığında takımın hücum eforunu azaltma (rehavet) veya sürdürme (acımasızlık) kararı.
+    // Tüm parametreler dinamik: statik yüzdelik değer veya keyfi sabit YOK.
+    //
+    // Girdiler:
+    //   - Saldıran: FİŞİ_ÇEKME (killer instinct), GOL_IHTIYACI (relegation/cup/championship pressure),
+    //               TURNUVA_BASKISI (tournament stage importance)
+    //   - Savunan:  PSIKOLOJIK_KIRILGANLIK (fragility), ZİHİNSEL_DAYANIKLILIK (toughness)
+    //   - Lig:      leagueGoalVolatility (league pace)
+    //
+    // Mantık:
+    //   1. rawBrake: Takımın doğal rehavet eğilimi (ZİHİNSEL/FİŞİ × leagueRef/teamExp).
+    //      Oran tersine çevrildi: güçlü takımda < 1.0 → doğal fren, zayıf takımda ≈ 1.0.
+    //   2. Her ekstra gol için üstel sönümleme uygulanır, AMA sönümlemenin şiddeti
+    //      tamamen "Kan Kokusu" (bloodlustRatio) tarafından belirlenir.
+    //   3. bloodlustRatio yüksekse (acımasız takım + kırılgan rakip + turnuva baskısı):
+    //      sönümleme neredeyse sıfır → maç 7-0, 8-0'a gidebilir.
+    //   4. bloodlustRatio düşükse (rahat takım + dirençli rakip + düşük baskı):
+    //      sönümleme sert → maç 2-0 veya 3-0'da donar.
     const pb_side = side === 'home' ? hProb : aProb;
     const oppPb = oppSide === 'home' ? hProb : aProb;
     const teamExpGoals = pb_side.shotsPerMin * 90 * pb_side.onTargetRate * pb_side.goalConvRate;
@@ -519,10 +568,55 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
       const oppExpGoals = oppPb.shotsPerMin * 90 * oppPb.onTargetRate * oppPb.goalConvRate;
       const matchAvgGoals = (teamExpGoals + oppExpGoals) / 2;
       const leagueRef = baseline.leagueAvgGoals ?? matchAvgGoals;
-      comfortBrake = (u.ZİHİNSEL_DAYANIKLILIK / u.FİŞİ_ÇEKME) * (teamExpGoals / leagueRef);
+
+      // 1. Doğal rehavet eğilimi — oran TERSİNE ÇEVRİLDİ (leagueRef / teamExp).
+      //    Güçlü hücum takımı (teamExp > leagueRef) → rawBrake < 1.0 → doğal fren.
+      //    Zayıf hücum takımı → rawBrake ≈ 1.0 → fren yok (zaten gol bulmak mucize).
+      const rawBrake = (u.ZİHİNSEL_DAYANIKLILIK / Math.max(u.FİŞİ_ÇEKME, EPS))
+                     * (leagueRef / Math.max(teamExpGoals, EPS));
+
+      // 2. Fark eşiği aşıldı mı? Aşıldıysa her ekstra gol için sönümleme hesapla.
+      const goalDiff = goals[side] - goals[oppSide];
+      const excessGoals = goalDiff - comfortThreshold;
+
+      let diminishingMultiplier = 1.0;
+      if (excessGoals > 0) {
+        const oppU = oppSide === 'home' ? homeUnits : awayUnits;
+
+        // Rakibin çökme eğilimi: kırılganlık / dayanıklılık oranı
+        const oppCollapseRatio = (oppU.PSIKOLOJIK_KIRILGANLIK || 1.0) / Math.max(oppU.ZİHİNSEL_DAYANIKLILIK || 1.0, EPS);
+
+        // Saldıranın motivasyon profili:
+        //   FİŞİ_ÇEKME: acımasızlık içgüdüsü
+        //   GOL_IHTIYACI: küme düşme/şampiyonluk/kupa baskısından gelen gol ihtiyacı
+        //   TURNUVA_BASKISI: turnuva aşaması önemi (final vs grup maçı)
+        const killerInstinct = u.FİŞİ_ÇEKME || 1.0;
+        const goalNeed = u.GOL_IHTIYACI || 1.0;
+        const tournamentPressure = u.TURNUVA_BASKISI || 1.0;
+
+        // Lig temposu: volatil liglerde farklar daha kolay açılır
+        const volatility = baseline.leagueGoalVolatility || 1.0;
+
+        // "Kan Kokusu" (Bloodlust) Ratio — tamamen dinamik, sıfır sabit değer
+        // Yüksek → takım acımasızca basmaya devam eder (7-0 mümkün)
+        // Düşük → takım rehavete girer, tempo düşer
+        const bloodlustRatio = (killerInstinct * goalNeed * tournamentPressure * volatility * oppCollapseRatio);
+
+        // Sönümleme katsayısı: bloodlustRatio üzerinden sigmoid benzeri dönüşüm
+        // bloodlust çok yüksekse (>>1): decayPerGoal → 1.0'a yaklaşır (sönümleme yok)
+        // bloodlust çok düşükse (<<1): decayPerGoal → 1/e ≈ 0.37'ye yaklaşır (sert fren)
+        // Formül: 1 - (1 / (1 + bloodlustRatio))  →  bloodlust/(1+bloodlust)
+        // Bu, (0,1) aralığında doğal bir sigmoid oluşturur — hiçbir keyfi sabit YOK.
+        const decayPerGoal = bloodlustRatio / (1.0 + bloodlustRatio);
+
+        diminishingMultiplier = Math.pow(decayPerGoal, excessGoals);
+      }
+
+      // Sonuç asla 1.0'ı geçemez — takıma doğaüstü güç vermek yasak.
+      comfortBrake = Math.min(1.0, rawBrake * diminishingMultiplier);
     }
 
-    return clamp(atkUnit * formUnit * stateUnit * urgency * comfortBrake * (1 - s.redCardPenalty), SIM_CONFIG.LIMITS.POWER.MIN, SIM_CONFIG.LIMITS.POWER.MAX);
+    return clamp(atkUnit * formUnit * stateUnit * urgency * comfortBrake * (1 - s.redCardPenalty), DYN_LIMITS.POWER.MIN, DYN_LIMITS.POWER.MAX);
   };
 
   const getDefensePower = (side) => {
@@ -533,23 +627,30 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
     const _sddEPS = (baseline.leagueAvgGoals || 1) / 1000;
     const stateDefDamp = Math.max(_sddEPS, 1.0 - orgUnit);
     const stateUnit = 1.0 + (s.morale - 1.0) * stateDefDamp;
-    return clamp(defUnit * orgUnit * stateUnit * (1 - s.redCardPenalty), SIM_CONFIG.LIMITS.POWER.MIN, SIM_CONFIG.LIMITS.POWER.MAX);
+    return clamp(defUnit * orgUnit * stateUnit * (1 - s.redCardPenalty), DYN_LIMITS.POWER.MIN, DYN_LIMITS.POWER.MAX);
   };
 
   function pickActivePlayer(players, positions, side) {
     if (!players || !players.length) return null;
     const expelled = expelledPlayers[side];
+    const pitchSet = onPitch[side];
+
+    // Sadece sahada olan oyunculardan seç — onPitch set'i ground truth
     const pool = players.filter(p => {
-      if (!p || p.substitute) return false;
-      const name = p?.player?.name || p?.name || '';
+      const name = getName(p);
+      if (!name || !pitchSet.has(name)) return false;
       if (expelled.has(name)) return false;
       const pos = (p.player?.position || p.position || '').toUpperCase()[0];
       return !positions || positions.includes(pos);
     });
-    const list = pool.length ? pool : players.filter(p => !p.substitute && !expelled.has(p?.player?.name || p?.name));
+    // Fallback: pozisyon filtresi kaldırılır ama yine sadece sahada olan oyuncular
+    const list = pool.length ? pool : players.filter(p => {
+      const name = getName(p);
+      return name && pitchSet.has(name) && !expelled.has(name);
+    });
     if (!list.length) return null;
     const p = list[Math.floor(r() * list.length)];
-    return p?.player?.name || p?.name || SIM_CONFIG.LABELS.PLAYER;
+    return getName(p) || SIM_CONFIG.LABELS.PLAYER;
   }
 
   const subbedInNames = { home: new Set(), away: new Set() };
@@ -558,16 +659,19 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
     if (!players || !players.length) return null;
     const expelled = expelledPlayers[side];
     const alreadySubbed = subbedInNames[side];
-    const getName = p => p?.player?.name || p?.name || '';
-    let pool = players.filter(p => p && p.substitute && !expelled.has(getName(p)) && !alreadySubbed.has(getName(p)));
-    if (!pool.length) {
-      pool = players.filter(p => p && !expelled.has(getName(p)) && !alreadySubbed.has(getName(p)));
-    }
+    const pitchSet = onPitch[side];
+
+    // Yedek havuzu: sahada OLMAYAN, atılmamış, reserve olmayan, daha önce girmemiş oyuncular
+    let pool = players.filter(p => {
+      const name = getName(p);
+      return p && name && !pitchSet.has(name) && !p.isReserve && !expelled.has(name) && !alreadySubbed.has(name);
+    });
     if (!pool.length) return null;
     const p = pool[Math.floor(r() * pool.length)];
     const name = getName(p) || SIM_CONFIG.LABELS.SUB;
     alreadySubbed.add(name);
-    p.substitute = false;
+    // Oyuncuyu sahaya al
+    pitchSet.add(name);
     return name;
   }
 
@@ -576,22 +680,22 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
     const s = side === 'home' ? state.home : state.away;
     const effective = { ...u };
     const rcMult = (1 - s.redCardPenalty);
-    
+
     // Lig temposu (volatility) ve kadro derinliğine göre dinamik yorgunluk hızı
     // Yüksek tempolu ligde dar kadrolar daha çabuk yorulur.
-    const leaguePace = baseline.leagueGoalVolatility || 1.0; 
+    const leaguePace = baseline.leagueGoalVolatility || 1.0;
     const squadDepth = u.KADRO_DERINLIGI || 1.0;
     const fragility = u.PSIKOLOJIK_KIRILGANLIK || 1.0;
     const mentalToughness = u.ZİHİNSEL_DAYANIKLILIK || 1.0;
     const leagueTeamCount = baseline.leagueTeamCount || 20; // Genelde 18-20
 
     // Maçın hangi safhasında olduğumuzu lateBase (dinamik gol sonları dakikası) belirler
-    const matchProgress = minute / (lateBase || 90); 
-    
+    const matchProgress = minute / (lateBase || 90);
+
     // Yorgunluk Çarpanı: Takımın yorgunluk eşiği kadro derinliği ve zihinsel dirence göre esner
     const fatigueRate = (leaguePace * fragility) / (squadDepth * mentalToughness);
     // Yorgunluk maç ilerledikçe artar, minimum sınır kırılganlıkla orantılıdır, ölçek için lig takım sayısı kullanılır
-    const fatigueFactor = Math.max(fragility / (squadDepth + mentalToughness), 1.0 - ((matchProgress * fatigueRate) / leagueTeamCount)); 
+    const fatigueFactor = Math.max(fragility / (squadDepth + mentalToughness), 1.0 - ((matchProgress * fatigueRate) / leagueTeamCount));
 
     // ── HÜCUM GRUBU ──
     effective.BITIRICILIK = u.BITIRICILIK * s.morale * rcMult * fatigueFactor;
@@ -605,8 +709,8 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
     effective.SAVUNMA_AKSIYONU = u.SAVUNMA_AKSIYONU * s.momentum * fatigueFactor * rcMult;
     // Disiplin: takımın aciliyeti arttıkça kırılganlığa bağlı olarak düşer
     const urgencyExcess = Math.max(0, s.urgency - 1.0);
-    const disciplineDrop = urgencyExcess * fragility * leaguePace; 
-    effective.DISIPLIN = u.DISIPLIN * rcMult * Math.max(fragility / squadDepth, 1.0 - disciplineDrop); 
+    const disciplineDrop = urgencyExcess * fragility * leaguePace;
+    effective.DISIPLIN = u.DISIPLIN * rcMult * Math.max(fragility / squadDepth, 1.0 - disciplineDrop);
 
     // ── PSİKANALİZ GRUBU ──
     const moraleMin = baseline.normMinRatio || 0.5;
@@ -614,7 +718,7 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
     effective.ZİHİNSEL_DAYANIKLILIK = clamp(u.ZİHİNSEL_DAYANIKLILIK * s.morale * rcMult, moraleMin, moraleMax);
     // Kırılganlık ters çalışır: Moral düştükçe ve kırmızı kart oldukça kırılganlık üstel artar
     const moraleDeficit = Math.max(0, 1.0 - s.morale);
-    const cardImpact = s.redCardPenalty * (leaguePace / squadDepth); 
+    const cardImpact = s.redCardPenalty * (leaguePace / squadDepth);
     effective.PSIKOLOJIK_KIRILGANLIK = u.PSIKOLOJIK_KIRILGANLIK * (1.0 + moraleDeficit) * (1.0 + cardImpact);
     effective.GOL_IHTIYACI = u.GOL_IHTIYACI * s.urgency * rcMult;
     // Turnuva baskısı: maç sonuna yaklaştıkça ligin temposu kadar artar
@@ -625,17 +729,17 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
     // Başlangıç etkisi dinamik earlyBase (ör. ilk 20 dk) içinde erir
     const earlyPhaseRatio = minute / (earlyBase || 20);
     effective.MAC_BASLANGICI = u.MAC_BASLANGICI * Math.max(0, 1.0 - earlyPhaseRatio);
-    
+
     // Son dakika etkisi: lateBase geçildikten sonra aciliyete göre üstel fırlar
     const latePhaseAmplifier = Math.max(1.0, Math.pow(minute / (lateBase || 75), urgencyExcess + 1.0));
-    effective.MAC_SONU = u.MAC_SONU * latePhaseAmplifier; 
-    
+    effective.MAC_SONU = u.MAC_SONU * latePhaseAmplifier;
+
     // Menajer taktiği, takımın aciliyet seviyesine göre sahaya daha çok yansır
     effective.MENAJER_STRATEJISI = u.MENAJER_STRATEJISI * s.urgency;
-    
+
     // Hakem kararları stadyum momentumundan (lig volatilitesi oranında) etkilenir
     const momentumExcess = s.momentum - 1.0;
-    effective.HAKEM_DINAMIKLERI = u.HAKEM_DINAMIKLERI * (1.0 + (momentumExcess * leaguePace)); 
+    effective.HAKEM_DINAMIKLERI = u.HAKEM_DINAMIKLERI * (1.0 + (momentumExcess * leaguePace));
 
     // ── OPERASYONEL GRUP ──
     effective.TAKTIKSEL_UYUM = u.TAKTIKSEL_UYUM * rcMult * fatigueFactor;
@@ -644,14 +748,14 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
     const subImpact = subsDone[side] * (leaguePace / (squadDepth * leagueTeamCount));
     effective.KADRO_DERINLIGI = u.KADRO_DERINLIGI * (1.0 + subImpact);
     // H2H Dominasyon tarihseldir, maç içi sabittir (tek istisna)
-    effective.H2H_DOMINASYON = u.H2H_DOMINASYON; 
+    effective.H2H_DOMINASYON = u.H2H_DOMINASYON;
     const momMin = baseline.normMinRatio || 0.5;
     const momMax = baseline.normMaxRatio || 2.5;
     effective.MOMENTUM_AKIŞI = clamp(u.MOMENTUM_AKIŞI * s.momentum * rcMult, momMin, momMax);
 
     // ── KALECİ GRUBU ──
     // Kaleci yorulmaz ama morali (ve savunmanın çöküşü) etkiler
-    effective.GK_REFLEKS = u.GK_REFLEKS * s.morale; 
+    effective.GK_REFLEKS = u.GK_REFLEKS * s.morale;
     effective.GK_ALAN_HAKIMIYETI = u.GK_ALAN_HAKIMIYETI * s.morale;
     effective.TOPLA_OYNAMA = u.TOPLA_OYNAMA * s.momentum * rcMult;
 
@@ -661,8 +765,8 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
   // Momentum → Possession duyarlılık katsayısı: lig gol dağılımından türetilir
   // Formül: possRange × leagueGoalVolatility / (leagueAvgGoals × momentumRange)
   // Volatil lig → momentum → possession etkisi büyür; stabil lig → daha az sapma
-  const _mRange = SIM_CONFIG.LIMITS.MOMENTUM.MAX - SIM_CONFIG.LIMITS.MOMENTUM.MIN;
-  const _pRange = SIM_CONFIG.LIMITS.POSSESSION.MAX - SIM_CONFIG.LIMITS.POSSESSION.MIN;
+  const _mRange = DYN_LIMITS.MOMENTUM.MAX - DYN_LIMITS.MOMENTUM.MIN;
+  const _pRange = DYN_LIMITS.POSSESSION.MAX - DYN_LIMITS.POSSESSION.MIN;
   const _lgVol = baseline.leagueGoalVolatility ?? null;
   const momentumPossCoeff = (_lgVol != null && baseline.leagueAvgGoals != null && baseline.leagueAvgGoals > 0)
     ? _pRange * _lgVol / (baseline.leagueAvgGoals * _mRange)
@@ -679,7 +783,7 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
     : 0;
 
   // Kırmızı kart ceza sınırları: RC_MAX × saturation (sabit 0.10/0.60/0.20/0.35/0.75 kaldırıldı).
-  const _rcPenMax = SIM_CONFIG.LIMITS.RED_CARD_POWER_PENALTY_MAX ?? 0.8;
+  const _rcPenMax = DYN_LIMITS.RED_CARD_POWER_PENALTY_MAX ?? 0.8;
   const _rcCV = (baseline.leagueGoalVolatility != null && baseline.leagueAvgGoals > 0)
     ? baseline.leagueGoalVolatility / baseline.leagueAvgGoals : null;
   const _rcMedianCV = (baseline.medianGoalRate != null && baseline.leagueAvgGoals > 0)
@@ -706,6 +810,7 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
     const awayUrgencyStart = Math.max(0, lateBase - (lateBase - earlyBase) * Math.max(0, clamp(awayUnits.GOL_IHTIYACI, 1.0, _ihtMaxLoop) - 1.0));
 
     if (minute > homeUrgencyStart || minute > awayUrgencyStart) {
+      // ── Klasik Urgency: mevcut maçta geride olan takım daha agresif olur ──
       if (goals.away > goals.home && minute > homeUrgencyStart) {
         const timeRatio = (minute - homeUrgencyStart) / (95 - homeUrgencyStart);
         state.home.urgency = 1.0 + homeUnits.GOL_IHTIYACI * timeRatio;
@@ -713,6 +818,37 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
       if (goals.home > goals.away && minute > awayUrgencyStart) {
         const timeRatio = (minute - awayUrgencyStart) / (95 - awayUrgencyStart);
         state.away.urgency = 1.0 + awayUnits.GOL_IHTIYACI * timeRatio;
+      }
+
+      // ── Agrega Urgency: mevcut maçta önde AMA hâlâ gol ihtiyacı olan takım ──
+      // GOL_IHTIYACI > 1.0 ise takımın "daha fazla gol lazım" baskısı var demektir.
+      // Bu baskı M171 (birikmiş skor açığı), M172 (önem skoru), M141 (sezon aşaması) gibi
+      // tamamen dinamik verilerden türetilir. 1.0 = nötr (baskı yok).
+      //
+      // Senaryo: İlk maçta 0-4 kaybeden takım, rövanşta 3-0 önde.
+      // GOL_IHTIYACI ≈ 2.5 (M171 weight:4 → çok yüksek).
+      // Klasik urgency devreye GİRMEZ (çünkü takım önde).
+      // Agrega urgency devreye GİRER → takım 4. gol için basmaya devam eder.
+      //
+      // Formül: aggregateExcess = GOL_IHTIYACI - 1.0 (sıfır sabit, sadece nötr nokta)
+      // aggregateUrgency = 1.0 + aggregateExcess × timeRatio
+      // Sadece takım mevcut maçta önde veya berabere iken VE GOL_IHTIYACI > 1.0 iken aktif.
+      if (goals.home >= goals.away && minute > homeUrgencyStart) {
+        const homeAggExcess = Math.max(0, homeUnits.GOL_IHTIYACI - 1.0);
+        if (homeAggExcess > 0) {
+          const timeRatio = (minute - homeUrgencyStart) / (95 - homeUrgencyStart);
+          const aggregateUrgency = 1.0 + homeAggExcess * timeRatio;
+          // Klasik urgency (gerideyken) zaten hesaplanmışsa, en yükseğini al
+          state.home.urgency = Math.max(state.home.urgency, aggregateUrgency);
+        }
+      }
+      if (goals.away >= goals.home && minute > awayUrgencyStart) {
+        const awayAggExcess = Math.max(0, awayUnits.GOL_IHTIYACI - 1.0);
+        if (awayAggExcess > 0) {
+          const timeRatio = (minute - awayUrgencyStart) / (95 - awayUrgencyStart);
+          const aggregateUrgency = 1.0 + awayAggExcess * timeRatio;
+          state.away.urgency = Math.max(state.away.urgency, aggregateUrgency);
+        }
       }
     }
 
@@ -731,7 +867,7 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
     const normalizedHomePoss = possTotal > 0 ? (rawHomePoss / possTotal) * 100 : 50;
     const currentHomePos = clamp(
       normalizedHomePoss + (state.home.momentum - state.away.momentum) * momentumPossCoeff,
-      SIM_CONFIG.LIMITS.POSSESSION.MIN, SIM_CONFIG.LIMITS.POSSESSION.MAX
+      DYN_LIMITS.POSSESSION.MIN, DYN_LIMITS.POSSESSION.MAX
     );
     // Rastgele top sahibi: ev sahibi possession oranına göre stokastik seçim
     const possessor = r() < currentHomePos / 100 ? 'home' : 'away';
@@ -751,15 +887,15 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
       const rawFlow = atkPower / Math.max(oppDefPower, EPS);
       const dampCoeff = defProb.blockRate;
       const dampedFlow = Math.pow(Math.max(rawFlow, EPS), dampCoeff);
-      const shotProb = clamp(attkProb.shotsPerMin * dampedFlow, SIM_CONFIG.LIMITS.PROBABILITY.MIN, SIM_CONFIG.LIMITS.PROBABILITY.MAX);
+      const shotProb = clamp(attkProb.shotsPerMin * dampedFlow, DYN_LIMITS.PROBABILITY.MIN, DYN_LIMITS.PROBABILITY.MAX);
       if (r() < shotProb) {
         stats[side].shots++;
         // KRİTİK: onTargetRate = M014/M013 (gerçek sezon SOT oranı) — BAGLANTI_OYUNU burada çift sayma olur
         // adjustedOnTargetRate: blok sonrası kalan şutların isabetli olma olasılığı
         // P(isabet | bloklanmamış) = rawOnTargetRate / (1 - blockRate) — matematiksel türev, veri bazlı
         const adjustedOnTargetRate = attkProb.onTargetRate / Math.max(1 - defProb.blockRate, EPS);
-        const onTargetProb = clamp(adjustedOnTargetRate / (weatherErrorMult || ND.WEATHER_IDENTITY), SIM_CONFIG.LIMITS.ON_TARGET.MIN, SIM_CONFIG.LIMITS.ON_TARGET.MAX);
-        const blockProb = clamp(defProb.blockRate * oppDefPower / Math.max(atkPower, EPS), SIM_CONFIG.LIMITS.BLOCK.MIN, SIM_CONFIG.LIMITS.BLOCK.MAX);
+        const onTargetProb = clamp(adjustedOnTargetRate / (weatherErrorMult || ND.WEATHER_IDENTITY), DYN_LIMITS.ON_TARGET.MIN, DYN_LIMITS.ON_TARGET.MAX);
+        const blockProb = clamp(defProb.blockRate * oppDefPower / Math.max(atkPower, EPS), DYN_LIMITS.BLOCK.MIN, DYN_LIMITS.BLOCK.MAX);
 
         if (r() < blockProb) {
           pushEvent({ minute, type: 'shot_blocked', team: side, player: pickActivePlayer(isHome ? hPlayers : aPlayers, ['F', 'M', 'A'], side) });
@@ -773,7 +909,7 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
           const defGKSave = defProb.gkSaveRate ?? baseline.gkSaveRate;
           const rawGkAdj = (1 - defGKSave) / Math.max(1 - baseline.gkSaveRate, 0.01);
           const gkAdj = Math.sqrt(Math.max(rawGkAdj, 0.01));
-          const goalProb = clamp(attkProb.goalConvRate * gkAdj, SIM_CONFIG.LIMITS.PROBABILITY.MIN, SIM_CONFIG.LIMITS.PROBABILITY.MAX) * (weatherGoalMult || ND.WEATHER_IDENTITY);
+          const goalProb = clamp(attkProb.goalConvRate * gkAdj, DYN_LIMITS.PROBABILITY.MIN, DYN_LIMITS.PROBABILITY.MAX) * (weatherGoalMult || ND.WEATHER_IDENTITY);
 
           if (r() < goalProb) {
             goals[side]++;
@@ -790,13 +926,13 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
             const posBoost = normalizedConv * scorerKillerInst * goalDampening;
             const negDrop = negNormalizedConv * cFragil * goalDampening;
             if (isHome) {
-              state.home.morale = clamp(state.home.morale + posBoost, SIM_CONFIG.LIMITS.MORALE.MIN, SIM_CONFIG.LIMITS.MORALE.MAX);
-              state.home.momentum = clamp(state.home.momentum + posBoost * attkProb.onTargetRate, SIM_CONFIG.LIMITS.MOMENTUM.MIN, SIM_CONFIG.LIMITS.MOMENTUM.MAX);
-              state.away.morale = clamp(state.away.morale - negDrop, SIM_CONFIG.LIMITS.MORALE.MIN, SIM_CONFIG.LIMITS.MORALE.MAX);
+              state.home.morale = clamp(state.home.morale + posBoost, DYN_LIMITS.MORALE.MIN, DYN_LIMITS.MORALE.MAX);
+              state.home.momentum = clamp(state.home.momentum + posBoost * attkProb.onTargetRate, DYN_LIMITS.MOMENTUM.MIN, DYN_LIMITS.MOMENTUM.MAX);
+              state.away.morale = clamp(state.away.morale - negDrop, DYN_LIMITS.MORALE.MIN, DYN_LIMITS.MORALE.MAX);
             } else {
-              state.away.morale = clamp(state.away.morale + posBoost, SIM_CONFIG.LIMITS.MORALE.MIN, SIM_CONFIG.LIMITS.MORALE.MAX);
-              state.away.momentum = clamp(state.away.momentum + posBoost * attkProb.onTargetRate, SIM_CONFIG.LIMITS.MOMENTUM.MIN, SIM_CONFIG.LIMITS.MOMENTUM.MAX);
-              state.home.morale = clamp(state.home.morale - negDrop, SIM_CONFIG.LIMITS.MORALE.MIN, SIM_CONFIG.LIMITS.MORALE.MAX);
+              state.away.morale = clamp(state.away.morale + posBoost, DYN_LIMITS.MORALE.MIN, DYN_LIMITS.MORALE.MAX);
+              state.away.momentum = clamp(state.away.momentum + posBoost * attkProb.onTargetRate, DYN_LIMITS.MOMENTUM.MIN, DYN_LIMITS.MOMENTUM.MAX);
+              state.home.morale = clamp(state.home.morale - negDrop, DYN_LIMITS.MORALE.MIN, DYN_LIMITS.MORALE.MAX);
             }
           } else {
             pushEvent({ minute, type: 'shot_on_target', team: side, player: pickActivePlayer(isHome ? hPlayers : aPlayers, ['F', 'M', 'A'], side) });
@@ -809,14 +945,14 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
       // Korner — takımın kendi korner üretim kapasitesine dayalı, baskıdan BAĞIMSIZ
       // Gerçek futbolda korner; savunma bloğu, kenar baskısı ve orta sıklığından oluşur
       // Atak gücüyle doğrudan çarpılmaz — takımın kendi cornerPerMin datası yeterli
-      const cornerProb = clamp(attkProb.cornerPerMin, SIM_CONFIG.LIMITS.CORNER.MIN, SIM_CONFIG.LIMITS.CORNER.MAX);
+      const cornerProb = clamp(attkProb.cornerPerMin, DYN_LIMITS.CORNER.MIN, DYN_LIMITS.CORNER.MAX);
       if (r() < cornerProb) {
         stats[side].corners++;
         const m023raw = getM(isHome ? homeMetrics : awayMetrics, sel, 'M023') ?? dynamicAvgs?.M023 ?? SIM_CONFIG.GLOBAL_FALLBACK.CORNER_GOAL_RATE;
         if (m023raw != null) {
           const havaFactor = isHome ? homeUnits.HAVA_HAKIMIYETI : awayUnits.HAVA_HAKIMIYETI;
           const cornerGoalRate = (m023raw / 100) * havaFactor;
-          const cgProb = clamp(cornerGoalRate, SIM_CONFIG.LIMITS.CORNER_GOAL.MIN, SIM_CONFIG.LIMITS.CORNER_GOAL.MAX);
+          const cgProb = clamp(cornerGoalRate, DYN_LIMITS.CORNER_GOAL.MIN, DYN_LIMITS.CORNER_GOAL.MAX);
           // spMorale: gol morale ile aynı normalize formül — goalConvRate / expectedShots
           const spExpShots = Math.max(attkProb.shotsPerMin * 90, 1);
           const spMorale = attkProb.goalConvRate / spExpShots;
@@ -826,11 +962,11 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
             const sResil = isHome ? homeUnits.ZİHİNSEL_DAYANIKLILIK : awayUnits.ZİHİNSEL_DAYANIKLILIK;
             const cFragil = isHome ? awayUnits.PSIKOLOJIK_KIRILGANLIK : homeUnits.PSIKOLOJIK_KIRILGANLIK;
             if (isHome) {
-              state.home.morale = clamp(state.home.morale + spMorale * sResil, SIM_CONFIG.LIMITS.MORALE.MIN, SIM_CONFIG.LIMITS.MORALE.MAX);
-              state.away.morale = clamp(state.away.morale - spMorale * cFragil, SIM_CONFIG.LIMITS.MORALE.MIN, SIM_CONFIG.LIMITS.MORALE.MAX);
+              state.home.morale = clamp(state.home.morale + spMorale * sResil, DYN_LIMITS.MORALE.MIN, DYN_LIMITS.MORALE.MAX);
+              state.away.morale = clamp(state.away.morale - spMorale * cFragil, DYN_LIMITS.MORALE.MIN, DYN_LIMITS.MORALE.MAX);
             } else {
-              state.away.morale = clamp(state.away.morale + spMorale * sResil, SIM_CONFIG.LIMITS.MORALE.MIN, SIM_CONFIG.LIMITS.MORALE.MAX);
-              state.home.morale = clamp(state.home.morale - spMorale * cFragil, SIM_CONFIG.LIMITS.MORALE.MIN, SIM_CONFIG.LIMITS.MORALE.MAX);
+              state.away.morale = clamp(state.away.morale + spMorale * sResil, DYN_LIMITS.MORALE.MIN, DYN_LIMITS.MORALE.MAX);
+              state.home.morale = clamp(state.home.morale - spMorale * cFragil, DYN_LIMITS.MORALE.MIN, DYN_LIMITS.MORALE.MAX);
             }
           } else {
             pushEvent({ minute, type: 'corner', team: side });
@@ -875,11 +1011,12 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
         const cardName = pickActivePlayer(isHome ? hPlayers : aPlayers, null, side) || `Player ${Math.floor(r() * 11) + 1}`;
         if (!expelledPlayers[side].has(cardName)) {
           expelledPlayers[side].add(cardName);
+          onPitch[side].delete(cardName);
           stats[side].redCards++;
           state[side].redCardPenalty = clamp(state[side].redCardPenalty + organicPenalty, 0, _rcPenMax);
           pushEvent({ minute, type: 'red_card', team: side, player: cardName, subtype: 'direct_red' });
         }
-      } 
+      }
       // Yellow Card
       else if (r() < yellowProb) {
         // Use a generic player ID 1-11 if lineups are missing to prevent every card going to the same "Player"
@@ -888,9 +1025,10 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
           const yellows = playerYellows[side];
           yellows[cardName] = (yellows[cardName] || 0) + 1;
           stats[side].yellowCards++;
-          
+
           if (yellows[cardName] >= 2) {
             expelledPlayers[side].add(cardName);
+            onPitch[side].delete(cardName);
             stats[side].redCards++;
             state[side].redCardPenalty = clamp(state[side].redCardPenalty + organicPenalty, 0, _rcPenMax);
             pushEvent({ minute, type: 'red_card', team: side, player: cardName, subtype: 'second_yellow' });
@@ -900,15 +1038,54 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
         }
       }
 
-      if (minute > 45 && subsDone[side] < SIM_CONFIG.SUBS.MAX) {
-        if (r() < (SIM_CONFIG.SUBS.MAX - subsDone[side]) / (95 - minute + 1)) {
-          const subIn = pickSub(isHome ? hPlayers : aPlayers, side);
-          if (subIn) {
-            subsDone[side]++;
-            pushEvent({ minute, type: 'substitution', team: side, playerIn: subIn, playerOut: pickActivePlayer(isHome ? hPlayers : aPlayers, null, side) });
-            const sqImpact = isHome ? (homeSubQuality ?? ND.COUNTER_INIT) : (awaySubQuality ?? ND.COUNTER_INIT);
-            if (sqImpact !== 0) {
-              state[side].morale = clamp(state[side].morale + sqImpact, SIM_CONFIG.LIMITS.MORALE.MIN, SIM_CONFIG.LIMITS.MORALE.MAX);
+      // ── Dinamik Oyuncu Değişikliği ──────────────────────────────────────────
+      // Statik "minute > 45" yerine, takımın durumuna göre dinamik zamanlama.
+      // Gerçek futbolda değişiklik zamanı:
+      //   - Devre arası (46'): geride olan, stratejik değişiklik
+      //   - 55-65': taktiksel değişiklik (en yaygın)
+      //   - 70-80': yorgunluk kaynaklı
+      //   - 85+': zaman kazanma / son hamle
+      //
+      // Dinamik eşik: earlyBase (genelde ~20) + takımın durumuna göre kayma.
+      // urgency yüksek veya morale düşükse takım daha erken değişiklik yapar.
+      // Rahat ve formda takım geç değişiklik yapar.
+      {
+        const maxSubs = SIM_CONFIG.SUBS.MAX;
+        const remainingSubs = maxSubs - subsDone[side];
+        if (remainingSubs > 0) {
+          const sState = state[side];
+          const sUnits = side === 'home' ? homeUnits : awayUnits;
+
+          // Dinamik değişiklik başlangıç dakikası:
+          // Base: devre arası (46). Urgency ve morale düşüşü bunu erkene çekebilir.
+          // Rahat takım (morale yüksek, urgency yok): 46 + offset → ~60-65 arası
+          // Zor durumdaki takım: 46 → devre arasında hemen değiştirir
+          const moraleDeficit = Math.max(0, 1.0 - sState.morale);
+          const urgencyExcess = Math.max(0, sState.urgency - 1.0);
+          const comfortOffset = Math.max(0, (1.0 - moraleDeficit - urgencyExcess) * (lateBase - 46));
+          const subStartMinute = 46 + comfortOffset;
+
+          if (minute >= subStartMinute) {
+            // Değişiklik olasılığı: kalan değişiklik sayısı / kalan dakika
+            // Urgency ve yorgunluk bu olasılığı artırır
+            const remainingMinutes = Math.max(1, 95 - minute + 1);
+            const fatigueNeed = (sUnits.PSIKOLOJIK_KIRILGANLIK || 1.0) / Math.max(sUnits.KADRO_DERINLIGI || 1.0, EPS);
+            const subUrgency = 1.0 + urgencyExcess + moraleDeficit + (fatigueNeed - 1.0);
+            const subProb = (remainingSubs * subUrgency) / remainingMinutes;
+
+            if (r() < subProb) {
+              const subIn = pickSub(isHome ? hPlayers : aPlayers, side);
+              if (subIn) {
+                subsDone[side]++;
+                const subOut = pickActivePlayer(isHome ? hPlayers : aPlayers, null, side);
+                // Sahadan çıkan oyuncuyu onPitch setinden kaldır
+                if (subOut) onPitch[side].delete(subOut);
+                pushEvent({ minute, type: 'substitution', team: side, playerIn: subIn, playerOut: subOut });
+                const sqImpact = isHome ? (homeSubQuality ?? ND.COUNTER_INIT) : (awaySubQuality ?? ND.COUNTER_INIT);
+                if (sqImpact !== 0) {
+                  state[side].morale = clamp(state[side].morale + sqImpact, DYN_LIMITS.MORALE.MIN, DYN_LIMITS.MORALE.MAX);
+                }
+              }
             }
           }
         }
@@ -928,7 +1105,7 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
   const _fpBase = _fpTotal > 0 ? (hProb.possessionBase * 100 / _fpTotal) * 100 : 50;
   const finalHomePoss = Math.round(clamp(
     _fpBase + (homeUnits.TOPLA_OYNAMA - awayUnits.TOPLA_OYNAMA) * 20,
-    SIM_CONFIG.LIMITS.POSSESSION.MIN, SIM_CONFIG.LIMITS.POSSESSION.MAX
+    DYN_LIMITS.POSSESSION.MIN, DYN_LIMITS.POSSESSION.MAX
   ));
   return { result: { homeGoals: goals.home, awayGoals: goals.away, winner: goals.home > goals.away ? 'home' : (goals.away > goals.home ? 'away' : 'draw') }, stats: { home: { ...stats.home, possession: finalHomePoss }, away: { ...stats.away, possession: 100 - finalHomePoss } }, events, minuteLog, units: { home: homeUnits, away: awayUnits } };
 }
@@ -949,20 +1126,20 @@ function simulateMultipleRuns(params) {
     const run = simulateSingleRun(params);
     const hg = run.result.homeGoals;
     const ag = run.result.awayGoals;
-    
+
     const total = hg + ag;
     if (hg > ag) homeWins++;
     else if (ag > hg) awayWins++;
     else draws++;
-    
+
     if (total > 1.5) over15++;
     if (total > 2.5) over25++;
     if (hg > 0 && ag > 0) btts++;
-    
+
     totalGoals += total;
     totalHomeGoals += hg;
     totalAwayGoals += ag;
-    
+
     const key = `${hg}-${ag}`;
     scoreMap[key] = (scoreMap[key] || 0) + 1;
 

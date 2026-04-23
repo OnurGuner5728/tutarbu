@@ -156,47 +156,60 @@ function computeWeatherMetrics(weather) {
 /**
  * Hava durumu metriklerinden simülasyon çarpanı hesapla.
  * @param {Object} weatherMetrics - M170-M174
- * @returns {Object} { goalMult, errorMult, fatigueMult }
+ * @param {number|null} leagueVolatility - Lig sürpriz katsayısı
+ * @returns {Object} { goalMult, errorMult, fatigueMult, varianceMult }
  */
-function computeWeatherMultipliers(weatherMetrics) {
+function computeWeatherMultipliers(weatherMetrics, leagueVolatility = null) {
   if (!weatherMetrics || Object.keys(weatherMetrics).length === 0) {
-    return { goalMult: 1.0, errorMult: 1.0, fatigueMult: 1.0 };
+    return { goalMult: 1.0, errorMult: 1.0, fatigueMult: 1.0, varianceMult: 1.0 };
   }
 
   const m174 = weatherMetrics.M174;
   const m171 = weatherMetrics.M171; // yağış
   const m172 = weatherMetrics.M172; // rüzgar
 
-  // goalMult: kötü hava → daha az gol (kontrol zorlaşır, savunma avantajlı)
+  // Base lig volatilitesi. Lig sürprize ne kadar açıksa hava durumu sürprizi (varyansı) o kadar artırır.
+  const volAmp = leagueVolatility != null ? Math.max(1.0, leagueVolatility) : 1.0;
+
+  // goalMult: Kötü hava (M174 düşükse) golü doğrudan çok azaltmak yerine,
+  // lig volatilse düşüş daha az olur (gol ihtimali kalır ama varyans artar).
   let goalMult = 1.0;
   if (m174 != null) {
-    goalMult = 0.85 + (m174 / 100) * 0.2; // 0.85 - 1.05 arası
+    const baseDrop = 1.0 - (m174 / 100);
+    goalMult = Math.max(0.9, 1.0 - (baseDrop * 0.1 / volAmp));
   }
 
-  // errorMult: yağış/rüzgar → daha fazla hata (gol şansı artabilir ama kalite düşer)
+  // errorMult: Yağış ve rüzgardan etkilenme (sabit 0.15 yerine volAmp ile ölçeklenir)
   let errorMult = 1.0;
   if (m171 != null) {
-    errorMult += (100 - m171) / 100 * 0.15; // ıslak zemin → hata ↑
+    errorMult += ((100 - m171) / 100) * (0.10 * volAmp);
   }
   if (m172 != null) {
-    errorMult += (100 - m172) / 100 * 0.1; // rüzgar → hata ↑
+    errorMult += ((100 - m172) / 100) * (0.05 * volAmp);
   }
 
-  // fatigueMult: sıcaklık/nem → 2. yarıda yorgunluk
+  // fatigueMult: Yorgunluk
   let fatigueMult = 1.0;
   const m170 = weatherMetrics.M170;
   const m173 = weatherMetrics.M173;
   if (m170 != null && m170 < 80) {
-    fatigueMult += (80 - m170) / 100 * 0.15; // sıcak/soğuk → yorgunluk
+    fatigueMult += ((80 - m170) / 100) * 0.1;
   }
   if (m173 != null && m173 < 70) {
-    fatigueMult += (70 - m173) / 100 * 0.1; // nem → yorgunluk
+    fatigueMult += ((70 - m173) / 100) * 0.05;
+  }
+
+  // Yeni: Varyans çarpanı (score-profile.js ve prediction-generator.js'de overdispersion için)
+  let varianceMult = 1.0;
+  if (m174 != null) {
+    varianceMult += ((100 - m174) / 100) * 0.4 * volAmp;
   }
 
   return {
-    goalMult: Math.max(0.8, Math.min(1.1, goalMult)),
-    errorMult: Math.max(1.0, Math.min(1.3, errorMult)),
+    goalMult: Math.max(0.85, Math.min(1.1, goalMult)),
+    errorMult: Math.max(1.0, Math.min(1.4, errorMult)),
     fatigueMult: Math.max(1.0, Math.min(1.3, fatigueMult)),
+    varianceMult: Math.max(1.0, Math.min(1.5, varianceMult)),
   };
 }
 
