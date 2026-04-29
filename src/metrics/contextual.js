@@ -7,6 +7,7 @@ const clamp = (val, min, max) => Math.max(min, Math.min(max, val));
 
 function calculateContextualMetrics(data) {
   const odds = data.odds;
+  const oddsChanges = data.oddsChanges;
   const votes = data.votes;
   const event = data.event?.event;
   const standings = data.standingsTotal;
@@ -37,6 +38,8 @@ function calculateContextualMetrics(data) {
   // ── M131-M134: Bahis Oranı İma Edilen Olasılıklar ──
   let M131 = null, M132 = null, M133 = null, M134 = null;
   let M134b = null, M134c = null, ahLine = null;
+  // Ham decimal oranlar (UI'da göstermek için)
+  let rawOdds1 = null, rawOddsX = null, rawOdds2 = null;
 
   // Ev takımı adı (AH choice name eşleşmesi için)
   const homeTeamName = (event?.homeTeam?.name || '').toLowerCase();
@@ -51,9 +54,9 @@ function calculateContextualMetrics(data) {
       for (const choice of (market.choices || [])) {
         const decimal = parseOddsDecimal(choice);
         if (decimal != null) {
-          if (choice.name === '1') M131 = (1 / decimal) * 100;
-          if (choice.name === 'X') M132 = (1 / decimal) * 100;
-          if (choice.name === '2') M133 = (1 / decimal) * 100;
+          if (choice.name === '1') { M131 = (1 / decimal) * 100; rawOdds1 = +decimal.toFixed(2); }
+          if (choice.name === 'X') { M132 = (1 / decimal) * 100; rawOddsX = +decimal.toFixed(2); }
+          if (choice.name === '2') { M133 = (1 / decimal) * 100; rawOdds2 = +decimal.toFixed(2); }
         }
       }
     }
@@ -317,7 +320,7 @@ function calculateContextualMetrics(data) {
   let M068 = null;
   const homeFormation = parseFormation(data.lineups?.home?.formation);
   const awayFormation = parseFormation(data.lineups?.away?.formation);
-  
+
   const getTeamControlProxy = (playerStats) => {
     if (!playerStats || playerStats.length === 0) return null;
     let sumPass = 0, sumRating = 0, count = 0;
@@ -352,10 +355,10 @@ function calculateContextualMetrics(data) {
         _dfW = 1 - ctxCV;
       }
     }
-    
+
     // Formasyon yapısal skoru
     const formScore = (FWD_diff * _fwdW + MID_diff * 1.5 - DF_diff * _dfW) / 3.5;
-    
+
     // Pas ve Rating bazlı oyun kontrol skoru
     let statScore = 0;
     if (homeControl && awayControl) {
@@ -445,6 +448,81 @@ function calculateContextualMetrics(data) {
     M075 = clamp(Math.round(rawAdaptation), 30, 100);
   }
   // Yeterli veri yoksa M075 = null
+
+  // ── Açılış Oranları (ΔMarketMove için) ───────────────────────────────────────
+  // SofaScore /odds/1/all endpoint'i choice.openValue (açılış decimal oranı) döndürür.
+  // Aynı oranı şimdi de çekiyoruz; tek fark: kapanış = decimalValue, açılış = openValue.
+  let M131_open = null, M132_open = null, M133_open = null;
+  let rawOpenOdds1 = null, rawOpenOddsX = null, rawOpenOdds2 = null;
+  let oddsChange1 = null, oddsChangeX = null, oddsChange2 = null;
+  for (const market of markets) {
+    const mId = market.marketId;
+    const mName = (market.marketName || '').toLowerCase();
+    if (mId === 1 || mName === '1x2' || mName === 'full time') {
+      for (const choice of (market.choices || [])) {
+        // Açılış oranı: openValue → startOddsDecimal → openDecimalValue → openingDecimalValue → initialDecimalValue
+        const openDec = (() => {
+          // SofaScore choice objesindeki olası açılış oranı alanları
+          const raw = choice.openValue ?? choice.startOddsDecimal ??
+                      choice.openDecimalValue ?? choice.openingDecimalValue ??
+                      choice.initialDecimalValue ?? null;
+          if (raw != null) {
+            const d = parseFloat(raw);
+            return (!isNaN(d) && d > 1) ? d : null;
+          }
+          // initialFractionalValue'dan dönüştür
+          if (choice.initialFractionalValue != null) {
+            const parts = String(choice.initialFractionalValue).split('/');
+            if (parts.length === 2) {
+              const num = parseFloat(parts[0]), den = parseFloat(parts[1]);
+              if (!isNaN(num) && !isNaN(den) && den > 0) return (num + den) / den;
+            }
+          }
+          return null;
+        })();
+        // Change alanı (SofaScore'un oran değişimi sinyali)
+        const chg = choice.change ?? choice.changeValue ?? null;
+        
+        if (choice.name === '1') {
+          if (openDec != null) { M131_open = (1 / openDec) * 100; rawOpenOdds1 = +openDec.toFixed(2); }
+          if (chg != null) oddsChange1 = chg;
+        }
+        if (choice.name === 'X') {
+          if (openDec != null) { M132_open = (1 / openDec) * 100; rawOpenOddsX = +openDec.toFixed(2); }
+          if (chg != null) oddsChangeX = chg;
+        }
+        if (choice.name === '2') {
+          if (openDec != null) { M133_open = (1 / openDec) * 100; rawOpenOdds2 = +openDec.toFixed(2); }
+          if (chg != null) oddsChange2 = chg;
+        }
+      }
+    }
+  }
+
+  // ── Shin Transform: M131-M133 Fair Probability ────────────────────────────────
+  // Basit normalizasyon (1/o / Σ(1/o)) longshot yanlılığını içerir.
+  // Shin (1993): insider bilgisi modelinden türetilmiş fair probability dönüşümü.
+  // Overround ve longshot bias birlikte giderilir.
+  if (M131 != null && M132 != null && M133 != null) {
+    const w1 = M131 / 100, wX = M132 / 100, w2 = M133 / 100;
+    const W = w1 + wX + w2;
+    if (W > 1.001) {
+      const z = Math.max(0, Math.min(0.5, (W - 1) / W)); // margin fraction
+      const shin = (wi) => {
+        const qi = wi / W;
+        if (z >= 1) return qi;
+        const disc = Math.sqrt(z * z + 4 * (1 - z) * qi * qi);
+        return (disc - z) / (2 * (1 - z));
+      };
+      const s1 = shin(w1), sX = shin(wX), s2 = shin(w2);
+      const sSum = s1 + sX + s2;
+      if (sSum > 0) {
+        M131 = +(s1 / sSum * 100).toFixed(2);
+        M132 = +(sX / sSum * 100).toFixed(2);
+        M133 = +(s2 / sSum * 100).toFixed(2);
+      }
+    }
+  }
 
   // ── M176: Formasyon Çakışma İndeksi ──
   // Orta saha sayı üstünlüğünü ölçer: deplasman fazla mid oyuncusu → baskı altı.
@@ -575,10 +653,139 @@ function calculateContextualMetrics(data) {
     M179_away = +(clamp((60 - awayPress.avgOppFinalThird) / 30 * 50 + 50, 10, 90)).toFixed(2);
   }
 
+  // ── M180-M185: Piyasa Baskı İndeksleri ───────────────────────────────────────
+  // extraordinary.md formülleri: σ = sigmoid, tablo pozisyonundan dinamik baskı
+  const σ = (x) => 1 / (1 + Math.exp(-x));
+
+  // Puan tablosu: sıralanmış, mevcut tur bilgisi
+  const sortedRows = [...rows].sort((a, b) => (b.points ?? 0) - (a.points ?? 0));
+  const leaderPts = sortedRows[0]?.points ?? null;
+  const totalRoundsCalc = teamCount >= 4 ? (teamCount - 1) * 2 : null;
+  const matchesLeftCalc = (totalRoundsCalc != null && currentRound != null)
+    ? Math.max(0, totalRoundsCalc - currentRound) : null;
+
+  // Küme düşme sınırı: relegation/playoff zone'un en yüksek puanı
+  const relegRows = rows.filter(r =>
+    r.promotion?.text?.toLowerCase().includes('relegation') ||
+    r.promotion?.text?.toLowerCase().includes('playoff') ||
+    r.promotion?.text?.toLowerCase().includes('düşme')
+  );
+  const safetyBoundaryPts = relegRows.length > 0
+    ? Math.max(...relegRows.map(r => r.points ?? 0)) : null;
+
+  // M180: Ev sahibi küme düşme baskısı
+  const M180 = (homePoints != null && safetyBoundaryPts != null && matchesLeftCalc != null)
+    ? +σ((safetyBoundaryPts - homePoints) / (matchesLeftCalc + 1)).toFixed(4) : null;
+
+  // M181: Deplasman küme düşme baskısı
+  const M181 = (awayPoints != null && safetyBoundaryPts != null && matchesLeftCalc != null)
+    ? +σ((safetyBoundaryPts - awayPoints) / (matchesLeftCalc + 1)).toFixed(4) : null;
+
+  // Şampiyonluk hedefi: yalnızca üst %40'da olan takımlar için anlamlı
+  const topN = Math.ceil(rows.length * 0.40);
+
+  // M182: Ev sahibi şampiyonluk/Avrupa baskısı
+  const M182 = (homePos != null && homePos <= topN &&
+    homePoints != null && leaderPts != null && matchesLeftCalc != null)
+    ? +σ((leaderPts - homePoints) / (matchesLeftCalc + 1)).toFixed(4) : null;
+
+  // M183: Deplasman şampiyonluk/Avrupa baskısı
+  const M183 = (awayPos != null && awayPos <= topN &&
+    awayPoints != null && leaderPts != null && matchesLeftCalc != null)
+    ? +σ((leaderPts - awayPoints) / (matchesLeftCalc + 1)).toFixed(4) : null;
+
+  // M184: Tablo sıkışıklığı — ev sahibi çevresi
+  // TableCompression = 1 / (1 + |GapAbove| + |GapBelow|)
+  const homeGapAbove = (homePos != null && homePos > 1 && sortedRows[homePos - 2])
+    ? Math.abs((homeRow?.points ?? 0) - (sortedRows[homePos - 2]?.points ?? 0)) : 0;
+  const homeGapBelow = (homePos != null && sortedRows[homePos])
+    ? Math.abs((homeRow?.points ?? 0) - (sortedRows[homePos]?.points ?? 0)) : 0;
+  const M184 = +(1 / (1 + homeGapAbove + homeGapBelow)).toFixed(4);
+
+  // M185: Tablo sıkışıklığı — deplasman çevresi
+  const awayGapAbove = (awayPos != null && awayPos > 1 && sortedRows[awayPos - 2])
+    ? Math.abs((awayRow?.points ?? 0) - (sortedRows[awayPos - 2]?.points ?? 0)) : 0;
+  const awayGapBelow = (awayPos != null && sortedRows[awayPos])
+    ? Math.abs((awayRow?.points ?? 0) - (sortedRows[awayPos]?.points ?? 0)) : 0;
+  const M185 = +(1 / (1 + awayGapAbove + awayGapBelow)).toFixed(4);
+
+  // ── M186-M187: ResistanceIndex ────────────────────────────────────────────────
+  // extraordinary.md: E[ActualPts - ExpectedPts | high-pressure matches]
+  // Burada baskı filtresi standings verisinde yoksa global hesap yapılır.
+  // ExpectedPPG: takımın gol atma/yeme lambdalarından Poisson ile beklenen puan.
+  // ResistanceIndex > 0: takım beklentinin üzerinde performans → "dirençli"
+  // ResistanceIndex < 0: beklentinin altında → "dirençsiz"
+  const _pMF = (k, lam) => {
+    if (lam <= 0) return k === 0 ? 1 : 0;
+    let logFact = 0;
+    for (let i = 2; i <= k; i++) logFact += Math.log(i);
+    return Math.exp(-lam + k * Math.log(Math.max(lam, 1e-10)) - logFact);
+  };
+  const _expectedPPG = (lamFor, lamAgainst) => {
+    if (!lamFor || !lamAgainst || lamFor <= 0 || lamAgainst <= 0) return null;
+    let pW = 0, pD = 0;
+    for (let h = 0; h <= 8; h++) {
+      for (let a = 0; a <= 8; a++) {
+        const p = _pMF(h, lamFor) * _pMF(a, lamAgainst);
+        if (h > a) pW += p;
+        else if (h === a) pD += p;
+      }
+    }
+    return pW * 3 + pD;
+  };
+
+  const _rowPlayed = (row) => row?.matches ?? row?.played ?? 0;
+  const homeActualPPG = (homeRow && _rowPlayed(homeRow) > 0) ? (homeRow.points || 0) / _rowPlayed(homeRow) : null;
+  const awayActualPPG = (awayRow && _rowPlayed(awayRow) > 0) ? (awayRow.points || 0) / _rowPlayed(awayRow) : null;
+  const homeLamFor = (homeRow && _rowPlayed(homeRow) > 0) ? (homeRow.scoresFor ?? homeRow.goalsFor ?? 0) / _rowPlayed(homeRow) : null;
+  const homeLamAgainst = (homeRow && _rowPlayed(homeRow) > 0) ? (homeRow.scoresAgainst ?? homeRow.goalsAgainst ?? 0) / _rowPlayed(homeRow) : null;
+  const awayLamFor = (awayRow && _rowPlayed(awayRow) > 0) ? (awayRow.scoresFor ?? awayRow.goalsFor ?? 0) / _rowPlayed(awayRow) : null;
+  const awayLamAgainst = (awayRow && _rowPlayed(awayRow) > 0) ? (awayRow.scoresAgainst ?? awayRow.goalsAgainst ?? 0) / _rowPlayed(awayRow) : null;
+
+  const homeExpPPG = _expectedPPG(homeLamFor, homeLamAgainst);
+  const awayExpPPG = _expectedPPG(awayLamFor, awayLamAgainst);
+  const M186 = (homeActualPPG != null && homeExpPPG != null)
+    ? +(homeActualPPG - homeExpPPG).toFixed(4) : null;
+  const M187 = (awayActualPPG != null && awayExpPPG != null)
+    ? +(awayActualPPG - awayExpPPG).toFixed(4) : null;
+
+  // ── M188-M189: ΔMarketMove (Açılış → Kapanış Piyasa Hareketi) ────────────────
+  // extraordinary.md: logit(p_close) - logit(p_open)
+  // > 0: piyasa kapanışa doğru bu sonucu MORE likely gördü (para geldi)
+  // < 0: piyasa bu sonucu LESS likely gördü (para gitmedi)
+  // null: açılış oranı API'den gelmedi
+  const _logit = (p) => {
+    const pc = Math.max(0.001, Math.min(0.999, p / 100));
+    return Math.log(pc / (1 - pc));
+  };
+  // Açılış oranlarına da Shin uygula (kapanış M131 ile tutarlı)
+  let M131_openShin = null, M132_openShin = null, M133_openShin = null;
+  if (M131_open != null && M132_open != null && M133_open != null) {
+    const wo1 = M131_open/100, woX = M132_open/100, wo2 = M133_open/100;
+    const Wo = wo1 + woX + wo2;
+    if (Wo > 1.001) {
+      const zo = Math.max(0, Math.min(0.5, (Wo-1)/Wo));
+      const shinO = (wi) => { const qi=wi/Wo; if(zo>=1)return qi; const d=Math.sqrt(zo*zo+4*(1-zo)*qi*qi); return (d-zo)/(2*(1-zo)); };
+      const s1=shinO(wo1),sX=shinO(woX),s2=shinO(wo2),sS=s1+sX+s2;
+      if(sS>0){ M131_openShin=s1/sS*100; M132_openShin=sX/sS*100; M133_openShin=s2/sS*100; }
+    } else {
+      M131_openShin = M131_open; M132_openShin = M132_open; M133_openShin = M133_open;
+    }
+  }
+
+  const M188 = (M131 != null && M131_openShin != null)
+    ? +(_logit(M131) - _logit(M131_openShin)).toFixed(4) : null; // Home market move
+  const M189 = (M133 != null && M133_openShin != null)
+    ? +(_logit(M133) - _logit(M133_openShin)).toFixed(4) : null; // Away market move
+
   return {
     M068, M075,
     // Pressing metrikleri home/away versiyonları:
     M177_home, M177_away, M178_home, M178_away, M179_home, M179_away,
+    // Piyasa baskı indeksleri
+    M180, M181, M182, M183, M184, M185,
+    // ResistanceIndex + ΔMarketMove
+    M186, M187, M188, M189,
     M131, M132, M133, M134, M134b, M134c, M135, M136, M137, M138, M139, M140,
     M141, M142, M143, M144, M145, M170, M171, M172, M173, M174, M175, M176,
     _meta: {
@@ -595,28 +802,199 @@ function calculateContextualMetrics(data) {
       awayHasTarget: M173 > 80,
       homeFormation: data.lineups?.home?.formation || null,
       awayFormation: data.lineups?.away?.formation || null,
+      // Piyasa hareketi meta
+      openingOddsAvailable: M131_openShin != null,
+      openingHome: M131_openShin != null ? +M131_openShin.toFixed(2) : null,
+      openingDraw: M132_openShin != null ? +M132_openShin.toFixed(2) : null,
+      openingAway: M133_openShin != null ? +M133_openShin.toFixed(2) : null,
+      // Ham decimal oranlar (kapanış)
+      rawOdds: (rawOdds1 != null) ? { home: rawOdds1, draw: rawOddsX, away: rawOdds2 } : null,
+      // Ham decimal oranlar (açılış)
+      rawOpenOdds: (rawOpenOdds1 != null) ? { home: rawOpenOdds1, draw: rawOpenOddsX, away: rawOpenOdds2 } : null,
+      // Oran değişim sinyalleri (SofaScore change field)
+      oddsChange: (oddsChange1 != null || oddsChangeX != null || oddsChange2 != null)
+        ? { home: oddsChange1, draw: oddsChangeX, away: oddsChange2 }
+        : null,
+      // ── Tüm Marketler (Genişletilmiş Bahis Paneli) ──
+      allMarkets: (() => {
+        if (!markets.length) return null;
+        const parsed = [];
+        for (const market of markets) {
+          const mId = market.marketId;
+          const mName = market.marketName || `Market ${mId}`;
+          const group = market.choiceGroup ?? null;
+          const choices = (market.choices || []).map(c => {
+            const closing = parseOddsDecimal(c);
+            // Açılış oranı
+            let opening = null;
+            if (c.initialFractionalValue) {
+              const parts = String(c.initialFractionalValue).split('/');
+              if (parts.length === 2) {
+                const num = parseFloat(parts[0]), den = parseFloat(parts[1]);
+                if (!isNaN(num) && !isNaN(den) && den > 0) opening = +((num + den) / den).toFixed(2);
+              }
+            }
+            return {
+              name: c.name,
+              closing,
+              opening,
+              change: c.change ?? null,
+              drift: (closing != null && opening != null) ? +(closing - opening).toFixed(2) : null,
+            };
+          }).filter(c => c.closing != null);
+          if (choices.length === 0) continue;
+          parsed.push({ id: mId, name: mName, group, choices });
+        }
+        return parsed.length > 0 ? parsed : null;
+      })(),
+      // ResistanceIndex meta
+      homeResistance: M186, awayResistance: M187,
+      homeExpPPG: homeExpPPG != null ? +homeExpPPG.toFixed(3) : null,
+      awayExpPPG: awayExpPPG != null ? +awayExpPPG.toFixed(3) : null,
+      homeActualPPG: homeActualPPG != null ? +homeActualPPG.toFixed(3) : null,
+      awayActualPPG: awayActualPPG != null ? +awayActualPPG.toFixed(3) : null,
+      // ── Bölge Detayı: Her takımın hangi bölgede olduğu ──
+      homeZone: (() => {
+        if (!homeRow?.promotion?.text) return null;
+        const t = homeRow.promotion.text.toLowerCase();
+        if (t.includes('champions')) return 'CL';
+        if (t.includes('europa')) return 'EL';
+        if (t.includes('conference')) return 'ECL';
+        if (t.includes('promotion') && !t.includes('playoff')) return 'Promotion';
+        if (t.includes('playoff') && !t.includes('relegation')) return 'Playoff';
+        if (t.includes('relegation') && t.includes('playoff')) return 'Rel. Playoff';
+        if (t.includes('relegation') || t.includes('düşme')) return 'Relegation';
+        return homeRow.promotion.text || null;
+      })(),
+      awayZone: (() => {
+        if (!awayRow?.promotion?.text) return null;
+        const t = awayRow.promotion.text.toLowerCase();
+        if (t.includes('champions')) return 'CL';
+        if (t.includes('europa')) return 'EL';
+        if (t.includes('conference')) return 'ECL';
+        if (t.includes('promotion') && !t.includes('playoff')) return 'Promotion';
+        if (t.includes('playoff') && !t.includes('relegation')) return 'Playoff';
+        if (t.includes('relegation') && t.includes('playoff')) return 'Rel. Playoff';
+        if (t.includes('relegation') || t.includes('düşme')) return 'Relegation';
+        return awayRow.promotion.text || null;
+      })(),
+      homeZoneRaw: homeRow?.promotion?.text || null,
+      awayZoneRaw: awayRow?.promotion?.text || null,
+      // ── Fikstür Yoğunluğu ──
+      // Son 5 maçtaki ortalama maç arası gün sayısı
+      // Düşük gün = yoğun fikstür → yorgunluk/rotasyon riski
+      fixtureCongest: (() => {
+        const calcCongestion = (lastEvents) => {
+          if (!Array.isArray(lastEvents) || lastEvents.length < 2) return null;
+          const finished = lastEvents
+            .filter(e => e.status?.type === 'finished' && e.startTimestamp)
+            .sort((a, b) => b.startTimestamp - a.startTimestamp)
+            .slice(0, 5);
+          if (finished.length < 2) return null;
+          let totalDays = 0;
+          for (let i = 0; i < finished.length - 1; i++) {
+            totalDays += Math.abs(finished[i].startTimestamp - finished[i + 1].startTimestamp) / 86400;
+          }
+          const avgDays = totalDays / (finished.length - 1);
+          return +avgDays.toFixed(1);
+        };
+        return {
+          home: calcCongestion(data.homeLastEvents),
+          away: calcCongestion(data.awayLastEvents),
+        };
+      })(),
+      // ── Kullanıcı Oylamaları ──
+      votes: (M135 != null && M136 != null && M137 != null)
+        ? { home: +M135.toFixed(1), draw: +M136.toFixed(1), away: +M137.toFixed(1) }
+        : null,
+      // ── Pressing Metrikleri ──
+      pressing: {
+        home: { intensity: M177_home, territory: M178_home, lineHeight: M179_home },
+        away: { intensity: M177_away, territory: M178_away, lineHeight: M179_away },
+      },
+      // ── Taktik & Menajer ──
+      tacticalDominance: M068,
+      tacticalAdaptation: M075,
+      stadiumCapacity: M138,
+      managerExperience: M139,
+      managerWinRate: M140,
+      rankAdvantage: M175,
+      formationClash: M176,
+      leagueStrength: M144,
+      transferValue: M145,
+      pointDiff: M143,
+      posDiff: M142,
+      tournamentIntensity: M170,
+      // ── Oran Hareketi Analizi (oddsChanges API) ──
+      // API format: { changedOdds: [{ timestamp, choice1: { name, fractionalValue, changeFromInitial, changeFromLast }, ... }] }
+      oddsMovement: (() => {
+        const entries = oddsChanges?.changedOdds;
+        if (!entries || entries.length === 0) return null;
+
+        // fractional → decimal çevirici
+        const frac2dec = (fv) => {
+          if (!fv) return null;
+          const parts = String(fv).split('/');
+          if (parts.length !== 2) return null;
+          const num = parseFloat(parts[0]), den = parseFloat(parts[1]);
+          if (isNaN(num) || isNaN(den) || den === 0) return null;
+          return +((num + den) / den).toFixed(2);
+        };
+
+        // İlk entry = açılış, son entry = kapanış
+        const first = entries[0];
+        const last = entries[entries.length - 1];
+
+        // Her outcome (1, X, 2) için hareket analizi
+        const outcomes = {};
+        for (const key of ['choice1', 'choice2', 'choice3']) {
+          const name = first[key]?.name;
+          if (!name) continue;
+          const openOdds = frac2dec(first[key]?.fractionalValue);
+          const closeOdds = frac2dec(last[key]?.fractionalValue);
+          const totalChangeFromInitial = last[key]?.changeFromInitial ?? null;
+
+          // Kaç kez düştü, kaç kez yükseldi
+          let ups = 0, downs = 0;
+          for (let i = 1; i < entries.length; i++) {
+            const cfl = entries[i][key]?.changeFromLast;
+            if (cfl != null) {
+              if (cfl > 0) ups++;
+              else if (cfl < 0) downs++;
+            }
+          }
+          const total = ups + downs;
+          // direction: shortening = oran düşüyor = para giriyor
+          const direction = downs > ups ? 'shortening' : ups > downs ? 'drifting' : 'stable';
+
+          outcomes[name] = {
+            openOdds, closeOdds,
+            totalChangePercent: totalChangeFromInitial != null ? +totalChangeFromInitial.toFixed(1) : null,
+            ups, downs, total,
+            direction,
+          };
+        }
+
+        // Timeline (basit özet — her hareket noktası)
+        const timeline = entries.map(e => ({
+          time: parseInt(e.timestamp) * 1000, // ms
+          odds: {
+            '1': frac2dec(e.choice1?.fractionalValue),
+            'X': frac2dec(e.choice2?.fractionalValue),
+            '2': frac2dec(e.choice3?.fractionalValue),
+          },
+        }));
+
+        return {
+          totalChanges: entries.length - 1, // ilk entry açılış, geri kalanı hareket
+          outcomes,
+          timeline,
+        };
+      })(),
       rule: 'Dynamic standings data'
     }
   };
 }
-
-function findTeamRow(standings, teamId) {
-  if (!standings?.standings) return null;
-  for (const s of standings.standings) {
-    for (const row of (s.rows || [])) {
-      if (row.team?.id === teamId) return row;
-    }
-  }
-  return null;
-}
-
-function getTotalTeams(standings) {
-  if (!standings?.standings) return null;
-  for (const s of standings.standings) return (s.rows || []).length;
-  return null;
-}
-
-module.exports = { calculateContextualMetrics };
 
 function findTeamRow(standings, teamId) {
   if (!standings?.standings) return null;

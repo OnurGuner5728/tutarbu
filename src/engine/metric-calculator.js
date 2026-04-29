@@ -69,7 +69,8 @@ function calculateAllMetrics(data) {
   const awayMomentum = calculateMomentumMetrics(data, 'away');
 
   // Bölüm J: Tüm metrikleri düzleştir (Dinamik Üniteler İçin)
-  const homeFlat = { ...homeAttack, ...homeDefense, ...homeForm, ...homePlayer, ...homeGK, ...homeMomentum,
+  const homeFlat = {
+    ...homeAttack, ...homeDefense, ...homeForm, ...homePlayer, ...homeGK, ...homeMomentum,
     M170: contextual.M170, // Leg (shared)
     M171: 5 - contextual.M171, // Agg Deficit (mapped with pedestal of 5)
     M172: contextual.M172, // Importance (Home)
@@ -77,11 +78,19 @@ function calculateAllMetrics(data) {
     M175: contextual.M175, // Rank Adv (Home based)
     // Yorgunluk + Pressing metrikleri — ev sahibi perspektifi
     M096b: homePlayer.M096b,         // Yorgunluk endeksi
-    M177:  contextual.M177_home,     // Pressing yoğunluğu
-    M178:  contextual.M178_home,     // Territorial control
-    M179:  contextual.M179_home,     // Savunma hat yüksekliği
+    M177: contextual.M177_home,     // Pressing yoğunluğu
+    M178: contextual.M178_home,     // Territorial control
+    M179: contextual.M179_home,     // Savunma hat yüksekliği
+    // Piyasa baskı indeksleri — ev sahibi perspektifi
+    M180: contextual.M180,          // Küme düşme baskısı (home)
+    M182: contextual.M182,          // Şampiyonluk/Avrupa baskısı (home)
+    M184: contextual.M184,          // Tablo sıkışıklığı (home)
+    // ResistanceIndex + ΔMarketMove — ev sahibi perspektifi
+    M186: contextual.M186,          // ResistanceIndex (home)
+    M188: contextual.M188,          // ΔMarketMove home (logit shift)
   };
-  const awayFlat = { ...awayAttack, ...awayDefense, ...awayForm, ...awayPlayer, ...awayGK, ...awayMomentum,
+  const awayFlat = {
+    ...awayAttack, ...awayDefense, ...awayForm, ...awayPlayer, ...awayGK, ...awayMomentum,
     M170: contextual.M170,
     M171: 5 + contextual.M171, // Agg Deficit for away
     M172: contextual.M173,  // Importance (Away) => M172
@@ -89,15 +98,22 @@ function calculateAllMetrics(data) {
     M175: 100 - contextual.M175, // Inverted Rank Adv
     // Yorgunluk + Pressing metrikleri — deplasman perspektifi
     M096b: awayPlayer.M096b,
-    M177:  contextual.M177_away,
-    M178:  contextual.M178_away,
-    M179:  contextual.M179_away,
+    M177: contextual.M177_away,
+    M178: contextual.M178_away,
+    M179: contextual.M179_away,
+    // Piyasa baskı indeksleri — deplasman perspektifi
+    M181: contextual.M181,          // Küme düşme baskısı (away)
+    M183: contextual.M183,          // Şampiyonluk/Avrupa baskısı (away)
+    M185: contextual.M185,          // Tablo sıkışıklığı (away)
+    // ResistanceIndex + ΔMarketMove — deplasman perspektifi
+    M187: contextual.M187,          // ResistanceIndex (away)
+    M189: contextual.M189,          // ΔMarketMove away (logit shift)
   };
   const { M170, M171, M172, M173, M174, M175, ...contextualClean } = contextual;
   const sharedFlat = { ...referee, ...h2h, ...contextualClean };
-  
+
   const allMetricIds = new Set([
-     ...Object.keys(homeFlat), ...Object.keys(awayFlat), ...Object.keys(sharedFlat)
+    ...Object.keys(homeFlat), ...Object.keys(awayFlat), ...Object.keys(sharedFlat)
   ].filter(k => /^M[0-9]{3}[a-z]?$/i.test(k)));
 
   // Dinamik lig ortalaması — standings verisinden hesaplanır
@@ -170,9 +186,9 @@ function calculateAllMetrics(data) {
     dynamicAvgs,
     dynamicHomeAdvantage,
     // xG verileri — Dixon-Coles lambda kalibrasyonu için
-    homeXGScored:   homeXG.avgXGScored,
+    homeXGScored: homeXG.avgXGScored,
     homeXGConceded: homeXG.avgXGConceded,
-    awayXGScored:   awayXG.avgXGScored,
+    awayXGScored: awayXG.avgXGScored,
     awayXGConceded: awayXG.avgXGConceded,
     // Standings home/away-specific goal rates — en güvenilir home advantage kaynağı
     homeStGF, homeStGA, awayStGF, awayStGA,
@@ -197,6 +213,15 @@ function calculateAllMetrics(data) {
     matchScoreProfile,
     // Lig Parmak İzi — blend'e lig dağılımı ekleme için
     leagueFingerprint,
+    // Lineup Quality Ratio — Workshop kadro değişikliğinin Poisson'a etkisi
+    homeLineupQualityRatio: data._homeLineupQualityRatio ?? 1.0,
+    awayLineupQualityRatio: data._awayLineupQualityRatio ?? 1.0,
+    // Zone Quality Ratios — Bölgesel kadro etkisi (HBKE)
+    homeZoneQualityRatios: data._homeZoneQualityRatios ?? null,
+    awayZoneQualityRatios: data._awayZoneQualityRatios ?? null,
+    // Dynamic Block Weights — Oyuncu profil bazlı bölge ağırlıkları (Bayesian Hibrit)
+    homeDynamicBlockWeights: data._homeDynamicBlockWeights ?? null,
+    awayDynamicBlockWeights: data._awayDynamicBlockWeights ?? null,
   });
 
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
@@ -219,6 +244,18 @@ function calculateAllMetrics(data) {
       goalkeeper: homeGK,
       momentum: homeMomentum,
       compositeScores: advanced.home,
+      // Dinamik yeni metrikler — /api/metrics endpoint'ine expose etmek için
+      dynamic: {
+        M096b: homeFlat.M096b ?? null,   // Yorgunluk endeksi
+        M177: homeFlat.M177 ?? null,     // Pressing yoğunluğu
+        M178: homeFlat.M178 ?? null,     // Territorial control
+        M179: homeFlat.M179 ?? null,     // Savunma hat yüksekliği
+        M180: contextual.M180 ?? null,   // Küme düşme baskısı (home)
+        M182: contextual.M182 ?? null,   // Şampiyonluk baskısı (home)
+        M184: contextual.M184 ?? null,   // Tablo sıkışıklığı (home)
+        M186: contextual.M186 ?? null,   // ResistanceIndex (home)
+        M188: contextual.M188 ?? null,   // ΔMarketMove (home)
+      },
     },
     away: {
       attack: awayAttack,
@@ -228,6 +265,18 @@ function calculateAllMetrics(data) {
       goalkeeper: awayGK,
       momentum: awayMomentum,
       compositeScores: advanced.away,
+      // Dinamik yeni metrikler — /api/metrics endpoint'ine expose etmek için
+      dynamic: {
+        M096b: awayFlat.M096b ?? null,
+        M177: awayFlat.M177 ?? null,
+        M178: awayFlat.M178 ?? null,
+        M179: awayFlat.M179 ?? null,
+        M181: contextual.M181 ?? null,   // Küme düşme baskısı (away)
+        M183: contextual.M183 ?? null,   // Şampiyonluk baskısı (away)
+        M185: contextual.M185 ?? null,   // Tablo sıkışıklığı (away)
+        M187: contextual.M187 ?? null,   // ResistanceIndex (away)
+        M189: contextual.M189 ?? null,   // ΔMarketMove (away)
+      },
     },
     shared: {
       referee,
@@ -236,6 +285,10 @@ function calculateAllMetrics(data) {
       sharedComposite: advanced.shared,
     },
     prediction: advanced.prediction,
+    // Takım + H2H skor profilleri — prediction-generator'da dinamik O/U + BTTS eşiği için
+    homeScoreProfile,
+    awayScoreProfile,
+    matchScoreProfile,
     // Lig parmak izi — skor blend ve BTTS/OU kalibrasyon için
     leagueFingerprint,
     // Dinamik lig ortalamaları — simülasyon motoru ve UI tarafından kullanılır
@@ -350,19 +403,19 @@ function extractXGFromRecentMatches(recentMatchDetails, teamId, role = null) {
     const awayValue = xgItem.awayValue;
     if (homeValue == null || awayValue == null) continue;
 
-    const xgScored    = teamWasHome ? homeValue : awayValue;
-    const xgConceded  = teamWasHome ? awayValue : homeValue;
+    const xgScored = teamWasHome ? homeValue : awayValue;
+    const xgConceded = teamWasHome ? awayValue : homeValue;
 
     samples.push({ xgScored, xgConceded });
   }
 
   if (samples.length === 0) return { avgXGScored: null, avgXGConceded: null, sampleCount: 0 };
 
-  const avgXGScored   = samples.reduce((s, v) => s + v.xgScored, 0)   / samples.length;
+  const avgXGScored = samples.reduce((s, v) => s + v.xgScored, 0) / samples.length;
   const avgXGConceded = samples.reduce((s, v) => s + v.xgConceded, 0) / samples.length;
 
   return {
-    avgXGScored:   Math.round(avgXGScored   * 100) / 100,
+    avgXGScored: Math.round(avgXGScored * 100) / 100,
     avgXGConceded: Math.round(avgXGConceded * 100) / 100,
     sampleCount: samples.length,
   };

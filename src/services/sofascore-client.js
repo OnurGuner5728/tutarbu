@@ -226,6 +226,7 @@ const api = {
   getEventH2H: (eventId) => fetchAPI(`/event/${eventId}/h2h`, 'h2h'),
   getEventH2HEvents: (eventId) => fetchAPI(`/event/${eventId}/h2h/events`, 'h2h'),
   getEventOdds: (eventId) => fetchAPI(`/event/${eventId}/odds/1/all`, 'odds'),
+  getEventOddsChanges: (eventId) => fetchAPI(`/event/${eventId}/odds/1/changes`, 'odds'),
   getEventMissingPlayers: (eventId) => fetchAPI(`/event/${eventId}/missing-players`, 'eventDetail'),
   getEventStreaks: (eventId) => fetchAPI(`/event/${eventId}/team-streaks`, 'eventDetail'),
   getEventForm: (eventId) => fetchAPI(`/event/${eventId}/pregame-form`, 'eventDetail'),

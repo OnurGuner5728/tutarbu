@@ -10,6 +10,7 @@ const { SIM_CONFIG, getDynamicLimits } = require('./sim-config');
 const { recordBaselineTrace, recordSimWarning } = require('./audit-helper');
 const { computeWeatherMultipliers } = require('../services/weather-service');
 const { BLOCK_QF_MAP, computeAlpha, computeQualityFactors } = require('./quality-factors');
+const { applyZoneModifiers } = require('./lineup-impact');
 // METRIC_METADATA artık kullanılmıyor — tüm lig ortalamaları dinamik.
 
 // Merkezi nötr sabitler referansı
@@ -67,7 +68,8 @@ const SIM_BLOCKS = {
 
   // III. PSYCHOLOGY
   ZİHİNSEL_DAYANIKLILIK: [
-    { id: 'M064', weight: 4, sign: 1 }, { id: 'M165', weight: 3, sign: 1 }
+    { id: 'M064', weight: 4, sign: 1 }, { id: 'M165', weight: 3, sign: 1 },
+    { id: 'M186', weight: 2, sign: 1 }  // ResistanceIndex: beklentinin üzerinde performans gösteren takım daha sağlam
   ],
   FİŞİ_ÇEKME: [
     { id: 'M065', weight: 4, sign: 1 }, { id: 'M043', weight: 2, sign: 1 },
@@ -113,7 +115,8 @@ const SIM_BLOCKS = {
   ],
   GOL_IHTIYACI: [
     { id: 'M141', weight: 2, sign: 1 }, { id: 'M171', weight: 4, sign: 1 },
-    { id: 'M172', weight: 3, sign: 1 }
+    { id: 'M172', weight: 3, sign: 1 },
+    { id: 'M188', weight: 2, sign: 1 }  // ΔMarketMove: piyasa bu yönde hareket ettiyse motivasyon sinyali
   ],
 
   // V. OPERATIONAL
@@ -483,8 +486,78 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
     if (awayUnits[blockId] != null) awayUnits[blockId] *= _simQF.away[qfType];
   }
 
+  // ── Bölgesel Kadro Etkisi (ZQM) ──────────────────────────────────────────
+  // PVKD piyasa değeri kalite faktörlerinden SONRA, bireysel oyuncu kalitesini
+  // mevki bazlı (G/D/M/F) behavioral unit'lere yansıtır.
+  // zoneQualityRatios = { G: 0.85, D: 1.0, M: 0.95, F: 1.1 } — Workshop'ta hesaplanır.
+  // Yoksa (kadro değişmedi): tüm ratios identity (1.0), applyZoneModifiers erken çıkar.
+  const _hZQR = baseline.homeZoneQualityRatios ?? { G: 1.0, D: 1.0, M: 1.0, F: 1.0 };
+  const _aZQR = baseline.awayZoneQualityRatios ?? { G: 1.0, D: 1.0, M: 1.0, F: 1.0 };
+  const _hLQRForZQM = baseline.homeLineupQualityRatio ?? 1.0;
+  const _aLQRForZQM = baseline.awayLineupQualityRatio ?? 1.0;
+  const _hDynW = baseline.homeDynamicBlockWeights ?? null;
+  const _aDynW = baseline.awayDynamicBlockWeights ?? null;
+  applyZoneModifiers(homeUnits, _hZQR, _hLQRForZQM, _hDynW);
+  applyZoneModifiers(awayUnits, _aZQR, _aLQRForZQM, _aDynW);
+
+  // ── GOL_IHTIYACI Baskı Boost (M180/M182 entegrasyonu) ──────────────────────
+  // Küme düşme veya şampiyonluk baskısı GOL_IHTIYACI birimini güçlendirir.
+  // M180: ev küme düşme [0-1], M182: ev şampiyonluk [0-1]
+  // M181: dep küme düşme [0-1], M183: dep şampiyonluk [0-1]
+  const _hRelP = homeMetrics.M180 ?? null;
+  const _hTitP = homeMetrics.M182 ?? null;
+  if (homeUnits.GOL_IHTIYACI != null && (_hRelP != null || _hTitP != null)) {
+    const maxPressure = Math.max(_hRelP ?? 0, _hTitP ?? 0);
+    homeUnits.GOL_IHTIYACI *= (1.0 + maxPressure * 0.5);
+  }
+  const _aRelP = awayMetrics.M181 ?? null;
+  const _aTitP = awayMetrics.M183 ?? null;
+  if (awayUnits.GOL_IHTIYACI != null && (_aRelP != null || _aTitP != null)) {
+    const maxPressure = Math.max(_aRelP ?? 0, _aTitP ?? 0);
+    awayUnits.GOL_IHTIYACI *= (1.0 + maxPressure * 0.5);
+  }
+
   const hProb = computeProbBases(homeMetrics, sel, homeUnits, baseline, audit, _simQF.home);
   const aProb = computeProbBases(awayMetrics, sel, awayUnits, baseline, audit, _simQF.away);
+
+  // ── Bölge-Bazlı Sim Param Ölçeklemesi ────────────────────────────────
+  // ZQM behavioral unit'leri zaten modifiye etti. Burada sim parametrelerini
+  // (shotsPerMin, goalConvRate, gkSaveRate, blockRate) de bölge oranlarıyla
+  // ölçekliyoruz. Her parametre ilgili bölgenin kalitesinden etkilenir:
+  //   shotsPerMin → ATK zone (forvet üretimi)
+  //   onTargetRate → ATK zone
+  //   goalConvRate → ATK+MID zone (bitiricilik + yaratıcılık)
+  //   gkSaveRate → GK zone (kaleci refleksi)
+  //   blockRate → DEF zone (savunma müdahalesi)
+  const { computeBlockZoneModifier: _cbzm } = require('./lineup-impact');
+  const _applyZoneSimParams = (prob, zqr, lqr, dynW) => {
+    if (!zqr) return;
+    const allIdentity = Object.values(zqr).every(r => r === 1.0);
+    if (allIdentity && lqr === 1.0) return;
+    // ATK bölgesi → şut üretimi ve isabetlilik
+    const atkMod = _cbzm('BITIRICILIK', zqr, lqr, dynW);   // Dinamik: oyuncu profil bazlı
+    if (atkMod !== 1.0) {
+      prob.shotsPerMin *= atkMod;
+      prob.onTargetRate *= atkMod;
+    }
+    // ATK+MID bölgesi → gol dönüşümü (bitiricilik + yaratıcılık)
+    const atkMidMod = _cbzm('YARATICILIK', zqr, lqr, dynW); // Dinamik: oyuncu profil bazlı
+    if (atkMidMod !== 1.0) {
+      prob.goalConvRate *= Math.pow(atkMidMod, 0.6); // Daha hassas damping
+    }
+    // GK bölgesi → kaleci kurtarış performansı
+    const gkMod = _cbzm('GK_REFLEKS', zqr, lqr, dynW);     // G:1.00 (statik, tek bölge)
+    if (gkMod !== 1.0 && prob.gkSaveRate != null) {
+      prob.gkSaveRate *= gkMod;
+    }
+    // DEF bölgesi → savunma müdahalesi
+    const defMod = _cbzm('SAVUNMA_AKSIYONU', zqr, lqr, dynW); // Dinamik: oyuncu profil bazlı
+    if (defMod !== 1.0) {
+      prob.blockRate *= Math.pow(defMod, 0.6);
+    }
+  };
+  _applyZoneSimParams(hProb, _hZQR, _hLQRForZQM, _hDynW);
+  _applyZoneSimParams(aProb, _aZQR, _aLQRForZQM, _aDynW);
 
   // Ev sahibi avantajı doğrudan uygulanır (Anchor engeli kaldırıldı)
   if (homeAdvantage != null && homeAdvantage !== 1.0) {
@@ -561,7 +634,11 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
     //      sönümleme sert → maç 2-0 veya 3-0'da donar.
     const pb_side = side === 'home' ? hProb : aProb;
     const oppPb = oppSide === 'home' ? hProb : aProb;
-    const teamExpGoals = pb_side.shotsPerMin * 90 * pb_side.onTargetRate * pb_side.goalConvRate;
+    const teamExpGoalsRaw = pb_side.shotsPerMin * 90 * pb_side.onTargetRate * pb_side.goalConvRate;
+    const _brakeLeagueRef = baseline.leagueAvgGoals ?? 1.3;
+    const teamExpGoals = (teamExpGoalsRaw < _brakeLeagueRef * 0.60)
+      ? _brakeLeagueRef
+      : teamExpGoalsRaw;
     const comfortThreshold = Math.max(1, Math.ceil(teamExpGoals));
     let comfortBrake = 1.0;
     if ((goals[side] - goals[oppSide]) >= comfortThreshold) {
@@ -573,7 +650,7 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
       //    Güçlü hücum takımı (teamExp > leagueRef) → rawBrake < 1.0 → doğal fren.
       //    Zayıf hücum takımı → rawBrake ≈ 1.0 → fren yok (zaten gol bulmak mucize).
       const rawBrake = (u.ZİHİNSEL_DAYANIKLILIK / Math.max(u.FİŞİ_ÇEKME, EPS))
-                     * (leagueRef / Math.max(teamExpGoals, EPS));
+        * (leagueRef / Math.max(teamExpGoals, EPS));
 
       // 2. Fark eşiği aşıldı mı? Aşıldıysa her ekstra gol için sönümleme hesapla.
       const goalDiff = goals[side] - goals[oppSide];
@@ -607,7 +684,10 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
         // bloodlust çok düşükse (<<1): decayPerGoal → 1/e ≈ 0.37'ye yaklaşır (sert fren)
         // Formül: 1 - (1 / (1 + bloodlustRatio))  →  bloodlust/(1+bloodlust)
         // Bu, (0,1) aralığında doğal bir sigmoid oluşturur — hiçbir keyfi sabit YOK.
-        const decayPerGoal = bloodlustRatio / (1.0 + bloodlustRatio);
+        // Dinamik cap: lig gol ortalaması + volatilite'ye bağlı — yüksek golcü ligde daha az fren
+        const _decayCapLeague = (baseline?.leagueAvgGoals ?? 1.3) + (baseline?.leagueGoalVolatility ?? 1.0);
+        const _decayCap = 1.0 - 1.0 / Math.max(2, _decayCapLeague);
+        const decayPerGoal = Math.min(_decayCap, bloodlustRatio / (1.0 + bloodlustRatio));
 
         diminishingMultiplier = Math.pow(decayPerGoal, excessGoals);
       }
@@ -616,7 +696,12 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
       comfortBrake = Math.min(1.0, rawBrake * diminishingMultiplier);
     }
 
-    return clamp(atkUnit * formUnit * stateUnit * urgency * comfortBrake * (1 - s.redCardPenalty), DYN_LIMITS.POWER.MIN, DYN_LIMITS.POWER.MAX);
+    // Yorgunluk çarpanı: baseline'dan dinlenme günü bazlı (dynamic-baseline.js hesaplar)
+    const fatigueMult = side === 'home'
+      ? (baseline?.homeFatigue ?? 1.0)
+      : (baseline?.awayFatigue ?? 1.0);
+
+    return clamp(atkUnit * formUnit * stateUnit * urgency * comfortBrake * fatigueMult * (1 - s.redCardPenalty), DYN_LIMITS.POWER.MIN, DYN_LIMITS.POWER.MAX);
   };
 
   const getDefensePower = (side) => {
@@ -887,7 +972,10 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
       const rawFlow = atkPower / Math.max(oppDefPower, EPS);
       const dampCoeff = defProb.blockRate;
       const dampedFlow = Math.pow(Math.max(rawFlow, EPS), dampCoeff);
-      const shotProb = clamp(attkProb.shotsPerMin * dampedFlow, DYN_LIMITS.PROBABILITY.MIN, DYN_LIMITS.PROBABILITY.MAX);
+      // Goal velocity cap: tek taraflı 5+ gol sonrası şut olasılığı %50 düşer
+      // Gerçek futbolda 5-0'dan sonra tempo ve motivasyon belirgin biçimde düşer.
+      const goalVelocityCap = goals[side] >= 5 ? 0.50 : 1.0;
+      const shotProb = clamp(attkProb.shotsPerMin * dampedFlow * goalVelocityCap, DYN_LIMITS.PROBABILITY.MIN, DYN_LIMITS.PROBABILITY.MAX);
       if (r() < shotProb) {
         stats[side].shots++;
         // KRİTİK: onTargetRate = M014/M013 (gerçek sezon SOT oranı) — BAGLANTI_OYUNU burada çift sayma olur
@@ -1120,7 +1208,17 @@ function simulateMultipleRuns(params) {
   let homeWins = 0, draws = 0, awayWins = 0;
   let over15 = 0, over25 = 0, btts = 0;
   let totalGoals = 0, totalHomeGoals = 0, totalAwayGoals = 0;
+  // Öneri E: topScore filtrelemesi için kare toplamları (varyans hesabı)
+  let totalHomeGoalsSq = 0, totalAwayGoalsSq = 0;
   const scoreMap = {};
+
+  // ── İlk Yarı İzleme ─────────────────────────────────────────────────────
+  // simulateSingleRun, minute=46'da halftime event'i push eder:
+  // { minute: 45, type: 'halftime', homeGoals: N, awayGoals: N }
+  // Bu event'ten HT skoru her koşu için direkt alınır.
+  let htHomeWins = 0, htDraws = 0, htAwayWins = 0;
+  let totalHTHomeGoals = 0, totalHTAwayGoals = 0;
+  const htScoreMap = {};
 
   for (let i = 0; i < runs; i++) {
     const run = simulateSingleRun(params);
@@ -1139,9 +1237,23 @@ function simulateMultipleRuns(params) {
     totalGoals += total;
     totalHomeGoals += hg;
     totalAwayGoals += ag;
+    totalHomeGoalsSq += hg * hg;
+    totalAwayGoalsSq += ag * ag;
 
     const key = `${hg}-${ag}`;
     scoreMap[key] = (scoreMap[key] || 0) + 1;
+
+    // HT skor: events dizisindeki halftime olayından al
+    const htEvent = run.events?.find(e => e.type === 'halftime');
+    const htH = htEvent ? (htEvent.homeGoals ?? 0) : 0;
+    const htA = htEvent ? (htEvent.awayGoals ?? 0) : 0;
+    if (htH > htA) htHomeWins++;
+    else if (htA > htH) htAwayWins++;
+    else htDraws++;
+    totalHTHomeGoals += htH;
+    totalHTAwayGoals += htA;
+    const htKey = `${htH}-${htA}`;
+    htScoreMap[htKey] = (htScoreMap[htKey] || 0) + 1;
 
     if (i === 0 || i % 50 === 0) candidateRuns.push(run);
   }
@@ -1158,6 +1270,31 @@ function simulateMultipleRuns(params) {
 
   const pct = v => +((v / runs) * 100).toFixed(1);
   const sortedScores = Object.entries(scoreMap).sort((a, b) => b[1] - a[1]);
+
+  // ── Öneri E: topScore 2σ Varyans Filtresi ───────────────────────────────────
+  // Simülasyonun kendi dağılımından türetilen istatistiksel üst sınır.
+  // Absürd skorları (7-0, 0-8 vb.) topScore adaylarından elemek için kullanılır.
+  // E[X²] - E[X]² = Var[X] → std = sqrt(Var). 2σ üst sınır = avg + 2 × std.
+  // Tamamen simülasyonun kendi ürettiği veriden türer — sabit eşik yok.
+  const varHome = (totalHomeGoalsSq / runs) - (avgHome * avgHome);
+  const varAway = (totalAwayGoalsSq / runs) - (avgAway * avgAway);
+  const stdHome = varHome > 0 ? Math.sqrt(varHome) : avgHome * 0.5;
+  const stdAway = varAway > 0 ? Math.sqrt(varAway) : avgAway * 0.5;
+  const maxReasonableHome = avgHome + stdHome * 2;
+  const maxReasonableAway = avgAway + stdAway * 2;
+
+  // 2σ içinde kalan adayları filtrele; hiçbiri kalmazsa fallback olarak tüm liste
+  const filteredTopScores = sortedScores.filter(([score]) => {
+    const [h, a] = score.split('-').map(Number);
+    return h <= maxReasonableHome && a <= maxReasonableAway;
+  });
+  const topScoreCandidates = filteredTopScores.length > 0 ? filteredTopScores : sortedScores;
+
+  // HT dağılımı
+  const sortedHTScores = Object.entries(htScoreMap).sort((a, b) => b[1] - a[1]);
+  const avgHTHome = totalHTHomeGoals / runs;
+  const avgHTAway = totalHTAwayGoals / runs;
+
   return {
     runs,
     distribution: {
@@ -1166,9 +1303,17 @@ function simulateMultipleRuns(params) {
       avgGoals: +(totalGoals / runs).toFixed(2),
       avgHomeGoals: +avgHome.toFixed(2),
       avgAwayGoals: +avgAway.toFixed(2),
-      topScore: sortedScores[0]?.[0] ?? null,
+      topScore: topScoreCandidates[0]?.[0] ?? null,
       scoreFrequency: sortedScores.slice(0, 10).reduce((acc, [score, cnt]) => { acc[score] = pct(cnt); return acc; }, {}),
       lambdaAnchored: false,
+      // İlk yarı simülasyon dağılımı
+      ht: {
+        homeWin: pct(htHomeWins), draw: pct(htDraws), awayWin: pct(htAwayWins),
+        avgHomeGoals: +avgHTHome.toFixed(2),
+        avgAwayGoals: +avgHTAway.toFixed(2),
+        topScore: sortedHTScores[0]?.[0] ?? null,
+        scoreFrequency: sortedHTScores.slice(0, 6).reduce((acc, [s, c]) => { acc[s] = pct(c); return acc; }, {}),
+      },
     },
     sampleRun: bestSampleRun
   };

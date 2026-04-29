@@ -60,6 +60,7 @@ async function fetchAllMatchData(eventId) {
     track('h2h', api.getEventH2H(eventId)),
     track('h2hEvents', api.getEventH2HEvents(eventCustomId)),
     track('odds', api.getEventOdds(eventId)),
+    track('oddsChanges', api.getEventOddsChanges(eventId)),
     track('missingPlayers', api.getEventMissingPlayers(eventId)),
     track('streaks', api.getEventStreaks(eventId)),
     track('form', api.getEventForm(eventId)),
@@ -75,7 +76,7 @@ async function fetchAllMatchData(eventId) {
   });
 
   const [
-    lineupsRes, h2hRes, h2hEventsRes, oddsRes, missingPlayersRes,
+    lineupsRes, h2hRes, h2hEventsRes, oddsRes, oddsChangesRes, missingPlayersRes,
     streaksRes, formRes, managersRes, votesRes
   ] = matchLevelResults;
 
@@ -83,6 +84,7 @@ async function fetchAllMatchData(eventId) {
   let h2h = h2hRes.status === 'fulfilled' ? h2hRes.value.value : null;
   let h2hEvents = h2hEventsRes.status === 'fulfilled' ? h2hEventsRes.value.value : null;
   let odds = oddsRes.status === 'fulfilled' ? oddsRes.value.value : null;
+  let oddsChanges = oddsChangesRes.status === 'fulfilled' ? oddsChangesRes.value.value : null;
   let missingPlayers = missingPlayersRes.status === 'fulfilled' ? missingPlayersRes.value.value : null;
   let streaks = streaksRes.status === 'fulfilled' ? streaksRes.value.value : null;
   let form = formRes.status === 'fulfilled' ? formRes.value.value : null;
@@ -345,7 +347,7 @@ async function fetchAllMatchData(eventId) {
   const { stats: homePlayerStats, log: homePlayerLog } = homePResult;
   const { stats: awayPlayerStats, log: awayPlayerLog } = awayPResult;
 
-  // Enrich lineups and squad arrays with fetched statistics
+  // Enrich lineups and squad arrays with fetched statistics + attributes
   const enrichPlayers = (playersArr, statsArr) => {
     if (!playersArr || !statsArr) return playersArr;
     return playersArr.map(p => {
@@ -357,7 +359,10 @@ async function fetchAllMatchData(eventId) {
           player: {
             ...p.player,
             seasonStats: st.seasonStats || null,
-            statistics: st.seasonStats?.statistics || null
+            statistics: st.seasonStats?.statistics || null,
+            // Dinamik bölge ağırlıkları (HBKE) için attribute + characteristics enjeksiyonu
+            attributes: st.attributes || null,
+            characteristics: st.characteristics || null,
           }
         };
       }
@@ -473,6 +478,7 @@ async function fetchAllMatchData(eventId) {
     h2hEvents,
     teamH2H,
     odds,
+    oddsChanges,
     missingPlayers,
     streaks,
     form,

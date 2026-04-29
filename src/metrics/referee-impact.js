@@ -435,12 +435,3 @@ function createEmptyRefereeMetricsWithMeta(refId) {
 }
 
 module.exports = { calculateRefereeMetrics };
-
-function createEmptyRefereeMetricsWithMeta(refId) {
-  const m = createEmptyRefereeMetrics();
-  m._meta.refereeId = refId;
-  m._meta.error = 'Referee stats empty or unavailable';
-  return m;
-}
-
-module.exports = { calculateRefereeMetrics };

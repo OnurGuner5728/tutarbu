@@ -58,7 +58,6 @@ const BLOCK_QF_MAP = {
 };
 
 function computePositionMVBreakdown(squadData) {
-  const { getPositionalEfficiency } = require('./math-utils');
   const { calculateDynamicRating } = require('./player-rating-utils');
   const players = squadData?.players || [];
   const breakdown = { GK: 0, DEF: 0, MID: 0, ATK: 0, total: 0 };
@@ -67,37 +66,35 @@ function computePositionMVBreakdown(squadData) {
     const mv = entry.player?.proposedMarketValue ?? 0;
     if (!entry.player) continue;
     
-    // Dinamik rating hesapla (gerçek oyuncu verisi)
-    const ratingPower = calculateDynamicRating(entry.player); // 40-99 aralığında
+    // SofaScore pozisyon kodu (doğal mevki)
+    const nativePos = (entry.player?.position || '').toUpperCase()[0] || '';
     
-    // Sadece MV (Piyasa Değeri) yerine MV ile Formu (Rating) harmanla
+    // Uygulanan pozisyon (workshop'ta değiştirildiyse)
+    const assignedPos = (entry.assignedPosition || nativePos).toUpperCase()[0] || '';
+    
+    // Dinamik rating: atanan mevkiye göre istatistik ağırlıkları hesaplanır
+    // Mevki farklıysa organik ceza + rezidüel ceza otomatik uygulanır
+    const overridePos = (assignedPos !== nativePos) ? assignedPos : null;
+    const ratingPower = calculateDynamicRating(entry.player, overridePos); // 40-99 aralığında
+    
     // MV çarpanı: 0M -> 1, 1M -> ~1.04, 10M -> ~2.0, 100M -> ~3.0
     const mvMultiplier = mv > 0 ? Math.log10(mv / 100000 + 1) : 1;
     
     // Blended power: Rating'in karesi, yetenek ve formun baskın olmasını sağlar.
     const blendedPower = Math.pow(ratingPower, 2) * mvMultiplier;
 
-    // SofaScore pozisyon kodu
-    const pos = (entry.player?.position || '').toUpperCase()[0] || '';
-    
-    // Uygulanan pozisyon (eğer workshop'ta değiştirildiyse)
-    const assignedPos = (entry.assignedPosition || pos).toUpperCase()[0] || '';
-    
-    // Verim cezası
-    const efficiency = getPositionalEfficiency(pos, assignedPos);
-    
-    const effectivePower = blendedPower * efficiency;
-    breakdown.total += effectivePower;
+    breakdown.total += blendedPower;
 
     if (assignedPos === 'G') {
-      breakdown.GK += effectivePower;
+      breakdown.GK += blendedPower;
     } else if (assignedPos === 'D') {
-      breakdown.DEF += effectivePower;
+      breakdown.DEF += blendedPower;
     } else if (assignedPos === 'M') {
-      breakdown.MID += effectivePower;
+      breakdown.MID += blendedPower;
     } else if (assignedPos === 'F') {
-      breakdown.ATK += effectivePower;
+      breakdown.ATK += blendedPower;
     }
+
   }
 
   return breakdown;

@@ -63,6 +63,66 @@ function enrichMatchResponse(prediction, metrics, baseline, data, reqQuery) {
     leagueAvgTraces: enrichedTraces,
     dynamicHomeAdvantage: metrics.dynamicHomeAdvantage
   };
+
+  // ── Lineup Player Stats Enrichment ──
+  // Frontend VisualPitch, calculateDynamicRating(p.player) çağırır.
+  // Lineup player objeleri iki eksik veri içerir:
+  //   1. statistics/seasonStats → playerStats'tan gelir
+  //   2. proposedMarketValue → squad (homePlayers/awayPlayers) datasından gelir
+  // İkisini de enjekte ediyoruz — böylece rating doğru hesaplanır.
+  const _enrichLineupFull = (playersArr, statsArr, squadData) => {
+    if (!playersArr) return playersArr;
+    // Squad'dan hızlı lookup map: playerId → player obje
+    const squadMap = new Map();
+    if (squadData?.players) {
+      for (const sp of squadData.players) {
+        if (sp.player?.id) squadMap.set(sp.player.id, sp.player);
+      }
+    }
+    return playersArr.map(p => {
+      if (!p.player) return p;
+      const pid = p.player.id;
+      let enriched = { ...p.player };
+      let changed = false;
+
+      // 1. İstatistikler (playerStats'tan)
+      if (!enriched.statistics && statsArr) {
+        const st = statsArr.find(s => s.playerId === pid);
+        if (st?.seasonStats?.statistics) {
+          enriched.statistics = st.seasonStats.statistics;
+          enriched.seasonStats = st.seasonStats;
+          changed = true;
+        }
+      }
+
+      // 2. Piyasa değeri (squad'dan)
+      if (!enriched.proposedMarketValue && squadMap.has(pid)) {
+        const sq = squadMap.get(pid);
+        if (sq.proposedMarketValue) {
+          enriched.proposedMarketValue = sq.proposedMarketValue;
+          changed = true;
+        }
+      }
+
+      return changed ? { ...p, player: enriched } : p;
+    });
+  };
+
+  if (prediction.lineups?.home?.players) {
+    prediction.lineups.home.players = _enrichLineupFull(
+      prediction.lineups.home.players,
+      data.homePlayerStats || [],
+      data.homePlayers
+    );
+  }
+  if (prediction.lineups?.away?.players) {
+    prediction.lineups.away.players = _enrichLineupFull(
+      prediction.lineups.away.players,
+      data.awayPlayerStats || [],
+      data.awayPlayers
+    );
+  }
+
   return prediction;
 }
 
@@ -224,6 +284,42 @@ app.post('/api/predict/:eventId', async (req, res) => {
       if (modifiedLineup.away && data.lineups?.away) data.lineups.away.players = modifiedLineup.away;
     }
 
+    // ── Lineup Quality Ratio (LQR) — Poisson + Sim kadro etkisi ──
+    // Tüm endpoint'lerde tutarlı: calculateAllMetrics'ten ÖNCE data'ya,
+    // getDynamicBaseline'dan SONRA baseline'a enjekte edilir.
+    const { calculateDynamicRating: _cdr } = require('./engine/player-rating-utils');
+    const _avgR = (players) => {
+      if (!players?.length) return null;
+      const starters = players.filter(p => !p.substitute && !p.isReserve).slice(0, 11);
+      if (!starters.length) return null;
+      return starters.reduce((s, p) => s + _cdr(p.player || p, p.assignedPosition || null), 0) / starters.length;
+    };
+    if (modifiedLineup) {
+      const origH = _avgR(cachedData.lineups?.home?.players || []);
+      const origA = _avgR(cachedData.lineups?.away?.players || []);
+      const modH = _avgR(data.lineups?.home?.players || []);
+      const modA = _avgR(data.lineups?.away?.players || []);
+      data._homeLineupQualityRatio = (origH && modH) ? modH / origH : 1.0;
+      data._awayLineupQualityRatio = (origA && modA) ? modA / origA : 1.0;
+      console.log(`[API PREDICT] LQR pre-metrics: home=${data._homeLineupQualityRatio.toFixed(3)}, away=${data._awayLineupQualityRatio.toFixed(3)}`);
+
+      // ZQM pre-metrics: bölge oranlarını da data'ya enjekte et → calculateAllMetrics → allMetrics
+      const { computeZoneQualityRatios: _preZqm } = require('./engine/lineup-impact');
+      const { calculateDynamicRating: _preCdr } = require('./engine/player-rating-utils');
+      data._homeZoneQualityRatios = _preZqm(
+        cachedData.lineups?.home?.players || [], data.lineups?.home?.players || [], _preCdr
+      );
+      data._awayZoneQualityRatios = _preZqm(
+        cachedData.lineups?.away?.players || [], data.lineups?.away?.players || [], _preCdr
+      );
+    }
+
+    // Dinamik blok ağırlıkları: ORİJİNAL kadrodan hesaplanır — modifiedLineup olsun olmasın
+    // advanced-derived.js bu veriyi allMetrics üzerinden okur
+    const { computeDynamicBlockWeights: _preDbw } = require('./engine/lineup-impact');
+    data._homeDynamicBlockWeights = _preDbw(cachedData.lineups?.home?.players || []);
+    data._awayDynamicBlockWeights = _preDbw(cachedData.lineups?.away?.players || []);
+
     // 3. Initial Metrics
     const metrics = calculateAllMetrics(data);
 
@@ -239,11 +335,60 @@ app.post('/api/predict/:eventId', async (req, res) => {
     baseline.normMaxRatio         = metrics.meta?.normMaxRatio         ?? null;
 
     // Mevki Bazlı Piyasa Değeri Kalite Düzeltmesi (PVKD) — MC simülasyonu için
-    // match-simulator.js ve advanced-derived.js aynı quality-factors.js modülünü kullanır.
-    // Breakdown baseline'a eklenir; alpha + QF hesabı match-simulator'da tekrar yapılır
-    // (simulation her çalışmada güncel baseline parametrelerine ihtiyaç duyar).
-    baseline.homeMVBreakdown = computePositionMVBreakdown(data.homePlayers);
-    baseline.awayMVBreakdown = computePositionMVBreakdown(data.awayPlayers);
+    // Workshop lineup varsa, assignedPosition'ları içeren lineup oyuncuları kullanılır.
+    // Böylece kullanıcının mevki değişiklikleri PVKD'ye de yansır.
+    const pvkdHomeSrc = (modifiedLineup?.home && data.lineups?.home)
+      ? { players: data.lineups.home.players } : data.homePlayers;
+    const pvkdAwaySrc = (modifiedLineup?.away && data.lineups?.away)
+      ? { players: data.lineups.away.players } : data.awayPlayers;
+    baseline.homeMVBreakdown = computePositionMVBreakdown(pvkdHomeSrc);
+    baseline.awayMVBreakdown = computePositionMVBreakdown(pvkdAwaySrc);
+
+    // LQR: baseline'a da enjekte et (prediction-generator comparison hesabında kullanılır)
+    baseline.homeLineupQualityRatio = data._homeLineupQualityRatio ?? 1.0;
+    baseline.awayLineupQualityRatio = data._awayLineupQualityRatio ?? 1.0;
+
+    // GK Pozisyonel Bütünlük Kontrolü (predict endpoint)
+    if (modifiedLineup) {
+      const _checkGKIntegrity = (players) => {
+        if (!players?.length) return true;
+        const starters = players.filter(p => !p.substitute && !p.isReserve).slice(0, 11);
+        const gkSlotPlayer = starters.find(p => {
+          const assigned = (p.assignedPosition || '').toUpperCase()[0];
+          const native = (p.player?.position || '').toUpperCase()[0];
+          return assigned === 'G' || (!assigned && native === 'G');
+        });
+        if (!gkSlotPlayer) return false;
+        const nativePos = (gkSlotPlayer.player?.position || '').toUpperCase()[0];
+        return nativePos === 'G';
+      };
+      if (modifiedLineup.home && !_checkGKIntegrity(data.lineups?.home?.players)) {
+        baseline.homeLineupQualityRatio *= 0.70;
+      }
+      if (modifiedLineup.away && !_checkGKIntegrity(data.lineups?.away?.players)) {
+        baseline.awayLineupQualityRatio *= 0.70;
+      }
+    }
+
+    // ── Bölgesel Kadro Etkisi (ZQM) ──────────────────────────────────────
+    // Her mevki bölgesinin (G/D/M/F) kalite oranını hesapla ve baseline'a enjekte et.
+    // Behavioral unit'ler bu oranlarla modifiye edilecek (advanced-derived + match-simulator).
+    const { computeZoneQualityRatios, computeDynamicBlockWeights } = require('./engine/lineup-impact');
+    const { calculateDynamicRating: _zqmCdr } = require('./engine/player-rating-utils');
+    // Dinamik blok ağırlıkları: ORİJİNAL kadrodan hesaplanır (oyuncu profil bazlı)
+    baseline.homeDynamicBlockWeights = computeDynamicBlockWeights(cachedData.lineups?.home?.players || []);
+    baseline.awayDynamicBlockWeights = computeDynamicBlockWeights(cachedData.lineups?.away?.players || []);
+    if (modifiedLineup) {
+      baseline.homeZoneQualityRatios = computeZoneQualityRatios(
+        cachedData.lineups?.home?.players || [], data.lineups?.home?.players || [], _zqmCdr
+      );
+      baseline.awayZoneQualityRatios = computeZoneQualityRatios(
+        cachedData.lineups?.away?.players || [], data.lineups?.away?.players || [], _zqmCdr
+      );
+      console.log(`[API PREDICT] ZQM home: G=${baseline.homeZoneQualityRatios.G.toFixed(3)} D=${baseline.homeZoneQualityRatios.D.toFixed(3)} M=${baseline.homeZoneQualityRatios.M.toFixed(3)} F=${baseline.homeZoneQualityRatios.F.toFixed(3)}`);
+      console.log(`[API PREDICT] ZQM away: G=${baseline.awayZoneQualityRatios.G.toFixed(3)} D=${baseline.awayZoneQualityRatios.D.toFixed(3)} M=${baseline.awayZoneQualityRatios.M.toFixed(3)} F=${baseline.awayZoneQualityRatios.F.toFixed(3)}`);
+    }
+
     const rng = createRNG(req.query.seed);
 
     // 5. Generate Report
@@ -350,7 +495,10 @@ app.post('/api/workshop/:eventId', async (req, res) => {
             player: {
               ...p.player,
               seasonStats: st.seasonStats || null,
-              statistics: st.seasonStats?.statistics || null
+              statistics: st.seasonStats?.statistics || null,
+              // Dinamik bölge ağırlıkları (HBKE) için attribute + characteristics enjeksiyonu
+              attributes: st.attributes || null,
+              characteristics: st.characteristics || null,
             }
           };
         }
@@ -360,6 +508,39 @@ app.post('/api/workshop/:eventId', async (req, res) => {
 
     if (data.lineups?.home?.players) data.lineups.home.players = enrichPlayers(data.lineups.home.players, data.homePlayerStats);
     if (data.lineups?.away?.players) data.lineups.away.players = enrichPlayers(data.lineups.away.players, data.awayPlayerStats);
+
+    // ── Lineup Quality Ratio (LQR) — Poisson lambda'ya kadro etkisi ──
+    // calculateAllMetrics'ten ÖNCE hesaplanmalı — advanced-derived.js lambda'yı düzeltecek.
+    if (modifiedLineup) {
+      const { calculateDynamicRating: _cdr } = require('./engine/player-rating-utils');
+      const _avgR = (players) => {
+        if (!players?.length) return null;
+        const starters = players.filter(p => !p.substitute && !p.isReserve).slice(0, 11);
+        if (!starters.length) return null;
+        return starters.reduce((s, p) => s + _cdr(p.player || p, p.assignedPosition || null), 0) / starters.length;
+      };
+      const origH = _avgR(cachedData.lineups?.home?.players || []);
+      const origA = _avgR(cachedData.lineups?.away?.players || []);
+      const modH = _avgR(data.lineups?.home?.players || []);
+      const modA = _avgR(data.lineups?.away?.players || []);
+      data._homeLineupQualityRatio = (origH && modH) ? modH / origH : 1.0;
+      data._awayLineupQualityRatio = (origA && modA) ? modA / origA : 1.0;
+      console.log(`[API WORKSHOP] LQR pre-metrics: home=${data._homeLineupQualityRatio.toFixed(3)}, away=${data._awayLineupQualityRatio.toFixed(3)}`);
+
+      // ZQM pre-metrics: bölge oranlarını data'ya enjekte et → calculateAllMetrics → allMetrics
+      const { computeZoneQualityRatios: _wsPreZqm } = require('./engine/lineup-impact');
+      data._homeZoneQualityRatios = _wsPreZqm(
+        cachedData.lineups?.home?.players || [], data.lineups?.home?.players || [], _cdr
+      );
+      data._awayZoneQualityRatios = _wsPreZqm(
+        cachedData.lineups?.away?.players || [], data.lineups?.away?.players || [], _cdr
+      );
+    }
+
+    // Dinamik blok ağırlıkları: ORİJİNAL kadrodan
+    const { computeDynamicBlockWeights: _wsPreDbw } = require('./engine/lineup-impact');
+    data._homeDynamicBlockWeights = _wsPreDbw(cachedData.lineups?.home?.players || []);
+    data._awayDynamicBlockWeights = _wsPreDbw(cachedData.lineups?.away?.players || []);
 
     const metrics = calculateAllMetrics(data);
     const baseline = getDynamicBaseline(data);
@@ -374,11 +555,82 @@ app.post('/api/workshop/:eventId', async (req, res) => {
     baseline.normMaxRatio         = metrics.meta?.normMaxRatio         ?? null;
 
     // Inject Position-based Market Value Breakdown (PVKD)
+    // Workshop lineup'ında assignedPosition değiştirilmiş olabilir — lineup oyuncuları kullan
     const { computePositionMVBreakdown } = require('./engine/quality-factors');
-    baseline.homeMVBreakdown = computePositionMVBreakdown(data.homePlayers || []);
-    baseline.awayMVBreakdown = computePositionMVBreakdown(data.awayPlayers || []);
+    const pvkdHomeSrc = (modifiedLineup?.home && data.lineups?.home)
+      ? { players: data.lineups.home.players } : (data.homePlayers || []);
+    const pvkdAwaySrc = (modifiedLineup?.away && data.lineups?.away)
+      ? { players: data.lineups.away.players } : (data.awayPlayers || []);
+    baseline.homeMVBreakdown = computePositionMVBreakdown(pvkdHomeSrc);
+    baseline.awayMVBreakdown = computePositionMVBreakdown(pvkdAwaySrc);
     
     console.log(`[API WORKSHOP] PVKD Enjeksiyonu başarılı. home: ${baseline.homeMVBreakdown?.total}, away: ${baseline.awayMVBreakdown?.total}`);
+
+    // ── Lineup Quality Ratio (LQR) — Poisson lambda düzeltmesi ──
+    const { calculateDynamicRating } = require('./engine/player-rating-utils');
+    const _computeAvgRating = (players) => {
+      if (!players || !players.length) return null;
+      const starters = players.filter(p => !p.substitute && !p.isReserve).slice(0, 11);
+      if (starters.length === 0) return null;
+      const ratings = starters.map(p => calculateDynamicRating(p.player || p, p.assignedPosition || null));
+      return ratings.reduce((a, b) => a + b, 0) / ratings.length;
+    };
+    const origHomeAvg = _computeAvgRating(cachedData.lineups?.home?.players || []);
+    const origAwayAvg = _computeAvgRating(cachedData.lineups?.away?.players || []);
+    const modHomeAvg = modifiedLineup ? _computeAvgRating(data.lineups?.home?.players || []) : origHomeAvg;
+    const modAwayAvg = modifiedLineup ? _computeAvgRating(data.lineups?.away?.players || []) : origAwayAvg;
+    baseline.homeLineupQualityRatio = (origHomeAvg && modHomeAvg) ? modHomeAvg / origHomeAvg : 1.0;
+    baseline.awayLineupQualityRatio = (origAwayAvg && modAwayAvg) ? modAwayAvg / origAwayAvg : 1.0;
+
+    // ── GK Pozisyonel Bütünlük Kontrolü ──
+    // Kaleci pozisyonunda gerçek kaleci olmayan bir oyuncu varsa, takım istatistiklerinden
+    // gelen GK metrikleri (kurtarış oranı, alan hakimiyeti) geçersiz olur.
+    // Bu durumda LQR'e ağır bir çarpan uygulanır — sadece rating ortalaması değil,
+    // tüm savunma/kaleci birimleri de çöker.
+    if (modifiedLineup) {
+      const _checkGKIntegrity = (players) => {
+        if (!players?.length) return true; // veri yoksa kontrol etme
+        const starters = players.filter(p => !p.substitute && !p.isReserve).slice(0, 11);
+        // Kaleci slotundaki oyuncuyu bul (assignedPosition === 'G' veya doğal pozisyonu G ve assign yok)
+        const gkSlotPlayer = starters.find(p => {
+          const assigned = (p.assignedPosition || '').toUpperCase()[0];
+          const native = (p.player?.position || '').toUpperCase()[0];
+          return assigned === 'G' || (!assigned && native === 'G');
+        });
+        if (!gkSlotPlayer) return false; // Kaleci yok! (hiç G slotu yok)
+        // Kaleci slotundaki oyuncunun doğal mevkisi G mi?
+        const nativePos = (gkSlotPlayer.player?.position || '').toUpperCase()[0];
+        return nativePos === 'G';
+      };
+
+      if (modifiedLineup.home && !_checkGKIntegrity(data.lineups?.home?.players)) {
+        baseline.homeLineupQualityRatio *= 0.70; // %30 ek düşüş — kalecisiz takım
+        console.log(`[API WORKSHOP] ⚠️ Ev sahibi kaleci yok/yanlış mevki! LQR ek ceza: ${baseline.homeLineupQualityRatio.toFixed(3)}`);
+      }
+      if (modifiedLineup.away && !_checkGKIntegrity(data.lineups?.away?.players)) {
+        baseline.awayLineupQualityRatio *= 0.70; // %30 ek düşüş — kalecisiz takım
+        console.log(`[API WORKSHOP] ⚠️ Deplasman kaleci yok/yanlış mevki! LQR ek ceza: ${baseline.awayLineupQualityRatio.toFixed(3)}`);
+      }
+
+      console.log(`[API WORKSHOP] LQR: home=${baseline.homeLineupQualityRatio.toFixed(3)}, away=${baseline.awayLineupQualityRatio.toFixed(3)}`);
+    }
+
+    // ── Bölgesel Kadro Etkisi (ZQM) ──────────────────────────────────────
+    const { computeZoneQualityRatios: _wsZqm, computeDynamicBlockWeights: _wsDyn } = require('./engine/lineup-impact');
+    const { calculateDynamicRating: _wsCdr } = require('./engine/player-rating-utils');
+    // Dinamik blok ağırlıkları: ORİJİNAL kadrodan (oyuncu profil bazlı)
+    baseline.homeDynamicBlockWeights = _wsDyn(cachedData.lineups?.home?.players || []);
+    baseline.awayDynamicBlockWeights = _wsDyn(cachedData.lineups?.away?.players || []);
+    if (modifiedLineup) {
+      baseline.homeZoneQualityRatios = _wsZqm(
+        cachedData.lineups?.home?.players || [], data.lineups?.home?.players || [], _wsCdr
+      );
+      baseline.awayZoneQualityRatios = _wsZqm(
+        cachedData.lineups?.away?.players || [], data.lineups?.away?.players || [], _wsCdr
+      );
+      console.log(`[API WORKSHOP] ZQM home: G=${baseline.homeZoneQualityRatios.G.toFixed(3)} D=${baseline.homeZoneQualityRatios.D.toFixed(3)} M=${baseline.homeZoneQualityRatios.M.toFixed(3)} F=${baseline.homeZoneQualityRatios.F.toFixed(3)}`);
+      console.log(`[API WORKSHOP] ZQM away: G=${baseline.awayZoneQualityRatios.G.toFixed(3)} D=${baseline.awayZoneQualityRatios.D.toFixed(3)} M=${baseline.awayZoneQualityRatios.M.toFixed(3)} F=${baseline.awayZoneQualityRatios.F.toFixed(3)}`);
+    }
 
     const rng = createRNG(req.query.seed);
     let prediction = generatePrediction(metrics, data, baseline, metrics.metricAudit, rng);
@@ -492,7 +744,37 @@ app.post('/api/simulate/:eventId', async (req, res) => {
       if (modifiedLineup.home && data.lineups?.home) data.lineups.home.players = modifiedLineup.home;
       if (modifiedLineup.away && data.lineups?.away) data.lineups.away.players = modifiedLineup.away;
       console.log(`[API SIMULATE] Workshop lineup uygulandı.`);
+
+      // LQR: calculateAllMetrics'ten ÖNCE — advanced-derived.js lambda'yı düzeltecek
+      const { calculateDynamicRating: _cdr } = require('./engine/player-rating-utils');
+      const _avgR = (players) => {
+        if (!players?.length) return null;
+        const starters = players.filter(p => !p.substitute && !p.isReserve).slice(0, 11);
+        if (!starters.length) return null;
+        return starters.reduce((s, p) => s + _cdr(p.player || p, p.assignedPosition || null), 0) / starters.length;
+      };
+      const origH = _avgR(cachedData.lineups?.home?.players || []);
+      const origA = _avgR(cachedData.lineups?.away?.players || []);
+      const modH = _avgR(data.lineups?.home?.players || []);
+      const modA = _avgR(data.lineups?.away?.players || []);
+      data._homeLineupQualityRatio = (origH && modH) ? modH / origH : 1.0;
+      data._awayLineupQualityRatio = (origA && modA) ? modA / origA : 1.0;
+      console.log(`[API SIMULATE] LQR pre-metrics: home=${data._homeLineupQualityRatio.toFixed(3)}, away=${data._awayLineupQualityRatio.toFixed(3)}`);
+
+      // ZQM pre-metrics
+      const { computeZoneQualityRatios: _simPreZqm } = require('./engine/lineup-impact');
+      data._homeZoneQualityRatios = _simPreZqm(
+        cachedData.lineups?.home?.players || [], data.lineups?.home?.players || [], _cdr
+      );
+      data._awayZoneQualityRatios = _simPreZqm(
+        cachedData.lineups?.away?.players || [], data.lineups?.away?.players || [], _cdr
+      );
     }
+
+    // Dinamik blok ağırlıkları: ORİJİNAL kadrodan
+    const { computeDynamicBlockWeights: _simPreDbw } = require('./engine/lineup-impact');
+    data._homeDynamicBlockWeights = _simPreDbw(cachedData.lineups?.home?.players || []);
+    data._awayDynamicBlockWeights = _simPreDbw(cachedData.lineups?.away?.players || []);
 
     const metrics = calculateAllMetrics(data);
 
@@ -534,11 +816,93 @@ app.post('/api/simulate/:eventId', async (req, res) => {
     baseline.normMaxRatio         = metrics.meta?.normMaxRatio         ?? null;
 
     // Inject Position-based Market Value Breakdown (PVKD) for Monte Carlo simulation
+    // Workshop lineup varsa, assignedPosition'ları içeren lineup oyuncuları kullanılır.
     const { computePositionMVBreakdown } = require('./engine/quality-factors');
-    baseline.homeMVBreakdown = computePositionMVBreakdown(data.homePlayers);
-    baseline.awayMVBreakdown = computePositionMVBreakdown(data.awayPlayers);
+    const pvkdHomeSrc = (modifiedLineup?.home && data.lineups?.home)
+      ? { players: data.lineups.home.players } : data.homePlayers;
+    const pvkdAwaySrc = (modifiedLineup?.away && data.lineups?.away)
+      ? { players: data.lineups.away.players } : data.awayPlayers;
+    baseline.homeMVBreakdown = computePositionMVBreakdown(pvkdHomeSrc);
+    baseline.awayMVBreakdown = computePositionMVBreakdown(pvkdAwaySrc);
     
     console.log(`[API SIMULATE] PVKD Enjeksiyonu başarılı. home: ${baseline.homeMVBreakdown?.total}, away: ${baseline.awayMVBreakdown?.total}`);
+
+    // ── Lineup Quality Ratio (LQR) ──────────────────────────────────────────
+    // Workshop'ta kadro değiştiğinde, davranış üniteleri takım tarihçesinden
+    // hesaplanır ve değişmez. LQR, kadro kalitesindeki değişimi simülasyona
+    // yansıtmak için kullanılır:
+    //   ratio = modifiedAvgRating / originalAvgRating
+    //   ratio < 1.0 → kadro zayıfladı → metrikler düşürülür
+    //   ratio > 1.0 → kadro güçlendi → metrikler artırılır
+    const { calculateDynamicRating } = require('./engine/player-rating-utils');
+
+    const _computeAvgRating = (players) => {
+      if (!players || !players.length) return null;
+      const starters = players.filter(p => !p.substitute && !p.isReserve).slice(0, 11);
+      if (starters.length === 0) return null;
+      const ratings = starters.map(p => {
+        const pd = p.player || p;
+        return calculateDynamicRating(pd, p.assignedPosition || null);
+      });
+      return ratings.reduce((a, b) => a + b, 0) / ratings.length;
+    };
+
+    // Orijinal lineup ratingi (cache'ten)
+    const origHomePlayers = cachedData.lineups?.home?.players || [];
+    const origAwayPlayers = cachedData.lineups?.away?.players || [];
+    const origHomeAvg = _computeAvgRating(origHomePlayers);
+    const origAwayAvg = _computeAvgRating(origAwayPlayers);
+
+    // Modifiye lineup ratingi
+    const modHomeAvg = modifiedLineup ? _computeAvgRating(data.lineups?.home?.players || []) : origHomeAvg;
+    const modAwayAvg = modifiedLineup ? _computeAvgRating(data.lineups?.away?.players || []) : origAwayAvg;
+
+    // Lineup Quality Ratio
+    baseline.homeLineupQualityRatio = (origHomeAvg && modHomeAvg) ? modHomeAvg / origHomeAvg : 1.0;
+    baseline.awayLineupQualityRatio = (origAwayAvg && modAwayAvg) ? modAwayAvg / origAwayAvg : 1.0;
+
+    if (modifiedLineup) {
+      // GK Pozisyonel Bütünlük Kontrolü (simulate endpoint)
+      const _checkGKIntegrity = (players) => {
+        if (!players?.length) return true;
+        const starters = players.filter(p => !p.substitute && !p.isReserve).slice(0, 11);
+        const gkSlotPlayer = starters.find(p => {
+          const assigned = (p.assignedPosition || '').toUpperCase()[0];
+          const native = (p.player?.position || '').toUpperCase()[0];
+          return assigned === 'G' || (!assigned && native === 'G');
+        });
+        if (!gkSlotPlayer) return false;
+        const nativePos = (gkSlotPlayer.player?.position || '').toUpperCase()[0];
+        return nativePos === 'G';
+      };
+      if (modifiedLineup.home && !_checkGKIntegrity(data.lineups?.home?.players)) {
+        baseline.homeLineupQualityRatio *= 0.70;
+        console.log(`[API SIMULATE] ⚠️ Ev sahibi kaleci yok/yanlış mevki! LQR ek ceza: ${baseline.homeLineupQualityRatio.toFixed(3)}`);
+      }
+      if (modifiedLineup.away && !_checkGKIntegrity(data.lineups?.away?.players)) {
+        baseline.awayLineupQualityRatio *= 0.70;
+        console.log(`[API SIMULATE] ⚠️ Deplasman kaleci yok/yanlış mevki! LQR ek ceza: ${baseline.awayLineupQualityRatio.toFixed(3)}`);
+      }
+
+      console.log(`[API SIMULATE] LQR: home=${baseline.homeLineupQualityRatio.toFixed(3)} (${origHomeAvg?.toFixed(1)}→${modHomeAvg?.toFixed(1)}), away=${baseline.awayLineupQualityRatio.toFixed(3)} (${origAwayAvg?.toFixed(1)}→${modAwayAvg?.toFixed(1)})`);
+    }
+
+    // ── Bölgesel Kadro Etkisi (ZQM) ──────────────────────────────────────
+    const { computeZoneQualityRatios: _simZqm, computeDynamicBlockWeights: _simDyn } = require('./engine/lineup-impact');
+    const { calculateDynamicRating: _simZqmCdr } = require('./engine/player-rating-utils');
+    // Dinamik blok ağırlıkları: ORİJİNAL kadrodan (oyuncu profil bazlı)
+    baseline.homeDynamicBlockWeights = _simDyn(cachedData.lineups?.home?.players || []);
+    baseline.awayDynamicBlockWeights = _simDyn(cachedData.lineups?.away?.players || []);
+    if (modifiedLineup) {
+      baseline.homeZoneQualityRatios = _simZqm(
+        cachedData.lineups?.home?.players || [], data.lineups?.home?.players || [], _simZqmCdr
+      );
+      baseline.awayZoneQualityRatios = _simZqm(
+        cachedData.lineups?.away?.players || [], data.lineups?.away?.players || [], _simZqmCdr
+      );
+      console.log(`[API SIMULATE] ZQM home: G=${baseline.homeZoneQualityRatios.G.toFixed(3)} D=${baseline.homeZoneQualityRatios.D.toFixed(3)} M=${baseline.homeZoneQualityRatios.M.toFixed(3)} F=${baseline.homeZoneQualityRatios.F.toFixed(3)}`);
+      console.log(`[API SIMULATE] ZQM away: G=${baseline.awayZoneQualityRatios.G.toFixed(3)} D=${baseline.awayZoneQualityRatios.D.toFixed(3)} M=${baseline.awayZoneQualityRatios.M.toFixed(3)} F=${baseline.awayZoneQualityRatios.F.toFixed(3)}`);
+    }
 
     const rng = createRNG(req.body.seed || req.query.seed);
 
@@ -719,6 +1083,346 @@ app.get('/api/match-debug/:eventId', async (req, res) => {
     });
   } catch (e) {
     res.status(500).json({ error: e.message });
+  }
+});
+
+// ── Backtest Endpoint (SSE streaming) ─────────────────────────────────────
+// GET /api/backtest?date=YYYY-MM-DD&endDate=YYYY-MM-DD&limit=1-9999&tournament=all|top|custom
+// Gerçek server pipeline: fetchAllMatchData → metrics → baseline → generatePrediction
+// SSE stream: her maç anlık gönderilir
+const TOP_TOURNAMENT_IDS_BT = new Set([17,8,23,35,34,7,679,52,325,37,132,23651]);
+const MAX_BACKTEST_DAYS_BACK = 30;
+const BACKTEST_INTER_DELAY_MS = 3000;
+
+function buildTournamentFilter(tournamentParam) {
+  if (tournamentParam === 'top') return (id) => TOP_TOURNAMENT_IDS_BT.has(id);
+  if (tournamentParam === 'all') return () => true;
+  // Custom: comma-separated tournament IDs
+  const ids = new Set(tournamentParam.split(',').map(s => parseInt(s, 10)).filter(n => !isNaN(n)));
+  return ids.size > 0 ? (id) => ids.has(id) : () => true;
+}
+
+app.get('/api/backtest', async (req, res) => {
+  const date    = req.query.date    || new Date(Date.now() - 86400000).toISOString().split('T')[0];
+  const endDate = req.query.endDate || date; // date range support
+  const rawLimit = parseInt(req.query.limit, 10);
+  const matchLimit = (!isNaN(rawLimit) && rawLimit >= 1) ? Math.min(rawLimit, 9999) : 10;
+  const tournamentFilter = req.query.tournament || 'top';
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
+    return res.status(400).json({ error: 'Invalid date format. Use YYYY-MM-DD.' });
+  }
+
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.flushHeaders();
+
+  const send = (evt, data) => res.write(`event: ${evt}\ndata: ${JSON.stringify(data)}\n\n`);
+  const progress = (msg) => send('progress', { message: msg });
+
+  try {
+    progress(`Backtest: ${date}${endDate !== date ? ' → '+endDate : ''} | limit: ${matchLimit} | turnuva: ${tournamentFilter}`);
+
+    // ── 1. Maç toplama (date range + dedup) ──────────────────────────────
+    const filterFn = buildTournamentFilter(tournamentFilter);
+    let collected = [];
+    const processedIds = new Set();
+
+    // Tarih aralığını hesapla: endDate → date (geriye doğru)
+    const endMs = new Date(endDate).getTime();
+    const startMs = new Date(date).getTime();
+    let cursor = endDate;
+    let daysBack = 0;
+    const maxDays = Math.min(MAX_BACKTEST_DAYS_BACK, Math.ceil((endMs - startMs) / 86400000) + 14);
+
+    while (collected.length < matchLimit && daysBack < maxDays) {
+      const cursorMs = new Date(cursor).getTime();
+      if (cursorMs < startMs) break; // Başlangıç tarihinin öncesine geçme
+
+      let evResp;
+      try { evResp = await playwrightClient.getScheduledEvents(cursor); } catch (_) { break; }
+
+      if (evResp?.events?.length) {
+        let dayFinished = evResp.events.filter(e =>
+          e.status?.type === 'finished' &&
+          e.homeScore?.current != null &&
+          e.awayScore?.current != null &&
+          e.tournament?.uniqueTournament?.id
+        );
+        dayFinished = dayFinished.filter(e => filterFn(e.tournament.uniqueTournament.id));
+        dayFinished = dayFinished.filter(e => !processedIds.has(String(e.id)));
+        dayFinished.forEach(e => processedIds.add(String(e.id)));
+        collected.push(...dayFinished);
+        if (dayFinished.length > 0) progress(`${cursor}: ${dayFinished.length} maç (+${collected.length})`);
+      }
+      if (collected.length >= matchLimit) break;
+      const prev = new Date(cursor);
+      prev.setDate(prev.getDate() - 1);
+      cursor = prev.toISOString().split('T')[0];
+      daysBack++;
+    }
+
+    const finishedMatches = collected.slice(0, matchLimit);
+    progress(`${finishedMatches.length} unique maç işlenecek.`);
+
+    // ── 2. Pipeline ───────────────────────────────────────────────────────
+    const results = [];
+    let hits1X2 = 0, hitsOU25 = 0, hitsBTTS = 0, hitsScore = 0;
+    let hitsHT1X2 = 0, hitsHTScore = 0, htTotal = 0;
+    let totalBrier = 0, totalLogLoss = 0;
+    let poissonHits = 0, simHits = 0, poissonTotal = 0, simTotal = 0;
+    const tournamentStats = {}; // { [tournamentId]: { name, total, hits1X2, hitsOU25, hitsBTTS } }
+    let totalDrawActual = 0, totalDrawPredicted = 0;
+
+    for (let mi = 0; mi < finishedMatches.length; mi++) {
+      const match = finishedMatches[mi];
+      if (mi > 0) await new Promise(r => setTimeout(r, BACKTEST_INTER_DELAY_MS));
+
+      const matchLabel = `${match.homeTeam.name} vs ${match.awayTeam.name}`;
+      progress(`(${mi+1}/${finishedMatches.length}) ${matchLabel}`);
+
+      try {
+        const data = await fetchAllMatchData(match.id);
+        const metrics = calculateAllMetrics(data);
+        const baseline = getDynamicBaseline(data);
+        baseline.leagueGoalVolatility = metrics.meta?.leagueGoalVolatility ?? null;
+        baseline.leaguePointDensity   = metrics.meta?.leaguePointDensity   ?? null;
+        baseline.medianGoalRate       = metrics.meta?.medianGoalRate       ?? null;
+        baseline.leagueTeamCount      = metrics.meta?.leagueTeamCount      ?? null;
+        baseline.ptsCV                = metrics.meta?.ptsCV                ?? null;
+        baseline.normMinRatio         = metrics.meta?.normMinRatio         ?? null;
+        baseline.normMaxRatio         = metrics.meta?.normMaxRatio         ?? null;
+        baseline.homeMVBreakdown      = computePositionMVBreakdown(data.homePlayers || []);
+        baseline.awayMVBreakdown      = computePositionMVBreakdown(data.awayPlayers || []);
+
+        const report = generatePrediction(metrics, data, baseline, metrics.metricAudit, Math.random);
+
+        // ── Gerçek FT skoru ──
+        const realHS = match.homeScore.current;
+        const realAS = match.awayScore.current;
+        const realTotal = realHS + realAS;
+        const realResult = realHS > realAS ? '1' : realHS < realAS ? '2' : 'X';
+        const realOU25 = realTotal > 2.5 ? 'Over' : 'Under';
+        const realBTTS = (realHS > 0 && realAS > 0) ? 'Yes' : 'No';
+        if (realResult === 'X') totalDrawActual++;
+
+        // ── Gerçek HT skoru (period1 varsa) ──
+        const realHTHS = match.homeScore?.period1 ?? null;
+        const realHTAS = match.awayScore?.period1 ?? null;
+        const realHTScore = (realHTHS != null && realHTAS != null) ? `${realHTHS}-${realHTAS}` : null;
+        const realHTResult = realHTScore
+          ? (realHTHS > realHTAS ? '1' : realHTHS < realHTAS ? '2' : 'X')
+          : null;
+
+        // ── Hibrit tahmin ──
+        const pHome = report.result.homeWin || 0;
+        const pDraw = report.result.draw || 0;
+        const pAway = report.result.awayWin || 0;
+        const predicted = pHome >= pDraw && pHome >= pAway ? '1' : pAway >= pHome && pAway >= pDraw ? '2' : 'X';
+        if (predicted === 'X') totalDrawPredicted++;
+
+        const simDist = report.simulationInsights?.distribution || {};
+        const pOU25 = simDist.over25 || report.goals?.over25 || 0;
+        const predictedOU25 = pOU25 > (report.goals?.over25DynamicThreshold ?? 50.0) ? 'Over' : 'Under';
+        const pBTTS = simDist.btts || report.goals?.btts || 0;
+        const predictedBTTS = pBTTS > (report.goals?.bttsDynamicThreshold ?? 50.0) ? 'Yes' : 'No';
+
+        const predictedScore = report.score?.predicted || 'N/A';
+        const simTopScore = simDist.topScore || report.firstHalfSimulation?.topScore || null;
+
+        // ── HT tahmin ──
+        const htReport = report.firstHalf;
+        const simHTDist = report.firstHalfSimulation;
+        const htPredResult = htReport?.htResult ?? null;
+        const htPredScore = (() => {
+          if (htReport?.htLambdaHome != null && htReport?.htLambdaAway != null) {
+            return `${Math.round(htReport.htLambdaHome)}-${Math.round(htReport.htLambdaAway)}`;
+          }
+          if (htReport?.expectedHomeGoals != null) {
+            return `${Math.round(htReport.expectedHomeGoals)}-${Math.round(htReport.expectedAwayGoals)}`;
+          }
+          return null;
+        })();
+        const simHTTopScore = simHTDist?.topScore ?? null;
+
+        // ── Hit hesapları ──
+        const hit1X2 = predicted === realResult;
+        const hitOU25 = predictedOU25 === realOU25;
+        const hitBTTS = predictedBTTS === realBTTS;
+        const hitScore = predictedScore === `${realHS}-${realAS}`;
+        const hitHTResult = (htPredResult && realHTResult) ? htPredResult === realHTResult : null;
+        const hitHTScore = (htPredScore && realHTScore) ? htPredScore === realHTScore : null;
+
+        if (hit1X2) hits1X2++;
+        if (hitOU25) hitsOU25++;
+        if (hitBTTS) hitsBTTS++;
+        if (hitScore) hitsScore++;
+        if (hitHTResult !== null) { htTotal++; if (hitHTResult) hitsHT1X2++; }
+        if (hitHTScore === true) hitsHTScore++;
+
+        // ── Brier + LogLoss ──
+        const eps = 1e-10;
+        const pH_n = pHome/100, pD_n = pDraw/100, pA_n = pAway/100;
+        const oH = realResult==='1'?1:0, oD = realResult==='X'?1:0, oA = realResult==='2'?1:0;
+        const brierScore = (pH_n-oH)**2 + (pD_n-oD)**2 + (pA_n-oA)**2;
+        const logLoss = -(oH*Math.log(pH_n+eps)+oD*Math.log(pD_n+eps)+oA*Math.log(pA_n+eps));
+        totalBrier += brierScore;
+        totalLogLoss += logLoss;
+
+        // ── Motor karşılaştırması ──
+        const poissonRes = report.poissonResult;
+        const simRes = report.simulationResult;
+        if (poissonRes?.predicted) { poissonTotal++; if (poissonRes.predicted===realResult) poissonHits++; }
+        if (simRes?.predicted) { simTotal++; if (simRes.predicted===realResult) simHits++; }
+
+        // ── Value bet göstergesi (model vs market) ──
+        const marketHome = metrics.shared?.contextual?.M131 ?? null;
+        const marketAway = metrics.shared?.contextual?.M133 ?? null;
+        const modelEdge = (() => {
+          if (marketHome == null || marketAway == null) return null;
+          // Favori yönde model olasılığı - piyasa olasılığı
+          if (predicted === '1') return +(pHome - marketHome).toFixed(1);
+          if (predicted === '2') return +(pAway - marketAway).toFixed(1);
+          return null;
+        })();
+        const isValueBet = modelEdge != null && modelEdge > 5; // %5'ten fazla kenar
+
+        // ── Turnuva istatistikleri ──
+        const tid = match.tournament?.uniqueTournament?.id;
+        const tname = match.tournament?.name || 'Unknown';
+        if (tid) {
+          if (!tournamentStats[tid]) tournamentStats[tid] = { name: tname, total:0, hits1X2:0, hitsOU25:0, hitsBTTS:0, hitsScore:0, totalBrier:0 };
+          const ts = tournamentStats[tid];
+          ts.total++; if (hit1X2) ts.hits1X2++; if (hitOU25) ts.hitsOU25++;
+          if (hitBTTS) ts.hitsBTTS++; if (hitScore) ts.hitsScore++;
+          ts.totalBrier += brierScore;
+        }
+
+        const coverageCtrl = report.coverageControl || {};
+        const entry = {
+          matchId: match.id,
+          match: matchLabel,
+          homeTeam: match.homeTeam?.name,
+          awayTeam: match.awayTeam?.name,
+          tournament: tname, tournamentId: tid || null,
+          matchDate: match.startTimestamp ? new Date(match.startTimestamp*1000).toISOString().split('T')[0] : date,
+          // FT gerçek
+          actual: `${realHS}-${realAS}`, actualResult: realResult, actualOU25: realOU25, actualBTTS: realBTTS,
+          // FT tahmin
+          predicted: predictedScore, predictedResult: predicted, predictedOU25, predictedBTTS,
+          simTopScore,
+          probHome: pHome, probDraw: pDraw, probAway: pAway,
+          probOU25: +pOU25.toFixed(1), probBTTS: +pBTTS.toFixed(1),
+          // HT gerçek
+          actualHT: realHTScore, actualHTResult: realHTResult,
+          // HT tahmin
+          predictedHT: htPredScore, predictedHTResult: htPredResult,
+          simHTTopScore,
+          htHomeWinProb: htReport?.htHomeWin ?? null,
+          htDrawProb: htReport?.htDraw ?? null,
+          htAwayWinProb: htReport?.htAwayWin ?? null,
+          simHTHomeWin: simHTDist?.homeWin ?? null,
+          simHTDraw: simHTDist?.draw ?? null,
+          simHTAwayWin: simHTDist?.awayWin ?? null,
+          // HT/FT 9-class
+          htft: report.htft ? { top1: report.htft.top1, top3: report.htft.top3 } : null,
+          // Hit'ler
+          hit1X2, hitOU25, hitBTTS, hitScore, hitHTResult, hitHTScore,
+          // Kalibrasyon
+          brierScore: +brierScore.toFixed(4), logLoss: +logLoss.toFixed(4),
+          // Güven
+          confidenceTier: coverageCtrl.confidenceTier || 'UNKNOWN',
+          maxProbability: coverageCtrl.maxProbability || 0,
+          isHighConfidence: coverageCtrl.isHighConfidence || false,
+          // Motor karşılaştırması
+          poisson: poissonRes ? { predicted:poissonRes.predicted, homeWin:poissonRes.homeWin, draw:poissonRes.draw, awayWin:poissonRes.awayWin, topScore:poissonRes.topScore, hit:poissonRes.predicted===realResult, lambdaHome:poissonRes.lambdaHome, lambdaAway:poissonRes.lambdaAway } : null,
+          simulation: simRes ? { predicted:simRes.predicted, homeWin:simRes.homeWin, draw:simRes.draw, awayWin:simRes.awayWin, hit:simRes.predicted===realResult } : null,
+          // Ek metrikler
+          restDays: { home: baseline.homeRestDays??null, away: baseline.awayRestDays??null },
+          isValueBet, modelEdge,
+          marketHome, marketAway,
+        };
+        results.push(entry);
+        send('match', entry);
+
+      } catch (err) {
+        send('error', { matchId: match.id, match: matchLabel, error: err.message });
+      }
+    }
+
+    // ── 3. Özet ──────────────────────────────────────────────────────────
+    const total = results.length;
+    if (total === 0) { send('summary', { error: 'Hiç maç işlenemedi.' }); res.end(); return; }
+
+    const tierStats = (tier) => {
+      const t = results.filter(r => r.confidenceTier === tier);
+      if (!t.length) return null;
+      return {
+        count: t.length,
+        accuracy1X2: +((t.filter(r=>r.hit1X2).length/t.length)*100).toFixed(1),
+        accuracyOU25: +((t.filter(r=>r.hitOU25).length/t.length)*100).toFixed(1),
+        accuracyBTTS: +((t.filter(r=>r.hitBTTS).length/t.length)*100).toFixed(1),
+        accuracyScore: +((t.filter(r=>r.hitScore).length/t.length)*100).toFixed(1),
+        avgBrier: +(t.reduce((s,r)=>s+r.brierScore,0)/t.length).toFixed(4),
+      };
+    };
+
+    // Turnuva özeti
+    const tournamentSummary = Object.entries(tournamentStats).map(([tid, ts]) => ({
+      tournamentId: +tid, name: ts.name, total: ts.total,
+      accuracy1X2: +((ts.hits1X2/ts.total)*100).toFixed(1),
+      accuracyOU25: +((ts.hitsOU25/ts.total)*100).toFixed(1),
+      accuracyBTTS: +((ts.hitsBTTS/ts.total)*100).toFixed(1),
+      accuracyScore: +((ts.hitsScore/ts.total)*100).toFixed(1),
+      avgBrier: +(ts.totalBrier/ts.total).toFixed(4),
+    })).sort((a,b) => b.total - a.total);
+
+    const valueBets = results.filter(r => r.isValueBet);
+    const valueBetHits = valueBets.filter(r => r.hit1X2).length;
+
+    const summary = {
+      date, endDate, total, tournamentFilter,
+      // Genel doğruluk
+      accuracy1X2: +((hits1X2/total)*100).toFixed(1),
+      accuracyOU25: +((hitsOU25/total)*100).toFixed(1),
+      accuracyBTTS: +((hitsBTTS/total)*100).toFixed(1),
+      accuracyScore: +((hitsScore/total)*100).toFixed(1),
+      // Kalibrasyon
+      avgBrierScore: +(totalBrier/total).toFixed(4),
+      avgLogLoss: +(totalLogLoss/total).toFixed(4),
+      // HT
+      htAccuracy1X2: htTotal>0 ? +((hitsHT1X2/htTotal)*100).toFixed(1) : null,
+      htAccuracyScore: htTotal>0 ? +((hitsHTScore/htTotal)*100).toFixed(1) : null,
+      htTotal,
+      // Tier breakdown
+      high: tierStats('HIGH'), medium: tierStats('MEDIUM'), low: tierStats('LOW'),
+      // Motor karşılaştırması
+      poissonAccuracy1X2: poissonTotal>0 ? +((poissonHits/poissonTotal)*100).toFixed(1) : null,
+      simulationAccuracy1X2: simTotal>0 ? +((simHits/simTotal)*100).toFixed(1) : null,
+      // Beraberlik tespiti
+      drawDetection: {
+        actual: totalDrawActual, predicted: totalDrawPredicted,
+        recallRate: totalDrawActual>0 ? +((results.filter(r=>r.actualResult==='X'&&r.predictedResult==='X').length/totalDrawActual)*100).toFixed(1) : null,
+        precisionRate: totalDrawPredicted>0 ? +((results.filter(r=>r.actualResult==='X'&&r.predictedResult==='X').length/totalDrawPredicted)*100).toFixed(1) : null,
+      },
+      // Value bet
+      valueBets: { count: valueBets.length, accuracy1X2: valueBets.length>0 ? +((valueBetHits/valueBets.length)*100).toFixed(1) : null },
+      // Turnuva bazlı
+      byTournament: tournamentSummary,
+      results,
+    };
+
+    const fs = require('fs'), path = require('path');
+    const fname = endDate !== date ? `backtest_${date}_to_${endDate}.json` : `backtest_${date}.json`;
+    fs.writeFileSync(path.join(__dirname, '..', fname), JSON.stringify(summary, null, 2), 'utf-8');
+    send('summary', summary);
+
+  } catch (err) {
+    send('error', { error: err.message });
+  } finally {
+    res.end();
   }
 });
 

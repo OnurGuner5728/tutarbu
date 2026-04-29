@@ -383,11 +383,50 @@ function getDynamicBaseline(data) {
   const possessionBase = (hPoss != null && aPoss != null) ? ((hPoss + aPoss) / 2) / 100 : NEUTRAL.POSSESSION;
   traces.push(`possessionBase: ${possessionBase.toFixed(3)} (${hPoss != null ? 'TEAM_PROXY' : 'NEUTRAL_SYMMETRY'})`);
 
+  // ── 13. Rest Days & Fatigue (Maçlar Arası Dinlenme) ────────────────────────────
+  // Yorgunluk etkisi: az dinlenme → hücum gücü düşer, iyi dinlenme → hafif bonus
+  // Kaynak: homeLastEvents / awayLastEvents startTimestamp farkı
+  const currentTS = data.event?.event?.startTimestamp ?? null;
+
+  const getRestDays = (lastEvents) => {
+    if (!currentTS || !Array.isArray(lastEvents) || lastEvents.length === 0) return null;
+    const finished = lastEvents
+      .filter(e => e.status?.type === 'finished' && e.startTimestamp != null && e.startTimestamp < currentTS)
+      .sort((a, b) => b.startTimestamp - a.startTimestamp);
+    if (finished.length === 0) return null;
+    return Math.round((currentTS - finished[0].startTimestamp) / 86400);
+  };
+
+  const homeRestDays = getRestDays(data.homeLastEvents);
+  const awayRestDays = getRestDays(data.awayLastEvents);
+  traces.push(`homeRestDays: ${homeRestDays ?? 'null'} | awayRestDays: ${awayRestDays ?? 'null'}`);
+
+  // Yorgunluk CV ölçeği: volatil liglerde yorgunluk farkı daha belirgin
+  // OPTIMAL_REST = 5 gün: standart hazırlık süresi futbol literatüründe
+  const OPTIMAL_REST = 5;
+  const _lgCV = (_standingsGoals != null && _standingsGoals > 0 && _dynBlock != null)
+    ? Math.min(0.20, Math.max(0.08, 0.12))  // veri güvenilirliği sınırlı, sabit aralık
+    : 0.12;
+
+  const computeFatigue = (restDays) => {
+    if (restDays == null) return 1.0; // veri yok → nötr
+    if (restDays < OPTIMAL_REST) {
+      // Yorgunluk: 1.0'dan _lgCV kadar düşebilir (2 gün: ~%10-12 düşüş)
+      return 1.0 - _lgCV * (OPTIMAL_REST - restDays) / OPTIMAL_REST;
+    }
+    // Dinginlik: max %30 × _lgCV yukarı (ör: 7 gün → +%2-3)
+    return Math.min(1.0 + _lgCV * 0.30, 1.0 + _lgCV * (restDays - OPTIMAL_REST) / 10);
+  };
+
+  const homeFatigue = computeFatigue(homeRestDays);
+  const awayFatigue = computeFatigue(awayRestDays);
+  traces.push(`homeFatigue: ${homeFatigue.toFixed(3)} | awayFatigue: ${awayFatigue.toFixed(3)}`);
+
   return {
     leagueAvgGoals, shotsPerMin, onTargetRate, goalConvRate,
     gkSaveRate, blockRate, cornerPerMin, yellowPerMin,
     redPerMin, penConvRate, penPerMatch, possessionBase,
-    matchMinutes,
+    matchMinutes, homeRestDays, awayRestDays, homeFatigue, awayFatigue,
     traces,
   };
 }

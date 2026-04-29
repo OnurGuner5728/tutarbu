@@ -117,42 +117,42 @@ function extractTeamStats(statsResponse, isHome) {
   // item.key mevcutsa önce buradan resolve edilir; bulunamazsa aşağıdaki switch fallback devreye girer.
   // Fraction/total gerektiren case'ler üçüncü parametre (st = stats objesi) ile birlikte handle edilir.
   const KEY_MAP = {
-    'totalShots':                (r, v)     => { r.totalShots = v; },
-    'onTargetScoringAttempts':   (r, v)     => { r.shotsOnTarget = v; },
-    'cornerKicks':               (r, v)     => { r.cornerKicks = v; },
-    'bigChances':                (r, v)     => { r.bigChances = v; },
-    'bigChancesScored':          (r, v)     => { r.bigChancesScored = v; },
-    'bigChancesMissed':          (r, v)     => { r.bigChancesMissed = v; },
-    'fouls':                     (r, v)     => { r.fouls = v; },
-    'ballPossession':            (r, v)     => { r.possession = v; },
-    'expectedGoals':             (r, v)     => { r.expectedGoals = v; },
-    'blockedShots':              (r, v)     => { r.blockedShots = v; },
-    'shotsOffTarget':            (r, v)     => { r.shotsOffTarget = v; },
-    'hitWoodwork':               (r, v)     => { r.hitWoodwork = v; },
-    'shotsInsideBox':            (r, v)     => { r.shotsInsideBox = v; },
-    'shotsOutsideBox':           (r, v)     => { r.shotsOutsideBox = v; },
-    'totalPasses':               (r, v)     => { r.totalPasses = v; },
-    'totalLongBalls':            (r, v)     => { r.totalLongBalls = v; },
-    'totalCrosses':              (r, v)     => { r.totalCrosses = v; },
-    'totalDuels':                (r, v)     => { r.totalDuels = v; },
-    'totalAerialDuels':          (r, v)     => { r.totalAerialDuels = v; },
-    'interceptions':             (r, v)     => { r.interceptions = v; },
-    'tackles':                   (r, v)     => { r.tackles = v; },
-    'clearances':                (r, v)     => { r.clearances = v; },
-    'saves':                     (r, v)     => { r.saves = v; },
-    'goalKeeperSaves':           (r, v)     => { r.saves = v; },
-    'yellowCards':               (r, v)     => { r.yellowCards = v; },
-    'redCards':                  (r, v)     => { r.redCards = v; },
-    'offsides':                  (r, v)     => { r.offsides = v; },
-    'blockedScoringAttempt':     (r, v)     => { r.blockedShots = v; },
-    'blockedScoringAttemptAgainst': (r, v)  => { r.blockedScoringAttemptAgainst = v; },
+    'totalShots': (r, v) => { r.totalShots = v; },
+    'onTargetScoringAttempts': (r, v) => { r.shotsOnTarget = v; },
+    'cornerKicks': (r, v) => { r.cornerKicks = v; },
+    'bigChances': (r, v) => { r.bigChances = v; },
+    'bigChancesScored': (r, v) => { r.bigChancesScored = v; },
+    'bigChancesMissed': (r, v) => { r.bigChancesMissed = v; },
+    'fouls': (r, v) => { r.fouls = v; },
+    'ballPossession': (r, v) => { r.possession = v; },
+    'expectedGoals': (r, v) => { r.expectedGoals = v; },
+    'blockedShots': (r, v) => { r.blockedShots = v; },
+    'shotsOffTarget': (r, v) => { r.shotsOffTarget = v; },
+    'hitWoodwork': (r, v) => { r.hitWoodwork = v; },
+    'shotsInsideBox': (r, v) => { r.shotsInsideBox = v; },
+    'shotsOutsideBox': (r, v) => { r.shotsOutsideBox = v; },
+    'totalPasses': (r, v) => { r.totalPasses = v; },
+    'totalLongBalls': (r, v) => { r.totalLongBalls = v; },
+    'totalCrosses': (r, v) => { r.totalCrosses = v; },
+    'totalDuels': (r, v) => { r.totalDuels = v; },
+    'totalAerialDuels': (r, v) => { r.totalAerialDuels = v; },
+    'interceptions': (r, v) => { r.interceptions = v; },
+    'tackles': (r, v) => { r.tackles = v; },
+    'clearances': (r, v) => { r.clearances = v; },
+    'saves': (r, v) => { r.saves = v; },
+    'goalKeeperSaves': (r, v) => { r.saves = v; },
+    'yellowCards': (r, v) => { r.yellowCards = v; },
+    'redCards': (r, v) => { r.redCards = v; },
+    'offsides': (r, v) => { r.offsides = v; },
+    'blockedScoringAttempt': (r, v) => { r.blockedShots = v; },
+    'blockedScoringAttemptAgainst': (r, v) => { r.blockedScoringAttemptAgainst = v; },
     // Fraction case'ler: current + total birlikte yazılır
-    'accuratePasses':            (r, v, st) => { r.accuratePasses = v; if (st.total) r.totalPasses = st.total; },
-    'accurateLongBalls':         (r, v, st) => { r.accurateLongBalls = v; if (st.total) r.totalLongBalls = st.total; },
-    'accurateCrosses':           (r, v, st) => { r.accurateCrosses = v; if (st.total) r.totalCrosses = st.total; },
-    'accuratePassesFinalThird':  (r, v, st) => { r.accuratePassesFinalThird = v; if (st.total) r.totalPassesFinalThird = st.total; },
-    'duelsWon':                  (r, v, st) => { r.duelsWon = v; if (st.total) r.totalDuels = st.total; },
-    'aerialDuelsWon':            (r, v, st) => { r.aerialDuelsWon = v; if (st.total) r.totalAerialDuels = st.total; },
+    'accuratePasses': (r, v, st) => { r.accuratePasses = v; if (st.total) r.totalPasses = st.total; },
+    'accurateLongBalls': (r, v, st) => { r.accurateLongBalls = v; if (st.total) r.totalLongBalls = st.total; },
+    'accurateCrosses': (r, v, st) => { r.accurateCrosses = v; if (st.total) r.totalCrosses = st.total; },
+    'accuratePassesFinalThird': (r, v, st) => { r.accuratePassesFinalThird = v; if (st.total) r.totalPassesFinalThird = st.total; },
+    'duelsWon': (r, v, st) => { r.duelsWon = v; if (st.total) r.totalDuels = st.total; },
+    'aerialDuelsWon': (r, v, st) => { r.aerialDuelsWon = v; if (st.total) r.totalAerialDuels = st.total; },
   };
 
   for (const period of statsResponse.statistics) {
@@ -249,19 +249,19 @@ function extractTeamStats(statsResponse, isHome) {
  */
 function getPositionalEfficiency(nativePos, assignedPos) {
   if (!nativePos || !assignedPos) return 1.0;
-  
+
   const map = { 'G': 0, 'D': 1, 'M': 2, 'F': 3 };
   const nativeIdx = map[nativePos[0]?.toUpperCase()];
   const assignedIdx = map[assignedPos[0]?.toUpperCase()];
-  
+
   if (nativeIdx === undefined || assignedIdx === undefined) return 1.0;
-  
+
   const distance = Math.abs(nativeIdx - assignedIdx);
   if (distance === 0) return 1.0;
   if (distance === 1) return 0.85; // 15% penalty
   if (distance === 2) return 0.60; // 40% penalty
   if (distance === 3) return 0.10; // 90% penalty
-  
+
   return 1.0;
 }
 

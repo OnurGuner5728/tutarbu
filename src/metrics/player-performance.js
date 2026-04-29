@@ -3,7 +3,7 @@
  * Oyuncu kalitesi, kadro etkisi, sakatlık etkisi, güçlü/güçsüze gol atma.
  */
 
-const { getPositionalEfficiency } = require('../engine/math-utils');
+const { calculateDynamicRating } = require('../engine/player-rating-utils');
 
 /**
  * Builds a map of { [playerId]: avgMinutesPerMatch } from recent match incidents.
@@ -429,20 +429,28 @@ function calculatePlayerMetrics(data, side, dynamicAvgs) {
   let starterValue = 0, subValue = 0, otherValue = 0;
   for (const p of allPlayers) {
     const pid = p.player?.id;
-    let val = p.player?.proposedMarketValue || 0;
+    const baseMV = p.player?.proposedMarketValue || 0;
     
-    // Uygulanan pozisyon cezası
+    // MV saf kalır — rating ile çift sayma (double-counting) önlenir.
+    // Mevki değişikliği varsa, sadece o zaman pozisyon-duyarlı ceza uygulanır.
     const nativePos = (p.player?.position || '').toUpperCase()[0] || '';
     const assignedPos = (p.assignedPosition || nativePos).toUpperCase()[0] || '';
-    const efficiency = getPositionalEfficiency(nativePos, assignedPos);
-    val *= efficiency;
+    
+    let val = baseMV;
+    if (assignedPos !== nativePos) {
+      // Workshop'ta mevki değiştirilmişse: organik rating düşüşü ile orantılı ceza
+      const nativeRating = calculateDynamicRating(p.player, null);
+      const assignedRating = calculateDynamicRating(p.player, assignedPos);
+      // Rating düşüş oranını MV'ye yansıt (ör: 93→75 = ×0.81)
+      val = baseMV * (nativeRating > 0 ? assignedRating / nativeRating : 1);
+    }
 
     if (pid && starterPlayerIds.has(pid)) {
       starterValue += val;
     } else if (pid && subPlayerIds.has(pid)) {
       subValue += val;
     } else {
-      otherValue += val; // Kadrodaki diğer oyuncular (stats alınamamış)
+      otherValue += val;
     }
   }
   // M087: Piyasa değeri log-normalize. Normalizer lig ortalamasından (100'e hizalama).
