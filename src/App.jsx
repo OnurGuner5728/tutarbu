@@ -1140,7 +1140,7 @@ export default function App() {
                                   <span style={{textAlign:'center'}}>{prediction.match?.awayTeam?.split(' ')[0] || 'Dep'}</span>
                                 </div>
                                 {items.map((it,i) => (
-                                  <div key={i} style={{ display:'grid', gridTemplateColumns:'2fr 1fr 1fr', padding:'4px 0', borderBottom:'1px solid rgba(255,255,255,0.03)' }}>
+                                  <div key={i} className="zebra-row" style={{ gridTemplateColumns:'2fr 1fr 1fr' }}>
                                     <span style={{color:'var(--text-secondary)'}}>{it.l}</span>
                                     <span style={{textAlign:'center'}}>{it.h}</span>
                                     <span style={{textAlign:'center'}}>{it.a}</span>
@@ -1225,7 +1225,7 @@ export default function App() {
                                   const aVal = aUnits[key];
                                   const { hBold, aBold } = isBetter(hVal, aVal, meta.invert);
                                   return (
-                                    <div key={key} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', padding: '3px 0', borderBottom: '1px solid rgba(255,255,255,0.03)', alignItems: 'center' }} title={meta.desc}>
+                                    <div key={key} className="zebra-row" style={{ gridTemplateColumns: '2fr 1fr 1fr', alignItems: 'center' }} title={meta.desc}>
                                       <span style={{ color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 4 }}>
                                         <span style={{ fontSize: '0.7rem' }}>{meta.icon}</span>
                                         <span>{meta.label}</span>
