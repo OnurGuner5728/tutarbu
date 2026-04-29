@@ -4,6 +4,7 @@
 **Turnuva:** UEFA Champions League, Knockout Stage  
 **Stadyum:** Parc des Princes | **Hakem:** Sandro Schärer  
 **Formasyon:** PSG 4-3-3 | Bayern 4-2-3-1  
+**Son Güncelleme:** 29 Nisan 2026 | **Metrik Sayısı:** 196/196 (0 Null)  
 
 ---
 
@@ -407,3 +408,69 @@ Her oyuncunun SofaScore API'sinden dönen **sezonluk** istatistikleri (ŞL turnu
 ## 1.7 Eksik Oyuncular
 
 Eksik oyuncu listesi: **BOŞ** (Her iki takımda da sakat/cezalı oyuncu yok)
+
+---
+
+## 1.8 Faz 3 ile Entegre Edilen Yeni Oyuncu İstatistik Alanları
+
+Aşağıdaki oyuncu istatistikleri **daha önce API'den çekilip kullanılmayan** alanlardı. Artık tamamı aktif olarak hesaplamalara dahil edilmiştir:
+
+### Hücum Alanları (BLOCK_STAT_MAP → BİTİRİCİLİK, YARATICILIK, ŞUT ÜRETİMİ)
+| Alan | Blok | Açıklama |
+|------|------|----------|
+| `goalsFromInsideTheBox` | BİTİRİCİLİK | Ceza sahası içi bitiricilik |
+| `goalsFromOutsideTheBox` | BİTİRİCİLİK | Uzak mesafe bitiricilik |
+| `goalConversionPercentage` | BİTİRİCİLİK | Gol dönüşüm oranı |
+| `hitWoodwork` | BİTİRİCİLİK | Direk isabet → fırsat göstergesi |
+| `expectedAssists` | YARATICILIK | Beklenen asist (xA) |
+| `passToAssist` | YARATICILIK | Asist öncesi son pas |
+| `totalAttemptAssist` | YARATICILIK | Asist girişimi |
+| `shotsFromInsideTheBox` | ŞUT ÜRETİMİ | Ceza sahası şutu |
+| `shotsFromOutsideTheBox` | ŞUT ÜRETİMİ | Uzak mesafe şutu |
+| `shotsOffTarget` | ŞUT ÜRETİMİ | İsabetsiz şut |
+| `headedGoals` | HAVA HAKİMİYETİ | Kafa golü |
+
+### Savunma Alanları (BLOCK_STAT_MAP → SAVUNMA_AKSİYONU)
+| Alan | Blok | Açıklama |
+|------|------|----------|
+| `groundDuelsWon` | SAVUNMA AKSİYONU | Yer düellosu kazanma |
+| `totalDuelsWon` | SAVUNMA AKSİYONU | Toplam düello kazanma |
+| `tacklesWon` | SAVUNMA AKSİYONU | Başarılı müdahale |
+| `blockedShots` | SAVUNMA AKSİYONU | Şut engelleme |
+| `outfielderBlocks` | SAVUNMA AKSİYONU | Saha oyuncusu blok |
+| `dribbledPast` | SAVUNMA AKSİYONU | Geçilme (negatif sinyal) |
+
+### Duran Top Alanları (BLOCK_STAT_MAP → DURAN_TOP)
+| Alan | Blok | Açıklama |
+|------|------|----------|
+| `penaltyWon` | DURAN TOP + Penaltı Şansı | Penaltı kazanma |
+| `penaltyGoals` | DURAN TOP + M020 | Penaltı golü |
+| `penaltyConceded` | Penaltı Şansı | Penaltı verdirme |
+| `freeKickGoal` | DURAN TOP | Serbest vuruş golü |
+| `shotFromSetPiece` | DURAN TOP | Set piece'ten şut |
+
+### Pas & Taktik Alanları (BLOCK_STAT_MAP → TOPLA OYNAMA, TAKTİKSEL UYUM)
+| Alan | Blok | Açıklama |
+|------|------|----------|
+| `accurateFinalThirdPasses` | TOPLA OYNAMA | Son bölge pası |
+| `accurateLongBalls` | TOPLA OYNAMA | Uzun pas başarısı |
+| `accurateOppositionHalfPasses` | TOPLA OYNAMA | Rakip yarı sahada pas |
+| `touches` | TOPLA OYNAMA | Topa dokunma |
+| `possessionLost` | TOPLA OYNAMA | Top kaybı (negatif) |
+| `possessionWonAttThird` | TAKTİKSEL UYUM + M096c | Hücum bölgesinde top kazanma |
+| `ballRecovery` | TAKTİKSEL UYUM + M096c | Top geri kazanma |
+| `wasFouled` | TAKTİKSEL UYUM | Faul kazanma |
+| `fouls` | TAKTİKSEL UYUM + Kırmızı Kart | Faul yapma (negatif) |
+| `offsides` | TAKTİKSEL UYUM | Ofsayt (negatif) |
+| `accurateCrosses` | BAĞLANTI OYUNU | Ortanın isabeti |
+| `totalCross` | BAĞLANTI OYUNU | Orta hacmi |
+| `dispossessed` | BAĞLANTI OYUNU | Top kaybedilme (negatif) |
+
+### Kart Riski Alanları (calculateRedCardChance)
+| Alan | Kullanım | Açıklama |
+|------|----------|----------|
+| `yellowCards` | Kırmızı Kart Riski | Sarı kart sayısı |
+| `redCards` | Kırmızı Kart Riski | Kırmızı kart (3x eşdeğer) |
+| `fouls` | Kırmızı Kart Riski | Faul (dinamik fouls/cards oranıyla) |
+
+**Toplam:** 30+ yeni alan, 10 blok ve 3 hesaplama fonksiyonuna entegre edildi.
