@@ -275,6 +275,7 @@ function calculateTeamAttackMetrics(data, side) {
         : null);
 
   // ── M025: Hücum Üçüncü Bölge Pas Başarısı ──
+  // Kaynak 1: Maç-seviye stats (recentDetails)
   let totalAccFinalThird = 0;
   let totalFinalThird = 0;
 
@@ -286,10 +287,29 @@ function calculateTeamAttackMetrics(data, side) {
     }
   }
 
-  const M025 = totalFinalThird > 0 ? Math.min((totalAccFinalThird / totalFinalThird) * 100, 100) : null;
+  let M025 = totalFinalThird > 0 ? Math.min((totalAccFinalThird / totalFinalThird) * 100, 100) : null;
+
+  // Kaynak 2 (Fallback): Oyuncu sezon istatistiklerinden topla — maç stats boşsa
+  if (M025 == null) {
+    const lineupSide = isHome ? data.lineups?.home : data.lineups?.away;
+    const starters = (lineupSide?.players || []).filter(p => !p.substitute).slice(0, 11);
+    let plAccFT = 0, plTotalFT = 0;
+    for (const p of starters) {
+      const ps = p.player?.statistics || p.player?.seasonStats?.statistics || {};
+      if (ps.accurateFinalThirdPasses != null) plAccFT += ps.accurateFinalThirdPasses;
+      // totalFinalThirdPasses yoksa accurateOppositionHalfPasses kullan (proxy)
+      if (ps.totalOppositionHalfPasses != null) plTotalFT += ps.totalOppositionHalfPasses;
+      else if (ps.accurateFinalThirdPasses != null && ps.accuratePassesPercentage != null && ps.accuratePassesPercentage > 0) {
+        plTotalFT += Math.round(ps.accurateFinalThirdPasses / (ps.accuratePassesPercentage / 100));
+      }
+    }
+    if (plTotalFT > 0) {
+      M025 = Math.min((plAccFT / plTotalFT) * 100, 100);
+    }
+  }
 
   // ── M025b: Set Piece (Korner + Serbest Vuruş) Gol Etkinliği ──
-  // Shotmap situation alanından korner/set-piece gollerini tespit et
+  // Kaynak 1: Shotmap situation alanından korner/set-piece gollerini tespit et
   let setPieceGoals = 0;
   let totalGoalsForSP = 0;
 
@@ -305,7 +325,23 @@ function calculateTeamAttackMetrics(data, side) {
       }
     }
   }
-  const M025b = totalGoalsForSP > 0 ? (setPieceGoals / totalGoalsForSP) * 100 : null;
+  let M025b = totalGoalsForSP > 0 ? (setPieceGoals / totalGoalsForSP) * 100 : null;
+
+  // Kaynak 2 (Fallback): Oyuncu bazlı shotFromSetPiece ve freeKickGoal
+  if (M025b == null) {
+    const lineupSide = isHome ? data.lineups?.home : data.lineups?.away;
+    const starters = (lineupSide?.players || []).filter(p => !p.substitute).slice(0, 11);
+    let plSPGoals = 0, plTotalGoals = 0;
+    for (const p of starters) {
+      const ps = p.player?.statistics || p.player?.seasonStats?.statistics || {};
+      if (ps.freeKickGoal != null) plSPGoals += ps.freeKickGoal;
+      if (ps.headedGoals != null) plSPGoals += ps.headedGoals; // Set piece'ten kafa golü proxy
+      if (ps.goals != null) plTotalGoals += ps.goals;
+    }
+    if (plTotalGoals > 0) {
+      M025b = Math.min((plSPGoals / plTotalGoals) * 100, 100);
+    }
+  }
 
   // ── M025c: Korner Başına Tehlike Oranı ──
   // extractTeamStats zaten period='ALL' filtrelemesini yapıyor

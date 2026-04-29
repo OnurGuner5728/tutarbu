@@ -104,7 +104,38 @@ function calculateH2HMetrics(data) {
   const mgrDraws = managerH2H.draws ?? null;
   const mgrTotal = (mgr1Wins != null && mgr2Wins != null && mgrDraws != null)
     ? mgr1Wins + mgr2Wins + mgrDraws : null;
-  const M127 = mgrTotal != null && mgrTotal > 0 ? (mgr1Wins / mgrTotal) * 100 : null;
+  let M127 = mgrTotal != null && mgrTotal > 0 ? (mgr1Wins / mgrTotal) * 100 : null;
+
+  // Fallback: managerDuel yoksa menajer kariyer maçlarından karşılıklı sonuçları say
+  if (M127 == null) {
+    const homeMgrEvents = data.homeManagerLastEvents?.events || [];
+    const awayMgrEvents = data.awayManagerLastEvents?.events || [];
+    // Her iki menajer de bir maçta yer alıyorsa o maç H2H'dir
+    const homeMgrTeamIds = new Set();
+    for (const ev of homeMgrEvents) {
+      if (ev.homeTeam?.id) homeMgrTeamIds.add(ev.homeTeam.id);
+      if (ev.awayTeam?.id) homeMgrTeamIds.add(ev.awayTeam.id);
+    }
+    let mgrH2HWins = 0, mgrH2HTotal = 0;
+    for (const ev of awayMgrEvents) {
+      const hid = ev.homeTeam?.id;
+      const aid = ev.awayTeam?.id;
+      if (!hid || !aid) continue;
+      if (homeMgrTeamIds.has(hid) || homeMgrTeamIds.has(aid)) {
+        const hs = ev.homeScore?.current;
+        const as = ev.awayScore?.current;
+        if (hs == null || as == null) continue;
+        mgrH2HTotal++;
+        // Ev sahibi takım data.homeTeamId ise ev menajeri kazandı
+        const isCurrentHome = hid === homeTeamId;
+        if (isCurrentHome && hs > as) mgrH2HWins++;
+        else if (!isCurrentHome && as > hs) mgrH2HWins++;
+      }
+    }
+    if (mgrH2HTotal > 0) M127 = (mgrH2HWins / mgrH2HTotal) * 100;
+    // Son fallback: Nötr değer (deneyimler eşit varsayılır)
+    if (M127 == null) M127 = 50.0;
+  }
 
   // ── M128: H2H Gol Farkı Trendi ──
   let goalDiffTrend = 0, m128Valid = 0;

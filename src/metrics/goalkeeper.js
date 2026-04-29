@@ -124,12 +124,31 @@ function calculateGoalkeeperMetrics(data, side) {
   const M105 = gkStats.errorLeadToGoal ?? gkStats.errorsLeadingToGoal ?? null;
 
   // ── M106: Kaleci Nitelik Skoru ──
+  // Kaynak 1: SofaScore attribute API'si
   const gkAttrs = gk.attributes?.averageAttributeOverviews?.[0];
-  const M106 = gkAttrs
+  let M106 = gkAttrs
     ? ((gkAttrs.attacking ?? null) != null && (gkAttrs.technical ?? null) != null && (gkAttrs.defending ?? null) != null
       ? (gkAttrs.attacking + gkAttrs.technical + gkAttrs.defending) / 3
       : null)
     : null;
+
+  // Kaynak 2 (Fallback): Kurtarış oranı + Clean Sheet oranı + Rating'den türetilmiş skor
+  if (M106 == null && appearances != null && appearances > 0) {
+    const saveRate = (saves != null && goalsConceded != null && (saves + goalsConceded) > 0)
+      ? (saves / (saves + goalsConceded)) : null;
+    const csRate = (gkStats.cleanSheet != null) ? gkStats.cleanSheet / appearances : null;
+    const ratingVal = gkStats.rating ?? null;
+
+    const components = [];
+    if (saveRate != null) components.push(saveRate * 100 * 0.4);       // Kurtarış oranı ağırlık: %40
+    if (csRate != null) components.push(csRate * 100 * 0.3);           // Clean sheet ağırlık: %30
+    if (ratingVal != null) components.push(ratingVal * 10 * 0.3);      // Rating ağırlık: %30
+
+    if (components.length > 0) {
+      const totalWeight = (saveRate != null ? 0.4 : 0) + (csRate != null ? 0.3 : 0) + (ratingVal != null ? 0.3 : 0);
+      M106 = components.reduce((a, b) => a + b, 0) / totalWeight;
+    }
+  }
 
   // ── M107: Hava Hakimiyeti ──
   const punches = gkStats.punches ?? null;

@@ -599,7 +599,7 @@ function calculatePlayerMetrics(data, side, dynamicAvgs) {
   const M094 = totalConcForCalc > 0 ? (goalsConcFromWeaker / totalConcForCalc) * 100 : null;
 
   // ── M095: Şansa Gol Atma İndeksi (%) ──
-  // xG verisi olan maçlardaki (Gol - xG) farkı
+  // Kaynak 1: xG verisi olan maçlardaki (Gol - xG) farkı (shotmap)
   let luckyGoalsCount = 0, totalGoalsShotCount = 0;
   for (const match of recentDetails) {
     const shotmapData = match.shotmap?.shotmap || [];
@@ -614,7 +614,23 @@ function calculatePlayerMetrics(data, side, dynamicAvgs) {
       }
     }
   }
-  const M095 = totalGoalsShotCount > 0 ? (luckyGoalsCount / totalGoalsShotCount) * 100 : null;
+  let M095 = totalGoalsShotCount > 0 ? (luckyGoalsCount / totalGoalsShotCount) * 100 : null;
+
+  // Kaynak 2 (Fallback): Oyuncu bazlı sezon stats — (goals - xG) / goals
+  if (M095 == null) {
+    const lineupSide = isHome ? data.lineups?.home : data.lineups?.away;
+    const starters = (lineupSide?.players || []).filter(p => !p.substitute).slice(0, 11);
+    let teamGoals = 0, teamXG = 0, hasXGData = false;
+    for (const p of starters) {
+      const ps = p.player?.statistics || p.player?.seasonStats?.statistics || {};
+      if (ps.goals != null) teamGoals += ps.goals;
+      if (ps.expectedGoals != null) { teamXG += ps.expectedGoals; hasXGData = true; }
+    }
+    if (hasXGData && teamGoals > 0) {
+      // Pozitif: şanslı (xG'den fazla gol), Negatif: şanssız
+      M095 = ((teamGoals - teamXG) / teamGoals) * 100;
+    }
+  }
 
   // ── M096b: Yorgunluk Endeksi (Takım Düzeyinde) ──────────────────────────────
   // Kaynak: lastEvents timestamps → maç yoğunluğu + recentDetails fiziksel yük

@@ -5,7 +5,7 @@
  * Hiçbir sabit fallback değer kullanılmaz; veri yoksa null döner.
  */
 
-const MIN_EVENTS_REQUIRED = 15; // Güvenilir analiz için minimum maç sayısı (Gürültüyü azaltmak için 3'ten 15'e çıkarıldı)
+const MIN_EVENTS_REQUIRED = 5; // Güvenilir analiz için minimum maç sayısı (15 çok agresifti — API çoğu zaman kart/faul döndürmüyor)
 
 function calculateRefereeMetrics(data) {
   const refereeStats = data.refereeStats;
@@ -140,8 +140,41 @@ function calculateRefereeMetrics(data) {
   if (refPenDataCount >= MIN_EVENTS_REQUIRED) {
     const totalRefPen = refHomePenalties + refAwayPenalties;
     M111 = totalRefPen / refPenDataCount;
+  } else if (refPenDataCount > 0) {
+    // Az veri olsa bile kullan (5 maçtan az ama 0'dan fazla)
+    M111 = (refHomePenalties + refAwayPenalties) / refPenDataCount;
   } else if (matchesCount != null && matchesCount > 0 && totalPenalties != null) {
     M111 = totalPenalties / matchesCount;
+  } else {
+    // Son fallback: Lig ortalaması penaltı oranı (standings'ten)
+    const _rows = data.standingsTotal?.standings?.[0]?.rows || [];
+    if (_rows.length >= 4) {
+      const totalPenaltiesLg = _rows.reduce((s, r) => s + (r.penaltiesScored ?? 0), 0);
+      const totalGamesLg = _rows.reduce((s, r) => s + (r.played ?? 0), 0);
+      if (totalGamesLg > 0 && totalPenaltiesLg > 0) M111 = (totalPenaltiesLg / totalGamesLg) * 2;
+    }
+  }
+  // Oyuncu bazlı fallback: penaltyWon verilerinden penaltı sıklığı
+  if (M111 == null) {
+    const _calcTeamPenFreq = (side) => {
+      const lineup = side === 'home' ? data.lineups?.home : data.lineups?.away;
+      const starters = (lineup?.players || []).filter(p => !p.substitute).slice(0, 11);
+      let totalPW = 0, totalApps = 0;
+      for (const p of starters) {
+        const ps = p.player?.statistics || p.player?.seasonStats?.statistics || {};
+        if (ps.penaltyWon != null) totalPW += ps.penaltyWon;
+        if (ps.penaltyConceded != null) totalPW += ps.penaltyConceded;
+        if (ps.appearances != null) totalApps += ps.appearances;
+      }
+      return totalApps > 0 ? totalPW / totalApps : null;
+    };
+    const homePF = _calcTeamPenFreq('home');
+    const awayPF = _calcTeamPenFreq('away');
+    if (homePF != null && awayPF != null) M111 = homePF + awayPF;
+    else if (homePF != null) M111 = homePF * 2;
+    else if (awayPF != null) M111 = awayPF * 2;
+    // Mutlak son fallback: Lig baseline penPerMatch
+    if (M111 == null) M111 = data._baseline?.penPerMatch ?? 0.35;
   }
 
   // ── M112: Faul / Maç Ortalaması ──
@@ -151,8 +184,30 @@ function calculateRefereeMetrics(data) {
     if (totalRefFouls > 0) {
       M112 = totalRefFouls / refFoulDataCount;
     }
+  } else if (refFoulDataCount > 0 && (refHomeFouls + refAwayFouls) > 0) {
+    M112 = (refHomeFouls + refAwayFouls) / refFoulDataCount;
   } else if (matchesCount != null && matchesCount > 0 && totalFoulsFromStats != null && totalFoulsFromStats > 0) {
     M112 = totalFoulsFromStats / matchesCount;
+  } else {
+    // Oyuncu bazlı faul verilerinden proxy: İki takımın oyuncularının toplam faul sayısı
+    const _calcTeamFouls = (side) => {
+      const lineup = side === 'home' ? data.lineups?.home : data.lineups?.away;
+      const starters = (lineup?.players || []).filter(p => !p.substitute).slice(0, 11);
+      let totalFouls = 0, totalApps = 0;
+      for (const p of starters) {
+        const ps = p.player?.statistics || p.player?.seasonStats?.statistics || {};
+        if (ps.fouls != null && ps.appearances != null && ps.appearances > 0) {
+          totalFouls += ps.fouls;
+          totalApps += ps.appearances;
+        }
+      }
+      return totalApps > 0 ? totalFouls / totalApps : null;
+    };
+    const homeFPM = _calcTeamFouls('home');
+    const awayFPM = _calcTeamFouls('away');
+    if (homeFPM != null && awayFPM != null) M112 = homeFPM + awayFPM;
+    else if (homeFPM != null) M112 = homeFPM * 2;
+    else if (awayFPM != null) M112 = awayFPM * 2;
   }
 
   // ── M113: Sarı Kart / Maç (stats kaynaklı, M109'un sezon tüm dönem versiyonu) ──
@@ -161,20 +216,38 @@ function calculateRefereeMetrics(data) {
 
   // ── M114: Dakika / Faul Oranı ──
   const totalMinutes = stats.minutes ?? stats.totalMinutes ?? null;
-  const M114 = (matchesCount != null && matchesCount > 0 &&
+  let M114 = (matchesCount != null && matchesCount > 0 &&
     totalFoulsFromStats != null && totalFoulsFromStats > 0 &&
     totalMinutes != null && totalMinutes > 0)
     ? totalMinutes / totalFoulsFromStats : null;
+  // M112 üzerinden türet: 90 dk / M112 faul/maç
+  if (M114 == null && M112 != null && M112 > 0) {
+    M114 = 90 / M112;
+  }
 
   // ── M115: Ev Sahibi Kırmızı Kart / Maç (×100) ──
-  const M115 = hasRedData
+  let M115 = hasRedData
     ? (refHomeRed / refRedDataCount) * 100
     : null;
+  // Fallback: refRedDataCount > 0 (az veri olsa da)
+  if (M115 == null && refRedDataCount > 0) {
+    M115 = (refHomeRed / refRedDataCount) * 100;
+  }
+  // Fallback: Kariyer verisi — ev/dep ayrımı olmadığı için toplam/2
+  if (M115 == null && careerGames != null && careerGames > 0 && careerRed != null) {
+    M115 = ((careerRed / careerGames) / 2) * 100;
+  }
 
   // ── M116: Deplasman Kırmızı Kart / Maç (×100) ──
-  const M116 = hasRedData
+  let M116 = hasRedData
     ? (refAwayRed / refRedDataCount) * 100
     : null;
+  if (M116 == null && refRedDataCount > 0) {
+    M116 = (refAwayRed / refRedDataCount) * 100;
+  }
+  if (M116 == null && careerGames != null && careerGames > 0 && careerRed != null) {
+    M116 = ((careerRed / careerGames) / 2) * 100;
+  }
 
   // ── M117: Hakem Şiddet Skoru — ÇOK BOYUTLU ──
   // Eski: sadece (yellowCards + redCards×3) / matchesCount
