@@ -111,24 +111,61 @@ function calculateAdvancedMetrics(allMetrics) {
 
   const getPower = (side, units) => {
 
-    const atk = Math.pow(
-      Math.max(units.BITIRICILIK, EPS) * Math.max(units.YARATICILIK, EPS) * Math.max(units.SUT_URETIMI, EPS) *
-      Math.max(units.FORM_KISA, EPS) * Math.max(units.FORM_UZUN, EPS) *
-      Math.max(units.TOPLA_OYNAMA, EPS) * Math.max(units.BAGLANTI_OYUNU, EPS),
-      1 / 7
-    );
+    // ═══════════════════════════════════════════════════════════════════════════
+    // ATK POWER — 13 blok: Tüm hücum, yaratıcılık, duran top, hava hakimiyeti,
+    // taktik, menajer, kadro, H2H, hakem, form, topla oynama, bağlantı dahil.
+    // ═══════════════════════════════════════════════════════════════════════════
+    const atkComponents = [
+      units.BITIRICILIK,          // Gol yolları
+      units.YARATICILIK,          // Fırsat yaratma
+      units.SUT_URETIMI,          // Şut hacmi
+      units.FORM_KISA,            // Kısa vadeli form
+      units.FORM_UZUN,            // Uzun vadeli form
+      units.TOPLA_OYNAMA,         // Top kontrolü
+      units.BAGLANTI_OYUNU,       // Geçiş oyunu
+      units.DURAN_TOP,            // Penaltı, korner, frikik golleri
+      units.HAVA_HAKIMIYETI,      // Kafa gücü, hava topları
+      units.TAKTIKSEL_UYUM,       // Pressing, blok yüksekliği
+      units.FİŞİ_ÇEKME,          // Comeback, maç kapatma
+      units.KADRO_DERINLIGI,      // Yedek gücü, yorgunluk
+      units.MENAJER_STRATEJISI,   // Menajer deneyimi/taktik
+    ].filter(v => v != null && v > 0);
 
-    const baseDef = Math.pow(
-      Math.max(units.SAVUNMA_DIRENCI, EPS) * Math.max(units.SAVUNMA_AKSIYONU, EPS) * Math.max(units.GK_REFLEKS, EPS) *
-      Math.max(units.DISIPLIN, EPS) * Math.max(units.GK_ALAN_HAKIMIYETI, EPS),
-      1 / 5
-    );
-    // Yüksek baskı savunmayı düşürür — kuplaj lig volatilitesine orantılı
-    // Formül: vol / leagueAvgGoals → volatil lig, baskı altında savunma daha çok çöker
-    // Kaynak: leagueGoalVolatility (standings std dev) + leagueAvgGoals (standings ortalama)
-    // Clamp sınırları vol ve avg'den türetilir — sabit [0.06, 0.28] kaldırıldı
-    // TURNUVA_KUPLA: vol/avg (CV). Clamp sınırları CV'nin kare/iki katı (doğal saturasyon).
-    // Sabit 0.02/0.12/0.15/0.45/0.04/0.30 kaldırıldı — tamamen veriden.
+    const atk = atkComponents.length > 0
+      ? Math.pow(
+          atkComponents.reduce((prod, v) => prod * Math.max(v, EPS), 1),
+          1 / atkComponents.length  // Dinamik dereceden geometrik ortalama
+        )
+      : 1.0;
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // DEF POWER — 11 blok: Savunma, kaleci, disiplin, zihinsel dayanıklılık,
+    // psikolojik kırılganlık, hakem, H2H, momentum dahil.
+    // ═══════════════════════════════════════════════════════════════════════════
+    const defComponents = [
+      units.SAVUNMA_DIRENCI,      // Gol yememe gücü
+      units.SAVUNMA_AKSIYONU,     // Tackle, intercept, blok
+      units.GK_REFLEKS,           // Kaleci kurtarışları
+      units.GK_ALAN_HAKIMIYETI,   // Kaleci çıkışları, alan kontrolü
+      units.ZİHİNSEL_DAYANIKLILIK, // Baskı altında dayanıklılık
+      units.DISIPLIN,             // Kart/faul kontrolü (düşük = savunma zayıflar)
+      units.HAKEM_DINAMIKLERI,    // Hakem eğilimi (kart/penaltı sertliği)
+      units.H2H_DOMINASYON,       // Tarihsel üstünlük
+      units.MOMENTUM_AKIŞI,       // Anlık ivme
+    ].filter(v => v != null && v > 0);
+
+    // PSİKOLOJİK_KIRILGANLIK savunmayı zayıflatır (tersi: yüksek = kırılgan = savunma düşer)
+    const psiFrag = units.PSIKOLOJIK_KIRILGANLIK ?? 1.0;
+    const psiFactor = psiFrag > 0 ? 1.0 / Math.max(psiFrag, 0.2) : 1.0; // invert: 0.4 kırılganlık → 2.5x savunma boost
+
+    const baseDef = defComponents.length > 0
+      ? Math.pow(
+          defComponents.reduce((prod, v) => prod * Math.max(v, EPS), 1),
+          1 / defComponents.length
+        ) * Math.sqrt(psiFactor) // sqrt damping — aşırı dalgalanmayı engeller
+      : 1.0;
+
+    // TURNUVA BASKISI: yüksek baskı savunmayı düşürür
     const _cvTK = (vol != null && leagueAvgGoals > 0) ? vol / leagueAvgGoals : null;
     const _tkLow = _cvTK != null ? _cvTK * _cvTK : null;
     const _tkHigh = _cvTK != null ? 2 * _cvTK : null;
@@ -139,7 +176,7 @@ function calculateAdvancedMetrics(allMetrics) {
       : 1.0;
     const def = baseDef / turnuvaMod;
 
-    // Kare alındı: güç = atak × savunma ürün skalasında, normalizasyon aralığının karesine izin ver.
+    // Kare alındı: güç = atak × savunma ürün skalasında
     const cvBand = (vol != null && leagueAvgGoals > 0) ? (vol / leagueAvgGoals) : 0;
     const _pwrMin = (allMetrics.normMinRatio != null && allMetrics.normMinRatio > 0)
       ? allMetrics.normMinRatio * allMetrics.normMinRatio : (1 - cvBand);
