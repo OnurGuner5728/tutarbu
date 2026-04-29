@@ -199,17 +199,22 @@ Bu sabitler keyfi ağırlık DEĞİL, matematiksel skala dönüşümüdür. Kald
 
 ---
 
-## 2.8 Poisson Motoru Çıktısı (`poissonResult`)
+## 2.8 Poisson Motoru Çıktısı (`poissonResult`) — Genişletilmiş
+
+**Mimari Değişiklik:** Poisson lambda artık sadece gol istatistiklerinden (M001/M026) değil, **tüm 27 davranışsal bloktan** etkileniyor. `getPower()` fonksiyonu genişletilerek:
+
+- **ATK Power (13 blok):** BİTİRİCİLİK, YARATICILIK, ŞUT ÜRETİMİ, FORM_KISA, FORM_UZUN, TOPLA_OYNAMA, BAĞLANTI_OYUNU, **DURAN_TOP** (penaltı/korner/frikik), **HAVA_HAKİMİYETİ** (kafa golü), **TAKTİKSEL_UYUM** (pressing/blok yüksekliği), **FİŞİ_ÇEKME** (comeback/clutch), **KADRO_DERİNLİĞİ** (yedek gücü/yorgunluk), **MENAJER_STRATEJİSİ**
+- **DEF Power (9+1 blok):** SAVUNMA_DİRENCİ, SAVUNMA_AKSİYONU, GK_REFLEKS, GK_ALAN_HAKİMİYETİ, **ZİHİNSEL_DAYANIKLILIK**, DİSİPLİN, **HAKEM_DİNAMİKLERİ**, **H2H_DOMİNASYON**, **MOMENTUM_AKIŞI** + PSİKOLOJİK_KIRILGANLIK (ters sinyal — savunmayı zayıflatır)
 
 | Parametre | Değer |
 |-----------|-------|
-| PSG Lambda (Beklenen Gol) | **2.36** |
-| Bayern Lambda | **2.23** |
-| PSG Galibiyeti | %45.3 |
-| Beraberlik | %10.3 |
+| PSG Lambda (Beklenen Gol) | **2.25** |
+| Bayern Lambda | **2.15** |
+| PSG Galibiyeti | %45.1 |
+| Beraberlik | %10.4 |
 | Bayern Galibiyeti | %44.5 |
 | En Olası Skor | 1-1 |
-| Kaynak | Poisson/Dixon-Coles |
+| Kaynak | Poisson/Dixon-Coles (Genişletilmiş) |
 
 ---
 
