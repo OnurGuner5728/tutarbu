@@ -818,7 +818,7 @@ export default function SimulationViewer({
               </div>
 
               {/* Behavioral Matrix */}
-              <div className="simViewerMatrixCol" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
+              <div data-tour="bim-section" className="simViewerMatrixCol" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
                 <div style={{ padding: '10px 12px', color: 'var(--accent-cyan)', fontSize: 9, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 2, borderBottom: '1px solid var(--glass-border)', background: 'rgba(0,242,255,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
                   <span>DAVRANIŞ MATRİSİ</span>
                   <span style={{ color: 'var(--text-tertiary)', fontWeight: 800 }}>{currentMinute}'</span>

@@ -2257,3 +2257,21 @@ body {
   background: rgba(0, 242, 255, 0.15);
   box-shadow: 0 0 10px rgba(0, 242, 255, 0.2);
 }
+/* ═══════════════════════════════════════════
+   GUIDED TOUR — Animations
+   ═══════════════════════════════════════════ */
+
+@keyframes tourBlink {
+  0%, 100% { opacity: 1; box-shadow: 0 0 6px 2px rgba(0, 242, 255, 0.5); }
+  50%       { opacity: 0.4; box-shadow: 0 0 2px 0 rgba(0, 242, 255, 0.1); }
+}
+
+@keyframes tourFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes tourSlideUp {
+  from { opacity: 0; transform: translateY(20px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}

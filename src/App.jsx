@@ -2,12 +2,14 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Trophy, Users, Zap, Calendar,
   AlertTriangle, ChevronDown, ChevronUp, Globe,
-  TrendingUp, Target, Shield, Activity, History, Bug, BarChart2
+  TrendingUp, Target, Shield, Activity, History, Bug, BarChart2, BookOpen
 } from 'lucide-react';
 import DebugPage from './DebugPage';
 import SimulationPage from './SimulationPage';
 import BacktestPage from './BacktestPage';
 import { calculateDynamicRating } from './utils/player-rating';
+import TourGuide, { useTour } from './TourGuide';
+import { TOUR_STEPS } from './tourSteps';
 
 export default function App() {
   const [matches, setMatches] = useState([]);
@@ -40,6 +42,20 @@ export default function App() {
   const [collapsed, setCollapsed] = useState({ power: true, insights: true, extra: true, htft: true, mi: true, context: true });
   const tabPaneRef = useRef(null);
   const autoRefreshRef = useRef(null);
+  const { tourActive, tourStep, setTourStep, isFirstVisit, startTour, completeTour, closeTour } = useTour();
+  const [tourSingleSimDone, setTourSingleSimDone] = useState(false);
+  const [tourMultiSimDone, setTourMultiSimDone] = useState(false);
+  const [tourWorkshopDone, setTourWorkshopDone] = useState(false);
+  const workshopWasLoadingRef = useRef(false);
+
+  useEffect(() => {
+    if (workshopLoading) {
+      workshopWasLoadingRef.current = true;
+    } else if (workshopWasLoadingRef.current) {
+      workshopWasLoadingRef.current = false;
+      setTourWorkshopDone(true);
+    }
+  }, [workshopLoading]);
 
   const fetchPrediction = useCallback(async (id, lineup = null) => {
     setError(null);
@@ -209,6 +225,25 @@ export default function App() {
     if (tabPaneRef.current) tabPaneRef.current.scrollTop = 0;
   };
 
+  const handleTourStepChange = useCallback((step) => {
+    setTourStep(step);
+    const s = TOUR_STEPS[step];
+    if (s?.tab) {
+      setActiveTab(s.tab);
+      if (tabPaneRef.current) tabPaneRef.current.scrollTop = 0;
+    }
+    if (s?.expandSection) {
+      setCollapsed(p => ({ ...p, [s.expandSection]: false }));
+    }
+    if (s?.expandOdds) {
+      setOddsExpanded(true);
+    }
+    if (s?.workshopSide) {
+      setWorkshopSide(s.workshopSide);
+      setSwapMode(null);
+    }
+  }, [setTourStep]);
+
   // Group matches by league
   const groupedMatches = React.useMemo(() => {
     const groups = {};
@@ -227,33 +262,35 @@ export default function App() {
       <aside className="match-sidebar glass-card" style={{ borderRadius: 0, padding: 0, border: 'none', borderRight: '1px solid var(--glass-border)' }}>
         <div className="sidebar-header">
           <input
+            data-tour="date-picker"
             type="date"
             className="date-picker-input"
             value={selectedDate}
             onChange={(e) => setSelectedDate(e.target.value)}
             disabled={matchLoading || loading}
           />
-          <button
-            className="refresh-btn"
-            onClick={() => fetchMatches(selectedDate)}
-            disabled={matchLoading || loading}
-            aria-label="Refresh match list"
-          >
-            <Globe size={14} />
-          </button>
-          <button
-            className="refresh-btn"
-            onClick={() => setShowBacktest(true)}
-            title="Backtest"
-            style={{ marginLeft: 2 }}
-          >
-            <BarChart2 size={14} />
-          </button>
+          <div data-tour="sidebar-btns" style={{ display: 'flex', gap: 2 }}>
+            <button
+              className="refresh-btn"
+              onClick={() => fetchMatches(selectedDate)}
+              disabled={matchLoading || loading}
+              aria-label="Refresh match list"
+            >
+              <Globe size={14} />
+            </button>
+            <button
+              className="refresh-btn"
+              onClick={() => setShowBacktest(true)}
+              title="Backtest"
+            >
+              <BarChart2 size={14} />
+            </button>
+          </div>
         </div>
         {matchLoading ? (
           <div className="mini-loader">Fetching matches...</div>
         ) : (
-          <div className="match-scroll-list">
+          <div data-tour="match-list" className="match-scroll-list">
             {matches.length === 0 && (
               <div className="empty-match-list">No matches scheduled for this date.</div>
             )}
@@ -305,6 +342,28 @@ export default function App() {
               {selectedMatch.isLive && <span style={{ color: '#ff4444', marginLeft: 8, fontSize: '0.7rem' }}>● LIVE</span>}
             </div>
           )}
+          <button
+            onClick={startTour}
+            title="Rehberi Başlat"
+            style={{
+              marginLeft: 'auto',
+              background: 'rgba(0,242,255,0.07)',
+              border: '1px solid rgba(0,242,255,0.2)',
+              borderRadius: 8,
+              color: 'rgba(0,242,255,0.7)',
+              padding: '5px 12px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 5,
+              fontSize: '0.72rem',
+              fontFamily: 'Outfit, sans-serif',
+              fontWeight: 700,
+              letterSpacing: 0.5,
+            }}
+          >
+            <BookOpen size={12} /> Rehber
+          </button>
         </header>
 
         {error && (
@@ -377,7 +436,7 @@ export default function App() {
                 {!debugEventId && (<>
                   {activeTab === 'summary' && (
                     <>
-                      <div className="score-hero">
+                      <div data-tour="score-hero" className="score-hero">
                         <div className="score-circle">
                           <span className="score-val">{prediction.score?.predicted ?? '-'}</span>
                           <span className="score-label">Predicted</span>
@@ -400,7 +459,7 @@ export default function App() {
                           )}
 
                           {/* Dynamic Trust Index */}
-                          <div style={{
+                          <div data-tour="confidence-badges" style={{
                             marginTop: 12,
                             display: 'flex',
                             gap: 8,
@@ -471,7 +530,7 @@ export default function App() {
 
                           {/* Edge Insights Messages */}
                           {prediction.meta?.edgeInsights?.messages?.length > 0 && (
-                            <div style={{
+                            <div data-tour="edge-insights" style={{
                               marginTop: 10,
                               padding: '8px 10px',
                               background: 'linear-gradient(90deg, rgba(188, 19, 254, 0.05) 0%, rgba(0, 242, 255, 0.05) 100%)',
@@ -498,7 +557,7 @@ export default function App() {
                       </div>
 
                       {/* Power Comparison Mini */}
-                      <div className="glass-card" style={{ marginBottom: 16 }}>
+                      <div data-tour="power-comparison" className="glass-card" style={{ marginBottom: 16 }}>
                         <h4 onClick={() => setCollapsed(p => ({...p, power: !p.power}))} style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-secondary)', marginBottom: collapsed.power ? 0 : 14, cursor: 'pointer', userSelect: 'none', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                           <span><Shield size={14} style={{ marginRight: 6, verticalAlign: 'middle' }} />Power Comparison</span>
                           <span style={{ fontSize: '0.7rem', transition: 'transform 0.2s', transform: collapsed.power ? 'rotate(0)' : 'rotate(90deg)' }}>▸</span>
@@ -608,7 +667,7 @@ export default function App() {
 
                       {/* ── Market Intelligence ── */}
                       {prediction.analysis?.marketIntelligence?.hasOdds && (
-                        <div className="glass-card insights-mini">
+                        <div data-tour="market-intel" className="glass-card insights-mini">
                           <h4 onClick={() => setCollapsed(p => ({...p, mi: !p.mi}))} style={{ cursor: 'pointer', userSelect: 'none', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: collapsed.mi ? 0 : 12 }}>
                             <span>📊 Market Intelligence</span>
                             <span style={{ fontSize: '0.7rem', transition: 'transform 0.2s', transform: collapsed.mi ? 'rotate(0)' : 'rotate(90deg)' }}>▸</span>
@@ -786,9 +845,10 @@ export default function App() {
                               {/* ── Tüm Bahis Oranları (MI kartı içinde) ── */}
                               {mi.allMarkets && (
                                 <div style={{ marginTop: 10, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                                  <div 
+                                  <div
+                                    data-tour="odds-expand"
                                     onClick={() => setOddsExpanded(!oddsExpanded)}
-                                    style={{ 
+                                    style={{
                                       cursor: 'pointer', userSelect: 'none', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                                       padding: '6px 10px', borderRadius: 6,
                                       background: oddsExpanded ? 'transparent' : 'linear-gradient(135deg, rgba(0,255,136,0.06), rgba(120,100,255,0.06))',
@@ -991,7 +1051,7 @@ export default function App() {
 
                       {/* ── Bağlamsal Zeka (Genişletilmiş) ── */}
                       {prediction.analysis?.contextIntelligence && (
-                        <div className="glass-card insights-mini">
+                        <div data-tour="context-intel" className="glass-card insights-mini">
                           <h4 onClick={() => setCollapsed(p => ({...p, context: !p.context}))} style={{ cursor: 'pointer', userSelect: 'none', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: collapsed.context ? 0 : 12 }}>
                             <span>🧠 Bağlamsal Zeka</span>
                             <span style={{ fontSize: '0.7rem', transition: 'transform 0.2s', transform: collapsed.context ? 'rotate(0)' : 'rotate(90deg)' }}>▸</span>
@@ -1096,7 +1156,7 @@ export default function App() {
 
                   {/* ──── GOALS MARKET ──── */}
                   {activeTab === 'goals' && (
-                    <div className="goals-market">
+                    <div data-tour="goals-content" className="goals-market">
                       {/* Over/Under */}
                       <div className="market-card">
                         <h5>Üst / Alt Gol</h5>
@@ -1126,7 +1186,7 @@ export default function App() {
                       </div>
 
                       {/* BTTS */}
-                      <div className="market-card">
+                      <div data-tour="btts-card" className="market-card">
                         <h5>KG Var / Yok (BTTS)</h5>
                         <div className="market-row">
                           <span className="market-label">KG Var</span>
@@ -1346,7 +1406,7 @@ export default function App() {
                     <div className="form-h2h-container">
 
                       {/* H2H BLOCK */}
-                      <div className="h2h-summary-card">
+                      <div data-tour="h2h-section" className="h2h-summary-card">
                         <h4>Head to Head (H2H)</h4>
                         {prediction.h2hSummary ? (
                           <div className="h2h-stats">
@@ -1404,7 +1464,7 @@ export default function App() {
                       </div>
 
                       {/* RECENT FORM BLOCK */}
-                      <div className="form-split">
+                      <div data-tour="form-section" className="form-split">
 
                         {/* HOME FORM */}
                         <div className="form-column">
@@ -1482,7 +1542,7 @@ export default function App() {
 
                   {/* ──── WORKSHOP ──── */}
                   {activeTab === 'workshop' && (
-                    <div className="workshop-view glass-card workshop-overlay">
+                    <div data-tour="workshop-content" className="workshop-view glass-card workshop-overlay">
                       {workshopLoading && (
                         <div className="workshop-recalc-overlay">
                           <div className="scanner-mini" />
@@ -1499,6 +1559,7 @@ export default function App() {
                             {prediction.match?.homeTeam ?? 'Ev Sahibi'}
                           </button>
                           <button
+                            data-tour="workshop-away-btn"
                             className={workshopSide === 'away' ? 'active' : ''}
                             onClick={() => { setWorkshopSide('away'); setSwapMode(null); }}
                           >
@@ -1534,7 +1595,7 @@ export default function App() {
                           </span>
                         </div>
                       )}
-                      <div className="lineup-grid">
+                      <div data-tour="workshop-lineup" className="lineup-grid">
                         {prediction?.lineups?.[workshopSide] ? (
                           <VisualPitch
                             title={
@@ -1631,6 +1692,7 @@ export default function App() {
                                 Orijinale Dön
                               </button>
                               <button
+                                data-tour="workshop-recalc-btn"
                                 className="workshop-btn primary"
                                 disabled={loading || workshopLoading || invalidLineup}
                                 title={invalidLineup ? "Simülasyon için İlk 11'de tam olarak 11 oyuncu olmalıdır!" : ""}
@@ -1654,7 +1716,7 @@ export default function App() {
 
                   {/* ──── METRIC LEDGER ──── */}
                   {activeTab === 'metrics' && (
-                    <div className="metrics-ledger glass-card">
+                    <div data-tour="metrics-content" className="metrics-ledger glass-card">
                       <h4>Full 168-Metric Breakdown</h4>
                       <div className="ledger-scroll">
                         <div className="comparison-grid">
@@ -1802,7 +1864,17 @@ export default function App() {
 
                   {/* ──── SIMULATION ──── */}
                   {activeTab === 'simulation' && (
-                    <SimulationPage prediction={prediction} selectedMatch={selectedMatch} modifiedLineup={modifiedLineup} />
+                    <div data-tour="sim-content" style={{ height: '100%' }}>
+                      <SimulationPage
+                        prediction={prediction}
+                        selectedMatch={selectedMatch}
+                        modifiedLineup={modifiedLineup}
+                        onSimulationComplete={(mode) => {
+                          if (mode === 'single') setTourSingleSimDone(true);
+                          else if (mode === 'multi') setTourMultiSimDone(true);
+                        }}
+                      />
+                    </div>
                   )}
                 </>)}
               </div>
@@ -1931,6 +2003,24 @@ export default function App() {
           <MatchDetailModal detail={matchDetail} onClose={() => setMatchDetail(null)} />
         )}
       </main>
+
+      {/* ── GUIDED TOUR ── */}
+      <TourGuide
+        steps={TOUR_STEPS}
+        active={tourActive}
+        currentStep={tourStep}
+        onStepChange={handleTourStepChange}
+        onComplete={completeTour}
+        onClose={closeTour}
+        isFirstVisit={isFirstVisit}
+        prediction={prediction}
+        loading={loading}
+        modifiedLineup={modifiedLineup}
+        workshopSide={workshopSide}
+        tourWorkshopDone={tourWorkshopDone}
+        tourSingleSimDone={tourSingleSimDone}
+        tourMultiSimDone={tourMultiSimDone}
+      />
     </div>
   );
 }

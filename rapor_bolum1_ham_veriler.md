@@ -378,13 +378,20 @@ Her oyuncunun SofaScore API'sinden dönen **sezonluk** istatistikleri (ŞL turnu
 | Bölge Hakimiyeti | 60.45 | 73.46 |
 | Çizgi Yüksekliği | 69.00 | 80.67 |
 
-**Bahis Oranları (Referans — Hesaplamaya SOKULMAZ):**
+**Bahis Oranları:**
+
+Oranlar doğrudan tahmin çıktısına kopyalanmaz ama hesaplamalarda dolaylı olarak kullanılır:
+- **M131-M133:** Implied probability → behavioral contextual bloğa girer
+- **M188-M189:** Açılış→kapanış oran hareketi → GOL_İHTİYACI bloğunda piyasa sinyali
+- **M134:** Over/Under 2.5 implied probability
 
 | | Açılış | Güncel | Değişim |
 |---|--------|--------|---------|
-| PSG (1) | 2.20 | 2.30 | +1 |
-| Beraberlik (X) | 3.75 | 4.00 | +1 |
-| Bayern (2) | 3.00 | 2.70 | -1 |
+| PSG (1) | 2.20 | 2.30 | ↑ PSG'ye para gelmedi |
+| Beraberlik (X) | 3.75 | 4.00 | ↑ |
+| Bayern (2) | 3.00 | 2.70 | ↓ Bayern'e para geldi |
+
+**Shin Fair Probability (margin temizlenmiş):** PSG ~%41 | Beraberlik ~%24 | Bayern ~%35
 
 **Kullanıcı Oyları:** PSG %37.6 — Beraberlik %11.2 — Bayern %51.2  
 **Fikstür Yoğunluğu:** PSG 3.5 gün arayla — Bayern 3.2 gün arayla

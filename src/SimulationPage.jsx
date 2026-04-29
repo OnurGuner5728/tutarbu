@@ -39,7 +39,7 @@ function getLastRunSummary(simulation, homeTeam, awayTeam) {
   return `Son koşu: ${homeGoals}-${awayGoals} (${outcome})`;
 }
 
-function SimulationPage({ prediction, selectedMatch, modifiedLineup }) {
+function SimulationPage({ prediction, selectedMatch, modifiedLineup, onSimulationComplete }) {
   const [selectedMetrics, setSelectedMetrics] = useState(() => new Set(ALL_METRIC_IDS));
   const [simulation, setSimulation] = useState(null);
   const [engineData, setEngineData] = useState(null);
@@ -111,6 +111,7 @@ function SimulationPage({ prediction, selectedMatch, modifiedLineup }) {
         setMultiRunResult(result);
         setSimulation(result.sampleRun);
         setEngineData(null);
+        onSimulationComplete?.('multi');
       } else {
         setSimulation(result);
         setMultiRunResult(null);
@@ -126,6 +127,7 @@ function SimulationPage({ prediction, selectedMatch, modifiedLineup }) {
             dynamicTimeWindows: result.dynamicTimeWindows || null,
           });
         }
+        onSimulationComplete?.('single');
       }
     } catch (e) {
       setError(e.message);
@@ -209,7 +211,7 @@ function SimulationPage({ prediction, selectedMatch, modifiedLineup }) {
 
         <div style={styles.headerControls}>
           {/* Run mode toggle */}
-          <div style={styles.toggleGroup}>
+          <div data-tour="run-mode" style={styles.toggleGroup}>
             <button
               style={{
                 ...styles.toggleBtn,
@@ -220,6 +222,7 @@ function SimulationPage({ prediction, selectedMatch, modifiedLineup }) {
               Tek Kosu
             </button>
             <button
+              data-tour="multi-run-btn"
               style={{
                 ...styles.toggleBtn,
                 ...(runMode === 'multi' ? styles.toggleBtnActive : {}),
@@ -232,7 +235,7 @@ function SimulationPage({ prediction, selectedMatch, modifiedLineup }) {
 
           {/* Run count selector (only in multi mode) */}
           {runMode === 'multi' && (
-            <div style={styles.runCountGroup}>
+            <div data-tour="run-count-group" style={styles.runCountGroup}>
               {RUN_COUNT_OPTIONS.map(n => (
                 <button
                   key={n}
@@ -250,6 +253,7 @@ function SimulationPage({ prediction, selectedMatch, modifiedLineup }) {
 
           {/* Start button */}
           <button
+            data-tour="start-sim-btn"
             style={{
               ...styles.startBtn,
               ...(isSimulating ? styles.startBtnDisabled : {}),
@@ -289,7 +293,7 @@ function SimulationPage({ prediction, selectedMatch, modifiedLineup }) {
       {/* Main content */}
       <div style={styles.mainContent}>
         {/* Left: Metrics selector */}
-        <div style={styles.leftPanel}>
+        <div data-tour="metrics-selector" style={styles.leftPanel}>
           {Object.keys(metricsData).length > 0 ? (
             <MetricsSelector
               metricsData={metricsData}
@@ -306,7 +310,7 @@ function SimulationPage({ prediction, selectedMatch, modifiedLineup }) {
         </div>
 
         {/* Right: Simulation viewer */}
-        <div style={styles.rightPanel}>
+        <div data-tour="sim-results" style={styles.rightPanel}>
           <SimulationViewer
             simulation={simulation}
             engineData={engineData}
