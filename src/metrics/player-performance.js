@@ -219,9 +219,9 @@ function calculatePlayerMetrics(data, side, dynamicAvgs) {
       }
       if (xA != null) { creativity += xA / appearances; signals++; }
       if (passToAssist != null) { creativity += passToAssist / appearances; signals++; }
-      if (succDrib != null) { creativity += (succDrib / appearances) * 0.5; signals++; } // Dribling kısmi katkı
-      // signals normalizasyonu: daha fazla veri = daha güvenilir
-      midCreativity += signals > 0 ? creativity : 0;
+      if (succDrib != null) { creativity += succDrib / appearances; signals++; }
+      // Tüm sinyaller eşit ağırlıklı — sinyal sayısı arttıkça her birinin payı düşer
+      midCreativity += signals > 0 ? creativity / signals : 0;
     }
   }
   const M070 = midfielders.length > 0 ? midCreativity / midfielders.length : null;
