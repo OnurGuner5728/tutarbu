@@ -328,22 +328,21 @@ Her oyuncunun SofaScore API'sinden dönen **sezonluk** istatistikleri (ŞL turnu
 
 ---
 
-## 1.4 H2H (Karşılıklı Geçmiş) — Son 10 Maç
+## 1.4 H2H (Karşılıklı Geçmiş) — Son 9 Maç
 
 | # | Ev Sahibi | Skor | Deplasman |
 |---|-----------|------|-----------|
-| 1 | PSG | **5-4** | Bayern |
-| 2 | PSG | 1-**2** | Bayern |
-| 3 | PSG | **2-0** | Bayern |
-| 4 | Bayern | **1-0** | PSG |
-| 5 | Bayern | **2-0** | PSG |
+| 1 | PSG | 1-**2** | Bayern |
+| 2 | PSG | **2-0** | Bayern |
+| 3 | Bayern | **1-0** | PSG |
+| 4 | Bayern | **2-0** | PSG |
+| 5 | PSG | 0-**1** | Bayern |
 | 6 | PSG | 0-**1** | Bayern |
-| 7 | PSG | 0-**1** | Bayern |
-| 8 | Bayern | 2-**3** | PSG |
-| 9 | PSG | 0-**1** | Bayern |
-| 10 | Bayern | **3-1** | PSG |
+| 7 | Bayern | 2-**3** | PSG |
+| 8 | PSG | 0-**1** | Bayern |
+| 9 | Bayern | **3-1** | PSG |
 
-**H2H Özet:** PSG 3 Galibiyet — 0 Beraberlik — Bayern 7 Galibiyet
+**H2H Özet:** PSG 2 Galibiyet — 0 Beraberlik — Bayern 7 Galibiyet
 
 ---
 

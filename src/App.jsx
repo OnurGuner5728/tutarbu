@@ -39,7 +39,7 @@ export default function App() {
   const [homeFormPage, setHomeFormPage] = useState(1);
   const [awayFormPage, setAwayFormPage] = useState(1);
   const [oddsExpanded, setOddsExpanded] = useState(false);
-  const [collapsed, setCollapsed] = useState({ power: true, insights: true, extra: true, htft: true, mi: true, context: true });
+  const [collapsed, setCollapsed] = useState({ power: true, insights: true, extra: true, htft: true, mi: true, context: true, behavioral: true });
   const tabPaneRef = useRef(null);
   const autoRefreshRef = useRef(null);
   const { tourActive, tourStep, setTourStep, isFirstVisit, startTour, completeTour, closeTour } = useTour();
@@ -1151,7 +1151,103 @@ export default function App() {
                           })()}
                         </div>
                       )}
-                    </>
+
+                      {/* ── Davranışsal Zeka Matrisi (27 Blok) ── */}
+                      {prediction.behavioralAnalysis && (() => {
+                        const ba = prediction.behavioralAnalysis;
+                        const hUnits = ba.home || {};
+                        const aUnits = ba.away || {};
+                        const BLOCK_LABELS = {
+                          BITIRICILIK: { icon: '⚽', label: 'Bitiricilik', desc: 'Gol yolları, xG dönüşüm' },
+                          YARATICILIK: { icon: '🎨', label: 'Yaratıcılık', desc: 'Fırsat yaratma, kilit pas' },
+                          SUT_URETIMI: { icon: '🎯', label: 'Şut Üretimi', desc: 'Şut hacmi ve kalitesi' },
+                          HAVA_HAKIMIYETI: { icon: '✈️', label: 'Hava Hakimiyeti', desc: 'Kafa gücü, uzun toplar' },
+                          DURAN_TOP: { icon: '🔄', label: 'Duran Top', desc: 'Penaltı, korner, frikik' },
+                          SAVUNMA_DIRENCI: { icon: '🛡️', label: 'Savunma Direnci', desc: 'Gol yememe gücü' },
+                          SAVUNMA_AKSIYONU: { icon: '🦵', label: 'Savunma Aksiyonu', desc: 'Tackle, intercept, blok' },
+                          GK_REFLEKS: { icon: '🧤', label: 'GK Refleks', desc: 'Kaleci kurtarışları' },
+                          GK_ALAN_HAKIMIYETI: { icon: '📐', label: 'GK Alan Hakimiyeti', desc: 'Kaleci çıkış, alan kontrolü' },
+                          'ZİHİNSEL_DAYANIKLILIK': { icon: '🧠', label: 'Zihinsel Dayanıklılık', desc: 'Baskı altında performans' },
+                          'FİŞİ_ÇEKME': { icon: '🔌', label: 'Fişi Çekme', desc: 'Comeback, maç kapatma' },
+                          PSIKOLOJIK_KIRILGANLIK: { icon: '💔', label: 'Psikolojik Kırılganlık', desc: 'Kırılganlık (düşük=iyi)', invert: true },
+                          DISIPLIN: { icon: '📒', label: 'Disiplin', desc: 'Kart/faul kontrolü' },
+                          'MOMENTUM_AKIŞI': { icon: '📈', label: 'Momentum Akışı', desc: 'Anlık ivme' },
+                          FORM_KISA: { icon: '🔥', label: 'Form (Kısa)', desc: 'Son 5 maç formu' },
+                          FORM_UZUN: { icon: '📊', label: 'Form (Uzun)', desc: 'Sezon geneli form' },
+                          MAC_BASLANGICI: { icon: '🏁', label: 'Maç Başlangıcı', desc: 'Erken baskı gücü' },
+                          MAC_SONU: { icon: '⏰', label: 'Maç Sonu', desc: 'Geç gol eğilimi' },
+                          MENAJER_STRATEJISI: { icon: '👔', label: 'Menajer Stratejisi', desc: 'Menajer deneyimi/taktik' },
+                          TURNUVA_BASKISI: { icon: '🏆', label: 'Turnuva Baskısı', desc: 'Turnuva motivasyonu' },
+                          GOL_IHTIYACI: { icon: '🎯', label: 'Gol İhtiyacı', desc: 'Sıralama/hedef baskısı' },
+                          TOPLA_OYNAMA: { icon: '⚙️', label: 'Topla Oynama', desc: 'Top kontrolü, possession' },
+                          BAGLANTI_OYUNU: { icon: '🔗', label: 'Bağlantı Oyunu', desc: 'Geçiş, orta kalitesi' },
+                          KADRO_DERINLIGI: { icon: '👥', label: 'Kadro Derinliği', desc: 'Yedek gücü, yorgunluk' },
+                          H2H_DOMINASYON: { icon: '⚔️', label: 'H2H Dominasyon', desc: 'Tarihsel üstünlük' },
+                          HAKEM_DINAMIKLERI: { icon: '🟨', label: 'Hakem Dinamikleri', desc: 'Hakem kart/penaltı eğilimi' },
+                          TAKTIKSEL_UYUM: { icon: '♟️', label: 'Taktiksel Uyum', desc: 'Pressing, hat yüksekliği' },
+                        };
+                        const blockKeys = Object.keys(BLOCK_LABELS).filter(k => hUnits[k] != null || aUnits[k] != null);
+                        if (blockKeys.length === 0) return null;
+
+                        const valColor = (v, invert) => {
+                          if (v == null) return 'var(--text-tertiary)';
+                          if (invert) return v < 0.9 ? '#00ff88' : v > 1.1 ? '#ff5252' : 'var(--text-primary)';
+                          return v > 1.1 ? '#00ff88' : v < 0.9 ? '#ff5252' : 'var(--text-primary)';
+                        };
+                        const fmtV = (v) => v != null ? v.toFixed(3) : '-';
+                        const isBetter = (h, a, invert) => {
+                          if (h == null || a == null) return { hBold: false, aBold: false };
+                          if (invert) return { hBold: h < a, aBold: a < h };
+                          return { hBold: h > a, aBold: a > h };
+                        };
+
+                        return (
+                          <div data-tour="behavioral-matrix" className="glass-card insights-mini" style={{ marginTop: 8 }}>
+                            <h4 onClick={() => setCollapsed(p => ({...p, behavioral: !p.behavioral}))} style={{ cursor: 'pointer', userSelect: 'none', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: collapsed.behavioral ? 0 : 8 }}>
+                              <span>🧬 Davranışsal Zeka Matrisi</span>
+                              <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <span style={{ fontSize: '0.55rem', color: 'var(--text-tertiary)', fontWeight: 400 }}>{blockKeys.length} blok</span>
+                                <span style={{ fontSize: '0.7rem', transition: 'transform 0.2s', transform: collapsed.behavioral ? 'rotate(0)' : 'rotate(90deg)' }}>▸</span>
+                              </span>
+                            </h4>
+                            {!collapsed.behavioral && (
+                              <div style={{ fontSize: '0.65rem' }}>
+                                {/* Header */}
+                                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', padding: '4px 0', borderBottom: '1px solid rgba(255,255,255,0.1)', fontWeight: 700, color: 'var(--text-secondary)' }}>
+                                  <span>Blok</span>
+                                  <span style={{ textAlign: 'center' }}>{prediction.match?.homeTeam?.split(' ')[0] || 'Ev'}</span>
+                                  <span style={{ textAlign: 'center' }}>{prediction.match?.awayTeam?.split(' ')[0] || 'Dep'}</span>
+                                </div>
+                                {/* Rows */}
+                                {blockKeys.map(key => {
+                                  const meta = BLOCK_LABELS[key];
+                                  const hVal = hUnits[key];
+                                  const aVal = aUnits[key];
+                                  const { hBold, aBold } = isBetter(hVal, aVal, meta.invert);
+                                  return (
+                                    <div key={key} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', padding: '3px 0', borderBottom: '1px solid rgba(255,255,255,0.03)', alignItems: 'center' }} title={meta.desc}>
+                                      <span style={{ color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                                        <span style={{ fontSize: '0.7rem' }}>{meta.icon}</span>
+                                        <span>{meta.label}</span>
+                                      </span>
+                                      <span style={{ textAlign: 'center', fontWeight: hBold ? 700 : 400, color: valColor(hVal, meta.invert) }}>
+                                        {fmtV(hVal)}
+                                      </span>
+                                      <span style={{ textAlign: 'center', fontWeight: aBold ? 700 : 400, color: valColor(aVal, meta.invert) }}>
+                                        {fmtV(aVal)}
+                                      </span>
+                                    </div>
+                                  );
+                                })}
+                                {/* Legend */}
+                                <div style={{ marginTop: 6, padding: '4px 6px', borderRadius: 4, background: 'rgba(255,255,255,0.02)', fontSize: '0.55rem', color: 'var(--text-tertiary)', lineHeight: 1.3 }}>
+                                  1.000 = lig ortalaması · <span style={{ color: '#00ff88' }}>yeşil</span> = üstün · <span style={{ color: '#ff5252' }}>kırmızı</span> = zayıf · <strong>kalın</strong> = o blokta avantajlı takım
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
                   )}
 
                   {/* ──── GOALS MARKET ──── */}
