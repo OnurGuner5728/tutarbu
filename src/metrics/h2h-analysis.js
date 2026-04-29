@@ -108,8 +108,8 @@ function calculateH2HMetrics(data) {
 
   // Fallback: managerDuel yoksa menajer kariyer maçlarından karşılıklı sonuçları say
   if (M127 == null) {
-    const homeMgrEvents = data.homeManagerLastEvents?.events || [];
-    const awayMgrEvents = data.awayManagerLastEvents?.events || [];
+    const homeMgrEvents = data.homeManagerCareer?.events || [];
+    const awayMgrEvents = data.awayManagerCareer?.events || [];
     // Her iki menajer de bir maçta yer alıyorsa o maç H2H'dir
     const homeMgrTeamIds = new Set();
     for (const ev of homeMgrEvents) {
@@ -133,8 +133,31 @@ function calculateH2HMetrics(data) {
       }
     }
     if (mgrH2HTotal > 0) M127 = (mgrH2HWins / mgrH2HTotal) * 100;
-    // Son fallback: Nötr değer (deneyimler eşit varsayılır)
-    if (M127 == null) M127 = 50.0;
+    // Son fallback: Menajer kariyer galibiyet oranlarını karşılaştır
+    if (M127 == null) {
+      const _calcMgrWinRate = (events, teamId) => {
+        let wins = 0, total = 0;
+        for (const ev of events) {
+          const hs = ev.homeScore?.current;
+          const as = ev.awayScore?.current;
+          if (hs == null || as == null) continue;
+          total++;
+          const isH = ev.homeTeam?.id === teamId;
+          if ((isH && hs > as) || (!isH && as > hs)) wins++;
+        }
+        return total > 0 ? wins / total : null;
+      };
+      const homeWR = _calcMgrWinRate(homeMgrEvents, homeTeamId);
+      const awayWR = _calcMgrWinRate(awayMgrEvents, awayTeamId);
+      if (homeWR != null && awayWR != null && (homeWR + awayWR) > 0) {
+        M127 = (homeWR / (homeWR + awayWR)) * 100;
+      } else if (homeWR != null) {
+        M127 = homeWR * 100;
+      } else if (awayWR != null) {
+        M127 = (1 - awayWR) * 100;
+      }
+      // Hiçbir veri yoksa null bırak — statik değer sokma
+    }
   }
 
   // ── M128: H2H Gol Farkı Trendi ──

@@ -132,21 +132,18 @@ function calculateGoalkeeperMetrics(data, side) {
       : null)
     : null;
 
-  // Kaynak 2 (Fallback): Kurtarış oranı + Clean Sheet oranı + Rating'den türetilmiş skor
+  // Kaynak 2 (Fallback): Ham veriden eşit ağırlıklı aritmetik ortalama
+  // Statik ağırlık yok — mevcut her bileşen 0-100 ölçeğinde normalize edilip eşit katkı sağlar
   if (M106 == null && appearances != null && appearances > 0) {
     const saveRate = (saves != null && goalsConceded != null && (saves + goalsConceded) > 0)
-      ? (saves / (saves + goalsConceded)) : null;
-    const csRate = (gkStats.cleanSheet != null) ? gkStats.cleanSheet / appearances : null;
-    const ratingVal = gkStats.rating ?? null;
+      ? (saves / (saves + goalsConceded)) * 100 : null;
+    const csRate = (gkStats.cleanSheet != null) ? (gkStats.cleanSheet / appearances) * 100 : null;
+    const ratingNorm = (gkStats.rating != null) ? gkStats.rating * 10 : null; // 0-10 → 0-100
+    const xgPerf = (M098 != null) ? (M098 + 1) * 50 : null; // -1..+1 → 0-100 (xG kazancı)
 
-    const components = [];
-    if (saveRate != null) components.push(saveRate * 100 * 0.4);       // Kurtarış oranı ağırlık: %40
-    if (csRate != null) components.push(csRate * 100 * 0.3);           // Clean sheet ağırlık: %30
-    if (ratingVal != null) components.push(ratingVal * 10 * 0.3);      // Rating ağırlık: %30
-
-    if (components.length > 0) {
-      const totalWeight = (saveRate != null ? 0.4 : 0) + (csRate != null ? 0.3 : 0) + (ratingVal != null ? 0.3 : 0);
-      M106 = components.reduce((a, b) => a + b, 0) / totalWeight;
+    const vals = [saveRate, csRate, ratingNorm, xgPerf].filter(v => v != null);
+    if (vals.length > 0) {
+      M106 = vals.reduce((a, b) => a + b, 0) / vals.length;
     }
   }
 

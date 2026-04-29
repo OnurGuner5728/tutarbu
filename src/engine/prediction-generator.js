@@ -1412,19 +1412,36 @@ function calculatePenaltyChance(home, away, shared, baseline) {
 
   const _hasRefPenData = (refFreq ?? null) != null;
 
-  const _cvPen = (baseline?.leagueGoalVolatility != null && baseline?.leagueAvgGoals > 0)
-    ? baseline.leagueGoalVolatility / baseline.leagueAvgGoals : 0.5;
-
-  const _teamPenW = _hasRefPenData ? Math.min(0.5, 0.35 + _cvPen * 0.1) : 1.0;
-  const _refPenW = _hasRefPenData ? (1.0 - _teamPenW) : 0.0;
+  // Ağırlıklar: Veri güvenilirliğine göre dinamik
+  // Hakem verisi varsa: eşit ağırlık (0.5/0.5). Yoksa: sadece takım verisi (1.0/0.0)
+  const _teamPenW = _hasRefPenData ? 0.5 : 1.0;
+  const _refPenW = _hasRefPenData ? 0.5 : 0.0;
 
   const chanceRaw = (teamFreq * _teamPenW) + ((refFreq ?? ND.COUNTER_INIT) * 90 * _refPenW);
 
+  // Lig ortalaması penaltı/maç — tamamen dinamik
   const _penMatchAvg = (baseline?.dynamicAvgs?.M019 != null && baseline?.dynamicAvgs?.M019 > 0)
     ? baseline.dynamicAvgs.M019 * 2
-    : ((baseline?.penPerMatch != null && baseline?.penPerMatch > 0) ? baseline.penPerMatch * 2 : 0.25);
+    : (baseline?.penPerMatch != null && baseline?.penPerMatch > 0)
+      ? baseline.penPerMatch * 2
+      : null;
 
-  const tier = chanceRaw > _penMatchAvg * 1.5 ? 'High' : chanceRaw > _penMatchAvg * 0.8 ? 'Medium' : 'Low';
+  if (_penMatchAvg == null) {
+    // Lig ortalaması bile yoksa sadece raw döndür, tier belirleyemeyiz
+    return { tier: 'Unknown', raw: round2(chanceRaw), avg: null };
+  }
+
+  // Tier eşikleri: lig ortalamasına göre z-score mantığı
+  // raw > avg × 1.5 → High, raw > avg × 0.8 → Medium, diğer → Low
+  // Bu eşikler veriden türetilemez çünkü sınıflandırma doğası gereği eşik gerektirir.
+  // Ama eşikler lig volatilitesine bağlı olarak ayarlanır:
+  const cv = (baseline?.leagueGoalVolatility != null && baseline?.leagueAvgGoals > 0)
+    ? baseline.leagueGoalVolatility / baseline.leagueAvgGoals : null;
+  // Yüksek volatilite = daha geniş eşikler, düşük volatilite = daha dar eşikler
+  const highMult = cv != null ? (1.2 + cv * 0.5) : 1.5;
+  const medMult = cv != null ? (0.6 + cv * 0.3) : 0.8;
+
+  const tier = chanceRaw > _penMatchAvg * highMult ? 'High' : chanceRaw > _penMatchAvg * medMult ? 'Medium' : 'Low';
   return { tier, raw: round2(chanceRaw), avg: round2(_penMatchAvg) };
 }
 
@@ -1433,13 +1450,31 @@ function calculateRedCardChance(home, away, shared, baseline) {
   const refAgg = shared.referee.M110 ?? null;
   if (teamAgg === 0 && refAgg == null) return null;
 
-  const chanceRaw = (teamAgg * 0.5) + ((refAgg ?? ND.COUNTER_INIT) * 90 * 0.5);
+  // Ağırlıklar: Hakem verisi varsa eşit, yoksa sadece takım
+  const _hasRefRedData = (refAgg ?? null) != null;
+  const _teamW = _hasRefRedData ? 0.5 : 1.0;
+  const _refW = _hasRefRedData ? 0.5 : 0.0;
 
+  const chanceRaw = (teamAgg * _teamW) + ((refAgg ?? ND.COUNTER_INIT) * 90 * _refW);
+
+  // Lig ortalaması kırmızı kart/maç — tamamen dinamik
   const _redMatchAvg = (baseline?.dynamicAvgs?.M040 != null && baseline?.dynamicAvgs?.M040 > 0)
     ? baseline.dynamicAvgs.M040 * 2
-    : ((baseline?.redPerMin != null && baseline?.redPerMin > 0) ? baseline.redPerMin * 90 * 2 : 0.10);
+    : (baseline?.redPerMin != null && baseline?.redPerMin > 0)
+      ? baseline.redPerMin * 90 * 2
+      : null;
 
-  const tier = chanceRaw > _redMatchAvg * 1.8 ? 'High' : chanceRaw > _redMatchAvg * 0.9 ? 'Medium' : 'Low';
+  if (_redMatchAvg == null) {
+    return { tier: 'Unknown', raw: round2(chanceRaw), avg: null };
+  }
+
+  // Tier eşikleri: lig volatilitesine bağlı
+  const cv = (baseline?.leagueGoalVolatility != null && baseline?.leagueAvgGoals > 0)
+    ? baseline.leagueGoalVolatility / baseline.leagueAvgGoals : null;
+  const highMult = cv != null ? (1.5 + cv * 0.5) : 1.8;
+  const medMult = cv != null ? (0.7 + cv * 0.3) : 0.9;
+
+  const tier = chanceRaw > _redMatchAvg * highMult ? 'High' : chanceRaw > _redMatchAvg * medMult ? 'Medium' : 'Low';
   return { tier, raw: round2(chanceRaw), avg: round2(_redMatchAvg) };
 }
 

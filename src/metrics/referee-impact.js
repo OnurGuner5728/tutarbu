@@ -173,8 +173,11 @@ function calculateRefereeMetrics(data) {
     if (homePF != null && awayPF != null) M111 = homePF + awayPF;
     else if (homePF != null) M111 = homePF * 2;
     else if (awayPF != null) M111 = awayPF * 2;
-    // Mutlak son fallback: Lig baseline penPerMatch
-    if (M111 == null) M111 = data._baseline?.penPerMatch ?? 0.35;
+    // Son fallback: Lig baseline penPerMatch (dinamik hesaplanmış)
+    // Sabit 0.35 kaldırıldı — veri yoksa null bırak, statik değer sokma
+    if (M111 == null && data._baseline?.penPerMatch != null) {
+      M111 = data._baseline.penPerMatch;
+    }
   }
 
   // ── M112: Faul / Maç Ortalaması ──
