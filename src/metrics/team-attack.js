@@ -190,8 +190,29 @@ function calculateTeamAttackMetrics(data, side) {
 
   }
 
-  const M019 = recentMatchCount > 0 ? penaltiesWon / recentMatchCount : null;
-  const M020 = penaltiesTaken > 0 ? (penaltiesScored / penaltiesTaken) * 100 : null;
+  let M019 = recentMatchCount > 0 ? penaltiesWon / recentMatchCount : null;
+  let M020 = penaltiesTaken > 0 ? (penaltiesScored / penaltiesTaken) * 100 : null;
+
+  // Fallback: Oyuncu bazlı penaltyWon ve penaltyGoals
+  if (M019 == null || penaltiesWon === 0) {
+    const lineupSide = isHome ? data.lineups?.home : data.lineups?.away;
+    const starters = (lineupSide?.players || []).filter(p => !p.substitute).slice(0, 11);
+    let plPenWon = 0, plPenGoals = 0, plPenTaken = 0, plApps = 0;
+    for (const p of starters) {
+      const ps = p.player?.statistics || p.player?.seasonStats?.statistics || {};
+      if (ps.penaltyWon != null) plPenWon += ps.penaltyWon;
+      if (ps.penaltyGoals != null) plPenGoals += ps.penaltyGoals;
+      if (ps.penaltiesTaken != null) plPenTaken += ps.penaltiesTaken;
+      if (ps.appearances != null) plApps += ps.appearances;
+    }
+    if (plApps > 0 && (plPenWon > 0 || M019 == null)) {
+      const playerRate = plPenWon / plApps;
+      M019 = M019 != null ? (M019 + playerRate) / 2 : playerRate;
+    }
+    if (M020 == null && plPenTaken > 0) {
+      M020 = (plPenGoals / plPenTaken) * 100;
+    }
+  }
 
   // ── M021: Hücum Baskı İndeksi (Graph'ten) ──
   let totalPositivePressure = 0;
