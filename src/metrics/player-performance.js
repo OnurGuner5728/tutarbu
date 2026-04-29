@@ -199,26 +199,55 @@ function calculatePlayerMetrics(data, side, dynamicAvgs) {
   }, 0);
   const M069 = totalContrib > 0 ? (forwardGoalContrib / totalContrib) * 100 : null;
 
-  // ── M070: Orta Saha Yaratıcılık İndeksi ──
+  // ── M070: Orta Saha Yaratıcılık İndeksi (Zenginleştirilmiş) ──
   const midfielders = starters.filter(p => p.position === 'M' || p.position === 'MF');
   let midCreativity = 0;
   for (const p of midfielders) {
-    const keyPasses = p.seasonStats?.statistics?.keyPasses || p.seasonStats?.statistics?.bigChancesCreated;
-    const assists = p.seasonStats?.statistics?.assists;
-    const appearances = p.seasonStats?.statistics?.appearances;
-    if (appearances > 0 && (keyPasses != null || assists != null)) {
-      midCreativity += ((keyPasses || 0) + (assists || 0)) / appearances;
+    const ps = p.seasonStats?.statistics || {};
+    const keyPasses = ps.keyPasses || ps.bigChancesCreated;
+    const assists = ps.assists;
+    const xA = ps.expectedAssists;    // YENİ: Beklenen asist
+    const passToAssist = ps.passToAssist; // YENİ: Asist öncesi son pas
+    const succDrib = ps.successfulDribbles; // YENİ: Dribling
+    const appearances = ps.appearances;
+    if (appearances > 0) {
+      let creativity = 0;
+      let signals = 0;
+      if (keyPasses != null || assists != null) {
+        creativity += ((keyPasses || 0) + (assists || 0)) / appearances;
+        signals++;
+      }
+      if (xA != null) { creativity += xA / appearances; signals++; }
+      if (passToAssist != null) { creativity += passToAssist / appearances; signals++; }
+      if (succDrib != null) { creativity += (succDrib / appearances) * 0.5; signals++; } // Dribling kısmi katkı
+      // signals normalizasyonu: daha fazla veri = daha güvenilir
+      midCreativity += signals > 0 ? creativity : 0;
     }
   }
   const M070 = midfielders.length > 0 ? midCreativity / midfielders.length : null;
 
-  // ── M071: Defans Hattı Stability Skoru ──
+  // ── M071: Defans Hattı Stability Skoru (Zenginleştirilmiş) ──
+  // Rating + defansif aksiyon istatistikleri (tackles, interceptions, groundDuelsWon) ortanlaması
   const defenders = starters.filter(p => p.position === 'D' || p.position === 'DF');
-  const defRatings = defenders
-    .map(p => p.seasonStats?.statistics?.rating)
-    .filter(r => r != null && r > 0);
-  const M071 = defRatings.length > 0
-    ? defRatings.reduce((a, b) => a + b, 0) / defRatings.length : null;
+  let defStabilityScore = 0, defStabilityCount = 0;
+  for (const p of defenders) {
+    const ps = p.seasonStats?.statistics || {};
+    const rating = ps.rating;
+    const apps = ps.appearances || 1;
+    const vals = [];
+    if (rating != null && rating > 0) vals.push(rating * 10); // 0-100 normalize
+    if (ps.tackles != null) vals.push(Math.min(100, (ps.tackles / apps) * 20)); // tackles/match normalize
+    if (ps.interceptions != null) vals.push(Math.min(100, (ps.interceptions / apps) * 25));
+    if (ps.groundDuelsWon != null && ps.groundDuelsWon + (ps.groundDuelsLost ?? 0) > 0) {
+      vals.push((ps.groundDuelsWon / (ps.groundDuelsWon + (ps.groundDuelsLost ?? 0))) * 100);
+    }
+    if (ps.clearances != null) vals.push(Math.min(100, (ps.clearances / apps) * 15));
+    if (vals.length > 0) {
+      defStabilityScore += vals.reduce((a, b) => a + b, 0) / vals.length;
+      defStabilityCount++;
+    }
+  }
+  const M071 = defStabilityCount > 0 ? defStabilityScore / defStabilityCount : null;
 
   // ── M072: Oyuncu xG Katkısı ──
   let playerXG = 0;
@@ -309,6 +338,13 @@ function calculatePlayerMetrics(data, side, dynamicAvgs) {
     }
   }
   const M076 = totalAerial > 0 ? (totalAerialWon / totalAerial) * 100 : null;
+
+  // -- Ek: Kafa golü (headedGoals) — hava topu sonucu
+  let totalHeadedGoals = 0;
+  for (const p of starters) {
+    const hg = p.seasonStats?.statistics?.headedGoals;
+    if (hg != null) totalHeadedGoals += hg;
+  }
 
   // ── M077-M078: Sakatlık ve Ceza Etkisi Skoru (Pozisyon Kritikliği Ağırlıklı) ──
   // Pozisyon kritikliği: Kaleci > Forvet > Defans > Orta Saha
@@ -686,11 +722,25 @@ function calculatePlayerMetrics(data, side, dynamicAvgs) {
     return Math.round(Math.min(100, Math.max(0, score)));
   })();
 
+  // ── M096c: Pressing Yoğunluğu (Oyuncu Bazlı) ──
+  // Kaynak: possessionWonAttThird + ballRecovery — tamamen ham veriden
+  let totalPWAT = 0, totalBR = 0, pressingApps = 0;
+  for (const p of starters) {
+    const ps = p.seasonStats?.statistics || {};
+    const apps = ps.appearances;
+    if (apps == null || apps <= 0) continue;
+    if (ps.possessionWonAttThird != null) totalPWAT += ps.possessionWonAttThird;
+    if (ps.ballRecovery != null) totalBR += ps.ballRecovery;
+    pressingApps += apps;
+  }
+  const M096c = pressingApps > 0 ? ((totalPWAT + totalBR) / pressingApps) * 100 : null;
+
   return {
     M066, M067, M068, M069, M070, M071, M072, M073, M074, M075,
     M076, M077, M078, M079, M079b, M080, M081, M082, M083, M084, M085,
     M086, M087, M088, M089, M090, M091, M092, M093, M094, M095,
     M096b,  // Yorgunluk Endeksi
+    M096c,  // Pressing Yoğunluğu
     M178: M067,
     _meta: { starterCount: starters.length, subCount: subs.length, missingCount: teamMissing.length }
   };
