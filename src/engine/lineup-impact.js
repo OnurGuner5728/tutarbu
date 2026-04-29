@@ -99,6 +99,10 @@ const BLOCK_STAT_MAP = {
       { key: 'shotsOnTarget', weight: 2 },     // M012: isabetli şut dönüşüm paydası
       { key: 'totalShots', weight: 1 },        // M011: şut-gol dönüşüm paydası
       { key: 'bigChancesCreated', weight: 1 }, // M018: büyük şans dönüşüm dolaylı
+      { key: 'goalsFromInsideTheBox', weight: 2 }, // Ceza sahası bitiricilik
+      { key: 'goalsFromOutsideTheBox', weight: 1 }, // Uzak mesafe bitiricilik
+      { key: 'goalConversionPercentage', weight: 2 }, // Gol dönüşüm oranı
+      { key: 'hitWoodwork', weight: 1 },       // Direk isabet → şanssızlık/fırsat göstergesi
     ],
     attrStats: [
       { key: 'attacking', weight: 1 },         // Hücum niteliği (ek sinyal)
@@ -114,6 +118,10 @@ const BLOCK_STAT_MAP = {
       { key: 'assists', weight: 3 },            // M070(×3): doğrudan yaratıcılık
       { key: 'expectedGoals', weight: 3 },      // M015(×3) + M072(×2): xG bileşeni
       { key: 'bigChancesCreated', weight: 2 },  // M017(×2): fırsat yaratma
+      { key: 'expectedAssists', weight: 2 },    // xA: beklenen asist → gerçek yaratıcılık
+      { key: 'passToAssist', weight: 2 },       // Asist öncesi son pas
+      { key: 'totalAttemptAssist', weight: 1 }, // Asist girişimi
+      { key: 'successfulDribbles', weight: 2 }, // Top taşıma → yaratıcılık proxy
     ],
   },
 
@@ -125,6 +133,9 @@ const BLOCK_STAT_MAP = {
       { key: 'goals', weight: 4 },             // M001(×2) + M002(×2): gol ortalaması çift
       { key: 'totalShots', weight: 3 },         // M013(×3): şut hacmi doğrudan
       { key: 'shotsOnTarget', weight: 3 },      // M014(×3): isabetli şut doğrudan
+      { key: 'shotsFromInsideTheBox', weight: 2 }, // Ceza sahası şutu → kaliteli pozisyon
+      { key: 'shotsFromOutsideTheBox', weight: 1 }, // Uzak mesafe şutu
+      { key: 'shotsOffTarget', weight: 1 },     // İsabetsiz şut → verim analizi
     ],
   },
 
@@ -135,6 +146,7 @@ const BLOCK_STAT_MAP = {
     stats: [
       { key: 'aerialDuelsWon', weight: 4 },    // M036(×2) + M076(×2): çift kaynak
       { key: 'clearances', weight: 1 },         // Hava topu sonrası uzaklaştırma (zayıf)
+      { key: 'headedGoals', weight: 2 },        // Kafa golü → hava hakimiyeti sonucu
     ],
   },
 
@@ -145,6 +157,10 @@ const BLOCK_STAT_MAP = {
     stats: [
       { key: 'aerialDuelsWon', weight: 1 },    // M023: korner başarısı hava gücüne bağlı
       { key: 'goals', weight: 1 },              // M019+M023: duran toptan sonuç alma
+      { key: 'penaltyWon', weight: 3 },         // Penaltı kazanma → duran top fırsat
+      { key: 'penaltyGoals', weight: 2 },       // Penaltı golü → duran top sonucu
+      { key: 'freeKickGoal', weight: 2 },       // Serbest vuruş golü
+      { key: 'shotFromSetPiece', weight: 1 },   // Set piece'ten şut
     ],
   },
 
@@ -173,6 +189,12 @@ const BLOCK_STAT_MAP = {
       { key: 'tackles', weight: 2 },           // M035(×2): düello kazanma proxy
       { key: 'interceptions', weight: 2 },      // M037(×2): doğrudan
       { key: 'clearances', weight: 2 },         // M034(×2): blok/uzaklaştırma proxy
+      { key: 'groundDuelsWon', weight: 2 },    // Yer düellosu kazanma
+      { key: 'totalDuelsWon', weight: 1 },     // Toplam düello kazanma
+      { key: 'tacklesWon', weight: 2 },        // Başarılı müdahale
+      { key: 'blockedShots', weight: 2 },      // Şut engelleme
+      { key: 'outfielderBlocks', weight: 1 },  // Saha oyuncusu blok
+      { key: 'dribbledPast', weight: -1 },     // Geçilme (negatif sinyal)
     ],
   },
 
@@ -216,6 +238,11 @@ const BLOCK_STAT_MAP = {
     stats: [
       { key: 'accuratePasses', weight: 6 },     // M025(×3) + M150(×3): çift kaynak
       { key: 'totalPasses', weight: 3 },         // M150(×3): pas hacmi → top kontrolü
+      { key: 'accurateFinalThirdPasses', weight: 3 }, // Son bölge pası
+      { key: 'accurateLongBalls', weight: 2 },   // Uzun pas başarısı
+      { key: 'accurateOppositionHalfPasses', weight: 2 }, // Rakip yarı sahada pas
+      { key: 'touches', weight: 1 },             // Topa dokunma → oyuna dahil olma
+      { key: 'possessionLost', weight: -2 },     // Top kaybı (negatif sinyal)
     ],
     attrStats: [
       { key: 'technical', weight: 2 },           // Teknik nitelik → pas kalitesi
@@ -230,7 +257,10 @@ const BLOCK_STAT_MAP = {
       { key: 'keyPasses', weight: 4 },          // M152(×2) + M154(×2): çift katkı
       { key: 'assists', weight: 2 },             // M154: fırsat yaratma sonucu
       { key: 'bigChancesCreated', weight: 2 },   // M154: doğrudan
-      { key: 'successfulDribbles', weight: 1 },  // İleri taşıma proxy (zayıf)
+      { key: 'successfulDribbles', weight: 2 },  // İleri taşıma → bağlantı
+      { key: 'accurateCrosses', weight: 2 },     // Ortanın isabeti → bağlantı kalitesi
+      { key: 'totalCross', weight: 1 },          // Orta hacmi
+      { key: 'dispossessed', weight: -1 },       // Top kaybedilme (negatif)
     ],
   },
 
@@ -241,6 +271,11 @@ const BLOCK_STAT_MAP = {
     stats: [
       { key: 'accuratePassesPercentage', weight: 2 }, // Şekil bütünlüğü proxy
       { key: 'interceptions', weight: 1 },              // M177: pressing uyumu
+      { key: 'possessionWonAttThird', weight: 3 },     // Hücum bölgesinde top kazanma → pressing
+      { key: 'ballRecovery', weight: 2 },              // Top geri kazanma → pressing sonucu
+      { key: 'wasFouled', weight: 1 },                 // Faul kazanma → baskı altında tutma
+      { key: 'fouls', weight: -1 },                    // Faul yapma (negatif)
+      { key: 'offsides', weight: -1 },                 // Ofsayt (negatif → zamanlama hatası)
     ],
     attrStats: [
       { key: 'technical', weight: 1 },                  // Teknik altyapı

@@ -639,8 +639,8 @@ function generatePrediction(metricsResult, data, baseline, audit, rng) {
       },
       hotZones: calculateHotZones(home, away),
       probabilities: {
-        penaltyChance: calculatePenaltyChance(home, away, shared, baseline),
-        redCardChance: calculateRedCardChance(home, away, shared, baseline),
+        penaltyChance: calculatePenaltyChance(home, away, shared, baseline, data),
+        redCardChance: calculateRedCardChance(home, away, shared, baseline, data),
         surpriseIndex: calculateSurpriseIndex(prediction, shared.contextual, baseline),
       },
       // ── Market Intelligence — Shin fair probs, opening/closing, ΔMarketMove ──
@@ -1405,19 +1405,37 @@ function getMetricForPeriod(p) {
   return map[p];
 }
 
-function calculatePenaltyChance(home, away, shared, baseline) {
+function calculatePenaltyChance(home, away, shared, baseline, data) {
   const teamFreq = (home.attack.M019 ?? ND.COUNTER_INIT) + (away.attack.M019 ?? ND.COUNTER_INIT);
   const refFreq = shared.referee.M111 ?? null;
-  if (teamFreq === 0 && refFreq == null) return null;
+
+  // Oyuncu bazlı penaltyWon/penaltyConceded — doğrudan API'den
+  const _sumPlayerPenStat = (side, statKey) => {
+    const lineup = side === 'home' ? data?.lineups?.home : data?.lineups?.away;
+    const starters = (lineup?.players || []).filter(p => !p.substitute).slice(0, 11);
+    let total = 0, apps = 0;
+    for (const p of starters) {
+      const ps = p.player?.statistics || p.player?.seasonStats?.statistics || {};
+      if (ps[statKey] != null) total += ps[statKey];
+      if (ps.appearances != null) apps += ps.appearances;
+    }
+    return apps > 0 ? total / apps : 0;
+  };
+  const playerPenWon = _sumPlayerPenStat('home', 'penaltyWon') + _sumPlayerPenStat('away', 'penaltyWon');
+  const playerPenConc = _sumPlayerPenStat('home', 'penaltyConceded') + _sumPlayerPenStat('away', 'penaltyConceded');
+  const playerPenSignal = playerPenWon + playerPenConc;
+
+  if (teamFreq === 0 && refFreq == null && playerPenSignal === 0) return null;
 
   const _hasRefPenData = (refFreq ?? null) != null;
 
-  // Ağırlıklar: Veri güvenilirliğine göre dinamik
-  // Hakem verisi varsa: eşit ağırlık (0.5/0.5). Yoksa: sadece takım verisi (1.0/0.0)
-  const _teamPenW = _hasRefPenData ? 0.5 : 1.0;
-  const _refPenW = _hasRefPenData ? 0.5 : 0.0;
+  // Veri kaynakları: takimFreq + hakemFreq + oyuncuPen — mevcut veriler eşit ağırlıklı
+  const sources = [];
+  if (teamFreq > 0) sources.push(teamFreq);
+  if (_hasRefPenData) sources.push((refFreq ?? 0) * 90);
+  if (playerPenSignal > 0) sources.push(playerPenSignal);
 
-  const chanceRaw = (teamFreq * _teamPenW) + ((refFreq ?? ND.COUNTER_INIT) * 90 * _refPenW);
+  const chanceRaw = sources.length > 0 ? sources.reduce((a, b) => a + b, 0) / sources.length : 0;
 
   // Lig ortalaması penaltı/maç — tamamen dinamik
   const _penMatchAvg = (baseline?.dynamicAvgs?.M019 != null && baseline?.dynamicAvgs?.M019 > 0)
@@ -1445,17 +1463,39 @@ function calculatePenaltyChance(home, away, shared, baseline) {
   return { tier, raw: round2(chanceRaw), avg: round2(_penMatchAvg) };
 }
 
-function calculateRedCardChance(home, away, shared, baseline) {
+function calculateRedCardChance(home, away, shared, baseline, data) {
   const teamAgg = (home.defense.M040 ?? ND.COUNTER_INIT) + (away.defense.M040 ?? ND.COUNTER_INIT);
   const refAgg = shared.referee.M110 ?? null;
-  if (teamAgg === 0 && refAgg == null) return null;
 
-  // Ağırlıklar: Hakem verisi varsa eşit, yoksa sadece takım
+  // Oyuncu bazlı kart riski — yellowCards + fouls (ham API)
+  const _sumPlayerCardRisk = (side) => {
+    const lineup = side === 'home' ? data?.lineups?.home : data?.lineups?.away;
+    const starters = (lineup?.players || []).filter(p => !p.substitute).slice(0, 11);
+    let cards = 0, fouls = 0, apps = 0, totalFoulsForRatio = 0, totalCardsForRatio = 0;
+    for (const p of starters) {
+      const ps = p.player?.statistics || p.player?.seasonStats?.statistics || {};
+      if (ps.yellowCards != null) { cards += ps.yellowCards; totalCardsForRatio += ps.yellowCards; }
+      if (ps.redCards != null) cards += ps.redCards * 3; // Kırmızı 3 kart eşdeğeri (oyundan atılma)
+      if (ps.fouls != null) { fouls += ps.fouls; totalFoulsForRatio += ps.fouls; }
+      if (ps.appearances != null) apps += ps.appearances;
+    }
+    // Faul→kart dönüşüm oranı: oyuncuların kendi verilerinden
+    const foulToCardRatio = totalFoulsForRatio > 0 ? totalCardsForRatio / totalFoulsForRatio : 0;
+    return apps > 0 ? (cards + fouls * foulToCardRatio) / apps : 0;
+  };
+  const playerCardRisk = _sumPlayerCardRisk('home') + _sumPlayerCardRisk('away');
+
+  if (teamAgg === 0 && refAgg == null && playerCardRisk === 0) return null;
+
   const _hasRefRedData = (refAgg ?? null) != null;
-  const _teamW = _hasRefRedData ? 0.5 : 1.0;
-  const _refW = _hasRefRedData ? 0.5 : 0.0;
 
-  const chanceRaw = (teamAgg * _teamW) + ((refAgg ?? ND.COUNTER_INIT) * 90 * _refW);
+  // Veri kaynakları: takımAgg + hakemAgg + oyuncuKartRisk — mevcut veriler eşit ağırlıklı
+  const sources = [];
+  if (teamAgg > 0) sources.push(teamAgg);
+  if (_hasRefRedData) sources.push((refAgg ?? 0) * 90);
+  if (playerCardRisk > 0) sources.push(playerCardRisk);
+
+  const chanceRaw = sources.length > 0 ? sources.reduce((a, b) => a + b, 0) / sources.length : 0;
 
   // Lig ortalaması kırmızı kart/maç — tamamen dinamik
   const _redMatchAvg = (baseline?.dynamicAvgs?.M040 != null && baseline?.dynamicAvgs?.M040 > 0)
