@@ -55,6 +55,15 @@ function TierChip({ tier, count, acc }) {
   );
 }
 
+function Row({ l, v, c }) {
+  return (
+    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',fontSize:12,marginBottom:4,gap:8}}>
+      <span style={{color:'#666',flexShrink:0}}>{l}</span>
+      <span style={{color:c||'#d1d5db',fontWeight:500,textAlign:'right',fontFamily:'monospace',fontSize:11}}>{v??'—'}</span>
+    </div>
+  );
+}
+
 export default function BacktestPage({ onBack }) {
   // Controls
   const today = new Date().toISOString().split('T')[0];
@@ -81,6 +90,7 @@ export default function BacktestPage({ onBack }) {
   const [includeUnplayed, setIncludeUnplayed] = useState(false);
   const [minConfidence, setMinConfidence] = useState('');
   const [filterStatus, setFilterStatus] = useState('ALL'); // ALL | FINISHED | UPCOMING
+  const [expandedRow, setExpandedRow] = useState(null); // matchId of expanded row
 
   // Data
   const [progress, setProgress] = useState([]);
@@ -412,7 +422,7 @@ export default function BacktestPage({ onBack }) {
                     const isUp = r.matchStatus !== 'finished';
                     const statusColor = (MS[r.matchStatus]||MS.unknown).color;
                     return (
-                    <tr key={r.matchId||i} style={{borderBottom:'1px solid #141414',background:i%2===0?'#0b0b0b':'#090909',borderLeft:`3px solid ${isUp ? statusColor + '60' : 'transparent'}`}}>
+                    <tr key={r.matchId||i} onClick={()=>setExpandedRow(expandedRow===r.matchId?null:r.matchId)} style={{borderBottom:'1px solid #141414',background:expandedRow===r.matchId?'#12121f':i%2===0?'#0b0b0b':'#090909',borderLeft:`3px solid ${isUp ? statusColor + '60' : expandedRow===r.matchId?'#6366f1':'transparent'}`,cursor:'pointer',transition:'background 0.15s'}}>
                       <td style={{...td,color:'#4b5563',fontSize:11}}>{r._order+1}</td>
                       <td style={{...td,maxWidth:220,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',color:isUp?'#a5b4fc':'#e5e7eb',fontWeight:500}} title={r.match}>
                         <span style={{marginRight:5,fontSize:13}} title={(MS[r.matchStatus]||MS.unknown).label}>{(MS[r.matchStatus]||MS.unknown).icon}</span>
@@ -447,6 +457,49 @@ export default function BacktestPage({ onBack }) {
                       </td>}
                       <td style={td}>{r.isValueBet?<span style={{color:'#f59e0b',fontSize:10}}>+{r.modelEdge}%</span>:<span style={{color:'#1f2937'}}>—</span>}</td>
                     </tr>
+                    {expandedRow === r.matchId && (
+                      <tr key={`${r.matchId}-detail`}>
+                        <td colSpan={99} style={{padding:0,background:'#0d0d10',borderBottom:'2px solid #6366f130'}}>
+                          <div style={{padding:'16px 20px',display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:16}}>
+                            {/* Sol: Poisson */}
+                            <div style={{background:'#111118',borderRadius:8,padding:'12px 16px',border:'1px solid #1f1f3a'}}>
+                              <div style={{fontSize:11,color:'#6366f1',fontWeight:700,marginBottom:8,textTransform:'uppercase',letterSpacing:1}}>Poisson Motor</div>
+                              {r.poisson ? <>
+                                <Row l="Lambda (H/A)" v={`${r.poisson.lambdaHome?.toFixed(2)} / ${r.poisson.lambdaAway?.toFixed(2)}`} />
+                                <Row l="Top Skor" v={r.poisson.topScore} c="#c4b5fd" />
+                                <Row l="1X2" v={`${r.poisson.homeWin?.toFixed(1)}% / ${r.poisson.draw?.toFixed(1)}% / ${r.poisson.awayWin?.toFixed(1)}%`} />
+                                <Row l="Tahmin" v={r.poisson.predicted} c={r.poisson.hit===true?'#4ade80':r.poisson.hit===false?'#f87171':'#9ca3af'} />
+                              </> : <div style={{color:'#374151',fontSize:11}}>Veri yok</div>}
+                            </div>
+                            {/* Orta: Simülasyon */}
+                            <div style={{background:'#111118',borderRadius:8,padding:'12px 16px',border:'1px solid #1f1f3a'}}>
+                              <div style={{fontSize:11,color:'#22c55e',fontWeight:700,marginBottom:8,textTransform:'uppercase',letterSpacing:1}}>Simülasyon Motor</div>
+                              {r.simulation ? <>
+                                <Row l="Top Skor" v={r.simTopScore} c="#86efac" />
+                                <Row l="1X2" v={`${r.simulation.homeWin?.toFixed(1)}% / ${r.simulation.draw?.toFixed(1)}% / ${r.simulation.awayWin?.toFixed(1)}%`} />
+                                <Row l="Tahmin" v={r.simulation.predicted} c={r.simulation.hit===true?'#4ade80':r.simulation.hit===false?'#f87171':'#9ca3af'} />
+                                <Row l="Sim HT" v={r.simHTTopScore||'—'} />
+                                <Row l="HT 1X2 (Sim)" v={`${r.simHTHomeWin?.toFixed(1)}% / ${r.simHTDraw?.toFixed(1)}% / ${r.simHTAwayWin?.toFixed(1)}%`} />
+                              </> : <div style={{color:'#374151',fontSize:11}}>Veri yok</div>}
+                            </div>
+                            {/* Sağ: Detaylar */}
+                            <div style={{background:'#111118',borderRadius:8,padding:'12px 16px',border:'1px solid #1f1f3a'}}>
+                              <div style={{fontSize:11,color:'#f59e0b',fontWeight:700,marginBottom:8,textTransform:'uppercase',letterSpacing:1}}>Detaylar</div>
+                              <Row l="FT Olasılıklar" v={`1: ${r.probHome?.toFixed(1)}% X: ${r.probDraw?.toFixed(1)}% 2: ${r.probAway?.toFixed(1)}%`} />
+                              <Row l="O/U 2.5" v={`${r.probOU25?.toFixed(1)}%`} c={r.probOU25>55?'#4ade80':'#fbbf24'} />
+                              <Row l="BTTS" v={`${r.probBTTS?.toFixed(1)}%`} />
+                              <Row l="HT Poisson" v={`${r.predictedHT||'—'} (${r.predictedHTResult||'—'})`} />
+                              <Row l="HT 1X2" v={`${r.htHomeWinProb?.toFixed(1)}% / ${r.htDrawProb?.toFixed(1)}% / ${r.htAwayWinProb?.toFixed(1)}%`} />
+                              {r.htft && <Row l="HT/FT Top" v={`${r.htft.top1} (${r.htft.top3?.[0]?.prob?.toFixed(1)}%)`} c="#c4b5fd" />}
+                              <Row l="Dinlenme" v={`Ev: ${r.restDays?.home??'—'}g  Dep: ${r.restDays?.away??'—'}g`} />
+                              <Row l="Market" v={`H: ${r.marketHome?.toFixed(1)}%  A: ${r.marketAway?.toFixed(1)}%`} />
+                              <Row l="Value Bet" v={r.isValueBet ? `✅ +${r.modelEdge}%` : `❌ ${r.modelEdge}%`} c={r.isValueBet?'#22c55e':'#6b7280'} />
+                              <Row l="Güven" v={`${r.confidenceTier} (${r.maxProbability}%)`} c={TC[r.confidenceTier]} />
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
                   );
                   })}
                 </tbody>

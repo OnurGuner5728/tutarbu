@@ -265,4 +265,24 @@ function getPositionalEfficiency(nativePos, assignedPos) {
   return 1.0;
 }
 
-module.exports = { poissonPMF, poissonExceed, samplePoisson, weightedAvg, clamp, round2, extractTeamStats, parseStatValue, getPositionalEfficiency };
+/**
+ * Binomial PMF — P(X = k) where X ~ Binom(n, p)
+ * Koşullu HT tahmini için: FT'de n gol atan takımın k tanesini ilk yarıda atma olasılığı
+ * @param {number} n - Toplam deneme sayısı (FT gol)
+ * @param {number} k - Başarılı deneme sayısı (HT gol)
+ * @param {number} p - Başarı olasılığı (htFrac, ilk yarı gol oranı)
+ * @returns {number} P(X = k)
+ */
+function binomPMF(n, k, p) {
+  if (k < 0 || k > n || n < 0) return 0;
+  if (n === 0) return k === 0 ? 1 : 0;
+  if (p <= 0) return k === 0 ? 1 : 0;
+  if (p >= 1) return k === n ? 1 : 0;
+  // Log-space hesaplama: overflow önlenir
+  let logP = 0;
+  for (let i = 0; i < k; i++) logP += Math.log(n - i) - Math.log(i + 1);
+  logP += k * Math.log(p) + (n - k) * Math.log(1 - p);
+  return Math.exp(logP);
+}
+
+module.exports = { poissonPMF, poissonExceed, samplePoisson, binomPMF, weightedAvg, clamp, round2, extractTeamStats, parseStatValue, getPositionalEfficiency };

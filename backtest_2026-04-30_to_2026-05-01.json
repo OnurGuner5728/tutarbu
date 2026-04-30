@@ -1,0 +1,815 @@
+{
+  "date": "2026-04-30",
+  "endDate": "2026-05-01",
+  "total": 8,
+  "finishedTotal": 0,
+  "upcomingTotal": 8,
+  "tournamentFilter": "top",
+  "accuracy1X2": null,
+  "accuracyOU25": null,
+  "accuracyBTTS": null,
+  "accuracyScore": null,
+  "avgBrierScore": null,
+  "avgLogLoss": null,
+  "htAccuracy1X2": null,
+  "htAccuracyScore": null,
+  "htTotal": 0,
+  "high": {
+    "count": 8,
+    "accuracy1X2": 0,
+    "accuracyOU25": 0,
+    "accuracyBTTS": 0,
+    "accuracyScore": 0,
+    "avgBrier": 0
+  },
+  "medium": null,
+  "low": null,
+  "poissonAccuracy1X2": 0,
+  "simulationAccuracy1X2": 0,
+  "drawDetection": {
+    "actual": 0,
+    "predicted": 0,
+    "recallRate": null,
+    "precisionRate": null
+  },
+  "valueBets": {
+    "count": 1,
+    "accuracy1X2": 0
+  },
+  "byTournament": [
+    {
+      "tournamentId": 52,
+      "name": "Trendyol Süper Lig",
+      "total": 2,
+      "accuracy1X2": 0,
+      "accuracyOU25": 0,
+      "accuracyBTTS": 0,
+      "accuracyScore": 0,
+      "avgBrier": 0
+    },
+    {
+      "tournamentId": 679,
+      "name": "UEFA Europa League, Knockout stage",
+      "total": 2,
+      "accuracy1X2": 0,
+      "accuracyOU25": 0,
+      "accuracyBTTS": 0,
+      "accuracyScore": 0,
+      "avgBrier": 0
+    },
+    {
+      "tournamentId": 8,
+      "name": "LaLiga",
+      "total": 1,
+      "accuracy1X2": 0,
+      "accuracyOU25": 0,
+      "accuracyBTTS": 0,
+      "accuracyScore": 0,
+      "avgBrier": 0
+    },
+    {
+      "tournamentId": 17,
+      "name": "Premier League",
+      "total": 1,
+      "accuracy1X2": 0,
+      "accuracyOU25": 0,
+      "accuracyBTTS": 0,
+      "accuracyScore": 0,
+      "avgBrier": 0
+    },
+    {
+      "tournamentId": 23,
+      "name": "Serie A",
+      "total": 1,
+      "accuracy1X2": 0,
+      "accuracyOU25": 0,
+      "accuracyBTTS": 0,
+      "accuracyScore": 0,
+      "avgBrier": 0
+    },
+    {
+      "tournamentId": 37,
+      "name": "VriendenLoterij Eredivisie, Relegation/Promotion Playoffs",
+      "total": 1,
+      "accuracy1X2": 0,
+      "accuracyOU25": 0,
+      "accuracyBTTS": 0,
+      "accuracyScore": 0,
+      "avgBrier": 0
+    }
+  ],
+  "results": [
+    {
+      "matchId": 15632623,
+      "matchStatus": "notstarted",
+      "match": "Nottingham Forest vs Aston Villa",
+      "homeTeam": "Nottingham Forest",
+      "awayTeam": "Aston Villa",
+      "tournament": "UEFA Europa League, Knockout stage",
+      "tournamentId": 679,
+      "matchDate": "2026-04-30",
+      "matchTime": "19:00",
+      "actual": null,
+      "actualResult": null,
+      "actualOU25": null,
+      "actualBTTS": null,
+      "predicted": "1-0",
+      "predictedResult": "1",
+      "predictedOU25": "Under",
+      "predictedBTTS": "No",
+      "simTopScore": "0-2",
+      "probHome": 30.76,
+      "probDraw": 26.93,
+      "probAway": 42.31,
+      "probOU25": 37.7,
+      "probBTTS": 33.8,
+      "actualHT": null,
+      "actualHTResult": null,
+      "predictedHT": "2-1",
+      "predictedHTResult": "1",
+      "simHTTopScore": "0-0",
+      "htHomeWinProb": 83.84,
+      "htDrawProb": 0,
+      "htAwayWinProb": 44.83,
+      "simHTHomeWin": 0,
+      "simHTDraw": 37.6,
+      "simHTAwayWin": 62.4,
+      "htft": {
+        "top1": "2/2",
+        "top3": [
+          {
+            "result": "2/2",
+            "prob": 62.4
+          },
+          {
+            "result": "X/2",
+            "prob": 32.71
+          },
+          {
+            "result": "X/X",
+            "prob": 4.89
+          }
+        ]
+      },
+      "hit1X2": null,
+      "hitOU25": null,
+      "hitBTTS": null,
+      "hitScore": null,
+      "hitHTResult": null,
+      "hitHTScore": null,
+      "brierScore": null,
+      "logLoss": null,
+      "confidenceTier": "HIGH",
+      "maxProbability": 87,
+      "isHighConfidence": true,
+      "poisson": {
+        "predicted": "1",
+        "homeWin": 46.46,
+        "draw": 14.33,
+        "awayWin": 39.2,
+        "topScore": "1-0",
+        "hit": false,
+        "lambdaHome": 1.34,
+        "lambdaAway": 0.79
+      },
+      "simulation": {
+        "predicted": "2",
+        "homeWin": 0,
+        "draw": 13,
+        "awayWin": 87,
+        "hit": false
+      },
+      "restDays": {
+        "home": 6,
+        "away": 5
+      },
+      "isValueBet": false,
+      "modelEdge": -3.2,
+      "marketHome": 33.98,
+      "marketAway": 37.57
+    },
+    {
+      "matchId": 15632622,
+      "matchStatus": "notstarted",
+      "match": "Sporting Braga vs SC Freiburg",
+      "homeTeam": "Sporting Braga",
+      "awayTeam": "SC Freiburg",
+      "tournament": "UEFA Europa League, Knockout stage",
+      "tournamentId": 679,
+      "matchDate": "2026-04-30",
+      "matchTime": "19:00",
+      "actual": null,
+      "actualResult": null,
+      "actualOU25": null,
+      "actualBTTS": null,
+      "predicted": "1-0",
+      "predictedResult": "1",
+      "predictedOU25": "Under",
+      "predictedBTTS": "No",
+      "simTopScore": "0-2",
+      "probHome": 39.3,
+      "probDraw": 28.94,
+      "probAway": 31.76,
+      "probOU25": 33.8,
+      "probBTTS": 28.3,
+      "actualHT": null,
+      "actualHTResult": null,
+      "predictedHT": "2-1",
+      "predictedHTResult": "1",
+      "simHTTopScore": "0-0",
+      "htHomeWinProb": 79.78,
+      "htDrawProb": 0,
+      "htAwayWinProb": 31.07,
+      "simHTHomeWin": 0,
+      "simHTDraw": 40,
+      "simHTAwayWin": 60,
+      "htft": {
+        "top1": "2/2",
+        "top3": [
+          {
+            "result": "2/2",
+            "prob": 60
+          },
+          {
+            "result": "X/2",
+            "prob": 34.76
+          },
+          {
+            "result": "X/X",
+            "prob": 5.24
+          }
+        ]
+      },
+      "hit1X2": null,
+      "hitOU25": null,
+      "hitBTTS": null,
+      "hitScore": null,
+      "hitHTResult": null,
+      "hitHTScore": null,
+      "brierScore": null,
+      "logLoss": null,
+      "confidenceTier": "HIGH",
+      "maxProbability": 86.9,
+      "isHighConfidence": true,
+      "poisson": {
+        "predicted": "1",
+        "homeWin": 65.65,
+        "draw": 17.4,
+        "awayWin": 16.95,
+        "topScore": "1-0",
+        "hit": false,
+        "lambdaHome": 2.4,
+        "lambdaAway": 0.97
+      },
+      "simulation": {
+        "predicted": "2",
+        "homeWin": 0,
+        "draw": 13.1,
+        "awayWin": 86.9,
+        "hit": false
+      },
+      "restDays": {
+        "home": 4,
+        "away": 4
+      },
+      "isValueBet": false,
+      "modelEdge": -3.5,
+      "marketHome": 42.82,
+      "marketAway": 25.75
+    },
+    {
+      "matchId": 14023940,
+      "matchStatus": "notstarted",
+      "match": "Leeds United vs Burnley",
+      "homeTeam": "Leeds United",
+      "awayTeam": "Burnley",
+      "tournament": "Premier League",
+      "tournamentId": 17,
+      "matchDate": "2026-05-01",
+      "matchTime": "19:00",
+      "actual": null,
+      "actualResult": null,
+      "actualOU25": null,
+      "actualBTTS": null,
+      "predicted": "2-0",
+      "predictedResult": "1",
+      "predictedOU25": "Under",
+      "predictedBTTS": "No",
+      "simTopScore": "0-0",
+      "probHome": 37.32,
+      "probDraw": 31.08,
+      "probAway": 31.6,
+      "probOU25": 2.2,
+      "probBTTS": 40.9,
+      "actualHT": null,
+      "actualHTResult": null,
+      "predictedHT": "1-1",
+      "predictedHTResult": "1",
+      "simHTTopScore": "0-0",
+      "htHomeWinProb": 38.08,
+      "htDrawProb": 42.58,
+      "htAwayWinProb": 19.34,
+      "simHTHomeWin": 0,
+      "simHTDraw": 78,
+      "simHTAwayWin": 22,
+      "htft": {
+        "top1": "X/X",
+        "top3": [
+          {
+            "result": "X/X",
+            "prob": 43.68
+          },
+          {
+            "result": "X/2",
+            "prob": 34.32
+          },
+          {
+            "result": "2/2",
+            "prob": 12.53
+          }
+        ]
+      },
+      "hit1X2": null,
+      "hitOU25": null,
+      "hitBTTS": null,
+      "hitScore": null,
+      "hitHTResult": null,
+      "hitHTScore": null,
+      "brierScore": null,
+      "logLoss": null,
+      "confidenceTier": "HIGH",
+      "maxProbability": 56,
+      "isHighConfidence": true,
+      "poisson": {
+        "predicted": "1",
+        "homeWin": 58.23,
+        "draw": 11.66,
+        "awayWin": 30.11,
+        "topScore": "2-0",
+        "hit": false,
+        "lambdaHome": 2.22,
+        "lambdaAway": 0.88
+      },
+      "simulation": {
+        "predicted": "X",
+        "homeWin": 0,
+        "draw": 56,
+        "awayWin": 44,
+        "hit": false
+      },
+      "restDays": {
+        "home": 5,
+        "away": 9
+      },
+      "isValueBet": false,
+      "modelEdge": -33.7,
+      "marketHome": 70.99,
+      "marketAway": 9.61
+    },
+    {
+      "matchId": 13980097,
+      "matchStatus": "notstarted",
+      "match": "Pisa vs Lecce",
+      "homeTeam": "Pisa",
+      "awayTeam": "Lecce",
+      "tournament": "Serie A",
+      "tournamentId": 23,
+      "matchDate": "2026-05-01",
+      "matchTime": "18:45",
+      "actual": null,
+      "actualResult": null,
+      "actualOU25": null,
+      "actualBTTS": null,
+      "predicted": "0-1",
+      "predictedResult": "2",
+      "predictedOU25": "Under",
+      "predictedBTTS": "No",
+      "simTopScore": "0-0",
+      "probHome": 26.01,
+      "probDraw": 32.91,
+      "probAway": 41.08,
+      "probOU25": 0.2,
+      "probBTTS": 24.6,
+      "actualHT": null,
+      "actualHTResult": null,
+      "predictedHT": "0-0",
+      "predictedHTResult": "X",
+      "simHTTopScore": "0-0",
+      "htHomeWinProb": 9.79,
+      "htDrawProb": 80.19,
+      "htAwayWinProb": 10.02,
+      "simHTHomeWin": 0,
+      "simHTDraw": 86.7,
+      "simHTAwayWin": 13.3,
+      "htft": {
+        "top1": "X/X",
+        "top3": [
+          {
+            "result": "X/X",
+            "prob": 64.94
+          },
+          {
+            "result": "X/2",
+            "prob": 21.76
+          },
+          {
+            "result": "2/X",
+            "prob": 7.36
+          }
+        ]
+      },
+      "hit1X2": null,
+      "hitOU25": null,
+      "hitBTTS": null,
+      "hitScore": null,
+      "hitHTResult": null,
+      "hitHTScore": null,
+      "brierScore": null,
+      "logLoss": null,
+      "confidenceTier": "HIGH",
+      "maxProbability": 74.9,
+      "isHighConfidence": true,
+      "poisson": {
+        "predicted": "2",
+        "homeWin": 39.51,
+        "draw": 15.94,
+        "awayWin": 44.55,
+        "topScore": "0-0",
+        "hit": false,
+        "lambdaHome": 0.75,
+        "lambdaAway": 1.02
+      },
+      "simulation": {
+        "predicted": "X",
+        "homeWin": 0,
+        "draw": 74.9,
+        "awayWin": 25.1,
+        "hit": false
+      },
+      "restDays": {
+        "home": 6,
+        "away": 6
+      },
+      "isValueBet": false,
+      "modelEdge": 1.2,
+      "marketHome": 28.74,
+      "marketAway": 39.9
+    },
+    {
+      "matchId": 14083457,
+      "matchStatus": "notstarted",
+      "match": "Girona FC vs Mallorca",
+      "homeTeam": "Girona FC",
+      "awayTeam": "Mallorca",
+      "tournament": "LaLiga",
+      "tournamentId": 8,
+      "matchDate": "2026-05-01",
+      "matchTime": "19:00",
+      "actual": null,
+      "actualResult": null,
+      "actualOU25": null,
+      "actualBTTS": null,
+      "predicted": "1-0",
+      "predictedResult": "1",
+      "predictedOU25": "Under",
+      "predictedBTTS": "No",
+      "simTopScore": "0-3",
+      "probHome": 34.84,
+      "probDraw": 24.23,
+      "probAway": 40.93,
+      "probOU25": 45.6,
+      "probBTTS": 36.7,
+      "actualHT": null,
+      "actualHTResult": null,
+      "predictedHT": "1-1",
+      "predictedHTResult": "1",
+      "simHTTopScore": "0-1",
+      "htHomeWinProb": 24.6,
+      "htDrawProb": 56.12,
+      "htAwayWinProb": 19.28,
+      "simHTHomeWin": 0,
+      "simHTDraw": 27.8,
+      "simHTAwayWin": 72.2,
+      "htft": {
+        "top1": "2/2",
+        "top3": [
+          {
+            "result": "2/2",
+            "prob": 72.2
+          },
+          {
+            "result": "X/2",
+            "prob": 25.8
+          },
+          {
+            "result": "X/X",
+            "prob": 2
+          }
+        ]
+      },
+      "hit1X2": null,
+      "hitOU25": null,
+      "hitBTTS": null,
+      "hitScore": null,
+      "hitHTResult": null,
+      "hitHTScore": null,
+      "brierScore": null,
+      "logLoss": null,
+      "confidenceTier": "HIGH",
+      "maxProbability": 92.8,
+      "isHighConfidence": true,
+      "poisson": {
+        "predicted": "1",
+        "homeWin": 48.16,
+        "draw": 12.84,
+        "awayWin": 39,
+        "topScore": "1-1",
+        "hit": false,
+        "lambdaHome": 1.52,
+        "lambdaAway": 1.04
+      },
+      "simulation": {
+        "predicted": "2",
+        "homeWin": 0,
+        "draw": 7.2,
+        "awayWin": 92.8,
+        "hit": false
+      },
+      "restDays": {
+        "home": 6,
+        "away": 6
+      },
+      "isValueBet": false,
+      "modelEdge": -13.8,
+      "marketHome": 48.59,
+      "marketAway": 24.73
+    },
+    {
+      "matchId": 14109901,
+      "matchStatus": "notstarted",
+      "match": "Çaykur Rizespor vs Konyaspor",
+      "homeTeam": "Çaykur Rizespor",
+      "awayTeam": "Konyaspor",
+      "tournament": "Trendyol Süper Lig",
+      "tournamentId": 52,
+      "matchDate": "2026-05-01",
+      "matchTime": "14:00",
+      "actual": null,
+      "actualResult": null,
+      "actualOU25": null,
+      "actualBTTS": null,
+      "predicted": "0-1",
+      "predictedResult": "2",
+      "predictedOU25": "Over",
+      "predictedBTTS": "No",
+      "simTopScore": "0-5",
+      "probHome": 27.33,
+      "probDraw": 27.25,
+      "probAway": 45.43,
+      "probOU25": 96,
+      "probBTTS": 36.9,
+      "actualHT": null,
+      "actualHTResult": null,
+      "predictedHT": "1-1",
+      "predictedHTResult": "X",
+      "simHTTopScore": "0-3",
+      "htHomeWinProb": 29.54,
+      "htDrawProb": 38.65,
+      "htAwayWinProb": 31.81,
+      "simHTHomeWin": 0,
+      "simHTDraw": 3.1,
+      "simHTAwayWin": 96.9,
+      "htft": {
+        "top1": "2/2",
+        "top3": [
+          {
+            "result": "2/2",
+            "prob": 96.9
+          },
+          {
+            "result": "X/2",
+            "prob": 3.09
+          },
+          {
+            "result": "X/X",
+            "prob": 0.01
+          }
+        ]
+      },
+      "hit1X2": null,
+      "hitOU25": null,
+      "hitBTTS": null,
+      "hitScore": null,
+      "hitHTResult": null,
+      "hitHTScore": null,
+      "brierScore": null,
+      "logLoss": null,
+      "confidenceTier": "HIGH",
+      "maxProbability": 99.7,
+      "isHighConfidence": true,
+      "poisson": {
+        "predicted": "2",
+        "homeWin": 42.97,
+        "draw": 13.26,
+        "awayWin": 43.77,
+        "topScore": "1-1",
+        "hit": false,
+        "lambdaHome": 1.23,
+        "lambdaAway": 1.34
+      },
+      "simulation": {
+        "predicted": "2",
+        "homeWin": 0,
+        "draw": 0.3,
+        "awayWin": 99.7,
+        "hit": false
+      },
+      "restDays": {
+        "home": 6,
+        "away": 4
+      },
+      "isValueBet": true,
+      "modelEdge": 18.8,
+      "marketHome": 46.65,
+      "marketAway": 26.68
+    },
+    {
+      "matchId": 14109902,
+      "matchStatus": "notstarted",
+      "match": "Gaziantep FK vs Beşiktaş JK",
+      "homeTeam": "Gaziantep FK",
+      "awayTeam": "Beşiktaş JK",
+      "tournament": "Trendyol Süper Lig",
+      "tournamentId": 52,
+      "matchDate": "2026-05-01",
+      "matchTime": "17:00",
+      "actual": null,
+      "actualResult": null,
+      "actualOU25": null,
+      "actualBTTS": null,
+      "predicted": "1-2",
+      "predictedResult": "2",
+      "predictedOU25": "Over",
+      "predictedBTTS": "No",
+      "simTopScore": "0-4",
+      "probHome": 25.75,
+      "probDraw": 25.69,
+      "probAway": 48.56,
+      "probOU25": 72.6,
+      "probBTTS": 35.4,
+      "actualHT": null,
+      "actualHTResult": null,
+      "predictedHT": "1-1",
+      "predictedHTResult": "2",
+      "simHTTopScore": "0-1",
+      "htHomeWinProb": 26.57,
+      "htDrawProb": 26.57,
+      "htAwayWinProb": 46.86,
+      "simHTHomeWin": 0,
+      "simHTDraw": 16.1,
+      "simHTAwayWin": 83.9,
+      "htft": {
+        "top1": "2/2",
+        "top3": [
+          {
+            "result": "2/2",
+            "prob": 83.9
+          },
+          {
+            "result": "X/2",
+            "prob": 15.78
+          },
+          {
+            "result": "X/X",
+            "prob": 0.32
+          }
+        ]
+      },
+      "hit1X2": null,
+      "hitOU25": null,
+      "hitBTTS": null,
+      "hitScore": null,
+      "hitHTResult": null,
+      "hitHTScore": null,
+      "brierScore": null,
+      "logLoss": null,
+      "confidenceTier": "HIGH",
+      "maxProbability": 98,
+      "isHighConfidence": true,
+      "poisson": {
+        "predicted": "2",
+        "homeWin": 38.43,
+        "draw": 10.78,
+        "awayWin": 50.78,
+        "topScore": "1-1",
+        "hit": false,
+        "lambdaHome": 1.12,
+        "lambdaAway": 2.09
+      },
+      "simulation": {
+        "predicted": "2",
+        "homeWin": 0,
+        "draw": 2,
+        "awayWin": 98,
+        "hit": false
+      },
+      "restDays": {
+        "home": 6,
+        "away": 4
+      },
+      "isValueBet": false,
+      "modelEdge": -5.7,
+      "marketHome": 22.55,
+      "marketAway": 54.25
+    },
+    {
+      "matchId": 16072837,
+      "matchStatus": "notstarted",
+      "match": "RKC Waalwijk vs Roda JC Kerkrade",
+      "homeTeam": "RKC Waalwijk",
+      "awayTeam": "Roda JC Kerkrade",
+      "tournament": "VriendenLoterij Eredivisie, Relegation/Promotion Playoffs",
+      "tournamentId": 37,
+      "matchDate": "2026-05-01",
+      "matchTime": "18:00",
+      "actual": null,
+      "actualResult": null,
+      "actualOU25": null,
+      "actualBTTS": null,
+      "predicted": "2-1",
+      "predictedResult": "1",
+      "predictedOU25": "Under",
+      "predictedBTTS": "No",
+      "simTopScore": "2-1",
+      "probHome": 38.58,
+      "probDraw": 26.51,
+      "probAway": 34.91,
+      "probOU25": 67.4,
+      "probBTTS": 58.7,
+      "actualHT": null,
+      "actualHTResult": null,
+      "predictedHT": "2-1",
+      "predictedHTResult": "1",
+      "simHTTopScore": "1-0",
+      "htHomeWinProb": 80.97,
+      "htDrawProb": 0,
+      "htAwayWinProb": 46.91,
+      "simHTHomeWin": 50.7,
+      "simHTDraw": 33,
+      "simHTAwayWin": 16.3,
+      "htft": {
+        "top1": "1/1",
+        "top3": [
+          {
+            "result": "1/1",
+            "prob": 44.99
+          },
+          {
+            "result": "X/1",
+            "prob": 21.62
+          },
+          {
+            "result": "2/1",
+            "prob": 8.78
+          }
+        ]
+      },
+      "hit1X2": null,
+      "hitOU25": null,
+      "hitBTTS": null,
+      "hitScore": null,
+      "hitHTResult": null,
+      "hitHTScore": null,
+      "brierScore": null,
+      "logLoss": null,
+      "confidenceTier": "HIGH",
+      "maxProbability": 65.5,
+      "isHighConfidence": true,
+      "poisson": {
+        "predicted": "1",
+        "homeWin": 50.4,
+        "draw": 10.85,
+        "awayWin": 38.75,
+        "topScore": "2-1",
+        "hit": false,
+        "lambdaHome": 2.29,
+        "lambdaAway": 1.45
+      },
+      "simulation": {
+        "predicted": "1",
+        "homeWin": 65.5,
+        "draw": 18,
+        "awayWin": 16.5,
+        "hit": false
+      },
+      "restDays": {
+        "home": 3,
+        "away": 3
+      },
+      "isValueBet": false,
+      "modelEdge": null,
+      "marketHome": null,
+      "marketAway": null
+    }
+  ]
+}

@@ -4,7 +4,7 @@
  * Poisson dağılımı + bileşik skorlar + ek özel tahminler.
  */
 
-const { poissonPMF, poissonExceed, round2, clamp } = require('./math-utils');
+const { poissonPMF, poissonExceed, binomPMF, round2, clamp } = require('./math-utils');
 const { simulateMatch } = require('./match-simulator');
 const simConfigModule = require('./sim-config');
 const SIM_CONFIG = simConfigModule.SIM_CONFIG;
@@ -1071,83 +1071,99 @@ function injectReserves(lineupPlayers, squadPlayers, suppressInjection = false) 
 }
 
 function generateFirstHalfPrediction(home, away, poissonPrediction, baseline) {
-  // ── İlk Yarı Tahmini (Lambda Bazlı Geliştirilmiş) ──
-  // Öncelik: FT lambda × HT gol fraksiyonu (M003)
-  // Fallback: M003 direkt kullanımı (maç başı HT gol ortalaması)
-  //
-  // KRİTİK: M003 = firstHalfGoals / totalGoals → 0-1 aralığında fraction
-  // YANLIŞ: M003 / 100 (→ 0.006, neredeyse sıfır lambda)
-  // DOĞRU:  M003 direkt (→ 0.6, %60 gol ilk yarıda, lambda × 0.6 = gerçekçi HT lambda)
-  const homeHTFrac = home.attack.M003 ?? null;  // 0-1 fraction, /100 YAPMA
+  // ── Koşullu Binom HT Tahmini ──
+  // FT Poisson'dan gelen skor dağılımını, takıma özel M003 fraksiyonuyla
+  // HT'ye bölüştürür. P(HT=h_ht, a_ht) = Σ P(FT=h_ft, a_ft) × Binom(h_ft, h_ht, htFracH) × Binom(a_ft, a_ht, htFracA)
+  // Bu sayede HT ≤ FT her zaman garanti edilir.
+
+  const lambdaH = poissonPrediction?.lambdaHome ?? null;
+  const lambdaA = poissonPrediction?.lambdaAway ?? null;
+
+  if (lambdaH == null || lambdaA == null || lambdaH <= 0 || lambdaA <= 0) {
+    return { expectedHomeGoals: null, expectedAwayGoals: null, over05HT: null, over15HT: null, htResult: null, source: 'no_data' };
+  }
+
+  // Takıma özel ilk yarı gol fraksiyonları (API'den M003)
+  const homeHTFrac = home.attack.M003 ?? null;  // 0-1 arası
   const awayHTFrac = away.attack.M003 ?? null;
-  
+
+  // Lig ortalaması fallback
   const _dynHT = (baseline?.dynamicAvgs?.M005 != null && baseline?.dynamicAvgs?.M006 != null && baseline?.dynamicAvgs?.M007 != null)
     ? (baseline.dynamicAvgs.M005 + baseline.dynamicAvgs.M006 + baseline.dynamicAvgs.M007) / 100
     : null;
 
-  const avgHTFrac = (homeHTFrac != null && awayHTFrac != null)
-    ? (homeHTFrac + awayHTFrac) / 2
-    : (homeHTFrac ?? awayHTFrac ?? _dynHT); // futbol geneli lig ortalaması veya %45
+  // Takıma özel htFrac: her takım kendi fraksiyonunu kullanır
+  const htFracH = homeHTFrac ?? _dynHT ?? (1 / 2); // matematiksel simetri fallback
+  const htFracA = awayHTFrac ?? _dynHT ?? (1 / 2);
 
-  // Tam maç lambda varsa HT lambda = FT lambda × HT fraksiyonu
-  const lambdaH = poissonPrediction?.lambdaHome ?? null;
-  const lambdaA = poissonPrediction?.lambdaAway ?? null;
+  // ── Joint dağılım: P(HT = h_ht-a_ht) ──
+  const MAX_GOALS = 7;
+  const htScoreProbs = {};
+  let htHomeWin = 0, htDraw = 0, htAwayWin = 0;
+  let expectedHTHome = 0, expectedHTAway = 0;
 
-  let hHT, aHT, source;
-  if (lambdaH != null && lambdaA != null && lambdaH > 0 && lambdaA > 0) {
-    hHT = lambdaH * avgHTFrac;
-    aHT = lambdaA * avgHTFrac;
-    source = 'lambda_scaled';
-  } else {
-    // Fallback: periyot metrikleri
-    const homeHTGoal = home.attack.M003 ?? null;
-    const awayHTGoal = away.attack.M003 ?? null;
-    if (homeHTGoal == null && awayHTGoal == null) {
-      return { expectedHomeGoals: null, expectedAwayGoals: null, over05HT: null, over15HT: null, htResult: null, source: 'no_data' };
+  for (let h_ht = 0; h_ht <= MAX_GOALS; h_ht++) {
+    for (let a_ht = 0; a_ht <= MAX_GOALS; a_ht++) {
+      let prob = 0;
+      // FT skorları üzerinde marjinalize et
+      for (let h_ft = h_ht; h_ft <= MAX_GOALS; h_ft++) {
+        const pFT_H = poissonPMF(h_ft, lambdaH);
+        const pBinomH = binomPMF(h_ft, h_ht, htFracH);
+        for (let a_ft = a_ht; a_ft <= MAX_GOALS; a_ft++) {
+          const pFT_A = poissonPMF(a_ft, lambdaA);
+          const pBinomA = binomPMF(a_ft, a_ht, htFracA);
+          prob += pFT_H * pFT_A * pBinomH * pBinomA;
+        }
+      }
+      if (prob > 1e-8) {
+        const key = `${h_ht}-${a_ht}`;
+        htScoreProbs[key] = prob;
+      }
+      // HT 1X2 akümülasyonu
+      if (h_ht > a_ht) htHomeWin += prob;
+      else if (a_ht > h_ht) htAwayWin += prob;
+      else htDraw += prob;
+      // Beklenen HT golleri
+      expectedHTHome += h_ht * prob;
+      expectedHTAway += a_ht * prob;
     }
-    hHT = homeHTGoal ?? ND.COUNTER_INIT;
-    aHT = awayHTGoal ?? ND.COUNTER_INIT;
-    source = 'period_metrics';
   }
 
-  const totalHTGoals = hHT + aHT;
-  const pOver05 = totalHTGoals > 0 ? (1 - Math.exp(-totalHTGoals)) * 100 : 0;
-  const pOver15 = totalHTGoals > 0
-    ? (1 - Math.exp(-totalHTGoals) * (1 + totalHTGoals)) * 100 : 0;
+  // Normalize (kuyruğun kesilmesinden dolayı toplam < 1 olabilir)
+  const totalProb = htHomeWin + htDraw + htAwayWin;
+  if (totalProb > 0 && totalProb < 0.999) {
+    htHomeWin /= totalProb;
+    htDraw /= totalProb;
+    htAwayWin /= totalProb;
+  }
 
-  // HT 1X2 via bivariate Poisson approximation
-  // P(Home wins HT) = Σ_{h>a} P(h) × P(a)
-  const htHomeWin = (() => {
-    let p = 0;
-    for (let h = 1; h <= 6; h++) {
-      for (let a = 0; a < h; a++) {
-        p += poissonPMF(hHT, h) * poissonPMF(aHT, a);
-      }
-    }
-    return p;
-  })();
-  const htAwayWin = (() => {
-    let p = 0;
-    for (let a = 1; a <= 6; a++) {
-      for (let h = 0; h < a; h++) {
-        p += poissonPMF(hHT, h) * poissonPMF(aHT, a);
-      }
-    }
-    return p;
-  })();
-  const htDraw = Math.max(0, 1 - htHomeWin - htAwayWin);
+  const totalHTGoals = expectedHTHome + expectedHTAway;
+  // Over 0.5 HT ve Over 1.5 HT: skor dağılımından direkt hesapla
+  const p00 = htScoreProbs['0-0'] || 0;
+  const pOver05 = Math.max(0, (1 - p00)) * 100;
+  // Over 1.5: P(total > 1.5) = 1 - P(0-0) - P(1-0) - P(0-1)
+  const p10 = htScoreProbs['1-0'] || 0;
+  const p01 = htScoreProbs['0-1'] || 0;
+  const pOver15 = Math.max(0, (1 - p00 - p10 - p01)) * 100;
+
+  // Top HT skorları
+  const sortedHT = Object.entries(htScoreProbs).sort((a, b) => b[1] - a[1]);
+  const topHTScore = sortedHT[0]?.[0] ?? null;
+  const topHTScores = sortedHT.slice(0, 5).map(([k, v]) => ({ score: k, prob: round2(v * 100) }));
 
   return {
-    expectedHomeGoals: round2(hHT),
-    expectedAwayGoals: round2(aHT),
+    expectedHomeGoals: round2(expectedHTHome),
+    expectedAwayGoals: round2(expectedHTAway),
     over05HT: round2(Math.min(UI_CFG.MAX_UI_PROB, pOver05)),
     over15HT: round2(Math.min(UI_CFG.O15_CAP, pOver15)),
-    htResult: hHT > aHT + UI_CFG.HT_RESULT_THRESHOLD ? '1' : aHT > hHT + UI_CFG.HT_RESULT_THRESHOLD ? '2' : 'X',
+    htResult: htHomeWin > htAwayWin + 0.02 ? '1' : htAwayWin > htHomeWin + 0.02 ? '2' : 'X',
     htHomeWin: round2(htHomeWin * 100),
     htDraw: round2(htDraw * 100),
     htAwayWin: round2(htAwayWin * 100),
-    htFraction: round2(avgHTFrac * 100),
-    source,
+    htFraction: round2(((htFracH + htFracA) / 2) * 100),
+    topHTScore,
+    topHTScores,
+    source: 'conditional_binomial',
   };
 }
 
