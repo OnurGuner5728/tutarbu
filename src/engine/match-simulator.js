@@ -635,7 +635,7 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
     const pb_side = side === 'home' ? hProb : aProb;
     const oppPb = oppSide === 'home' ? hProb : aProb;
     const teamExpGoalsRaw = pb_side.shotsPerMin * 90 * pb_side.onTargetRate * pb_side.goalConvRate;
-    const _brakeLeagueRef = baseline.leagueAvgGoals ?? 1.3;
+    const _brakeLeagueRef = baseline.leagueAvgGoals ?? teamExpGoalsRaw;
     const teamExpGoals = (teamExpGoalsRaw < _brakeLeagueRef * 0.60)
       ? _brakeLeagueRef
       : teamExpGoalsRaw;
@@ -685,7 +685,9 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
         // Formül: 1 - (1 / (1 + bloodlustRatio))  →  bloodlust/(1+bloodlust)
         // Bu, (0,1) aralığında doğal bir sigmoid oluşturur — hiçbir keyfi sabit YOK.
         // Dinamik cap: lig gol ortalaması + volatilite'ye bağlı — yüksek golcü ligde daha az fren
-        const _decayCapLeague = (baseline?.leagueAvgGoals ?? 1.3) + (baseline?.leagueGoalVolatility ?? 1.0);
+        const _decayCapGoals = baseline?.leagueAvgGoals ?? teamExpGoals;
+        const _decayCapVol = baseline?.leagueGoalVolatility ?? 1.0;
+        const _decayCapLeague = _decayCapGoals + _decayCapVol;
         const _decayCap = 1.0 - 1.0 / Math.max(2, _decayCapLeague);
         const decayPerGoal = Math.min(_decayCap, bloodlustRatio / (1.0 + bloodlustRatio));
 
@@ -1036,7 +1038,7 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
       const cornerProb = clamp(attkProb.cornerPerMin, DYN_LIMITS.CORNER.MIN, DYN_LIMITS.CORNER.MAX);
       if (r() < cornerProb) {
         stats[side].corners++;
-        const m023raw = getM(isHome ? homeMetrics : awayMetrics, sel, 'M023') ?? dynamicAvgs?.M023 ?? SIM_CONFIG.GLOBAL_FALLBACK.CORNER_GOAL_RATE;
+        const m023raw = getM(isHome ? homeMetrics : awayMetrics, sel, 'M023') ?? dynamicAvgs?.M023 ?? (baseline?.cornerGoalRate != null ? baseline.cornerGoalRate * 100 : null) ?? SIM_CONFIG.GLOBAL_FALLBACK.CORNER_GOAL_RATE;
         if (m023raw != null) {
           const havaFactor = isHome ? homeUnits.HAVA_HAKIMIYETI : awayUnits.HAVA_HAKIMIYETI;
           const cornerGoalRate = (m023raw / 100) * havaFactor;

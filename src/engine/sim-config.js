@@ -113,14 +113,20 @@ function getDynamicLimits(baseline) {
       MIN: Math.max(0.1, 0.4 / volAmp),
       MAX: Math.min(3.0, 1.6 * volAmp)
     },
-    POSSESSION: { MIN: 30, MAX: 70 }, // Fiziksel limit: futbolda 100% top kontrolü olmaz
+    // Possession: standings/takım verisinden dinamik, yoksa fiziksel limit
+    POSSESSION: baseline?.possessionLimits
+      ? { MIN: baseline.possessionLimits.min, MAX: baseline.possessionLimits.max }
+      : SIM_CONFIG.LIMITS.POSSESSION,
     PROBABILITY: SIM_CONFIG.LIMITS.PROBABILITY,
     ON_TARGET: SIM_CONFIG.LIMITS.ON_TARGET,
     BLOCK: SIM_CONFIG.LIMITS.BLOCK,
     CORNER: SIM_CONFIG.LIMITS.CORNER,
     CORNER_GOAL: SIM_CONFIG.LIMITS.CORNER_GOAL,
     CARDS: SIM_CONFIG.LIMITS.CARDS,
-    LAMBDA: SIM_CONFIG.LIMITS.LAMBDA,
+    // Lambda: standings gol dağılımından dinamik, yoksa genel futbol aralığı
+    LAMBDA: baseline?.lambdaLimits
+      ? { MIN: baseline.lambdaLimits.min, MAX: baseline.lambdaLimits.max }
+      : SIM_CONFIG.LIMITS.LAMBDA,
     FORM_MORALE: SIM_CONFIG.LIMITS.FORM_MORALE,
     RED_CARD_POWER_PENALTY_MAX: SIM_CONFIG.LIMITS.RED_CARD_POWER_PENALTY_MAX
   };

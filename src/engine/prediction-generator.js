@@ -211,9 +211,9 @@ function generatePrediction(metricsResult, data, baseline, audit, rng) {
       // Ligin gol volatilitesine göre dinamik olarak olasılıkları merkeze büzüştürür.
       const cvVal = (avg != null && avg > 0) ? (vol / avg) : 0.5;
 
-      // Lig dinamik metrikleri (varsayılan 1.0 nötr etki)
-      const compIndex = metricsResult.meta?.leagueCompetitiveness ?? 1.0;
-      const drawTendency = metricsResult.meta?.leagueDrawTendency ?? 1.0;
+      // Lig dinamik metrikleri — baseline'dan, yoksa metricsResult'tan, son çare nötr
+      const compIndex = baseline?.leagueCompetitiveness ?? metricsResult.meta?.leagueCompetitiveness ?? 1.0;
+      const drawTendency = baseline?.leagueDrawTendency ?? metricsResult.meta?.leagueDrawTendency ?? 1.0;
 
       // CV ne kadar yüksekse (sürpriz ihtimali çoksa) temperature o kadar artar.
       // Rekabetçilik ve Beraberlik eğilimi de T'yi artırır (olasılıkları düzleştirir)
@@ -1308,11 +1308,14 @@ function calculateConfidence(prediction, shared, home, away, baseline) {
       : ((baseline?.medianGoalRate != null && baseline?.leagueAvgGoals > 0)
           ? (baseline.medianGoalRate / (baseline.leagueAvgGoals * 2))
           : 0.35);
-    // Maksimum bonus 30 yerine lig gol averajından türeyen volatilite katsayısına bağlanır
-    const _maxBonus = (baseline.leagueAvgGoals || 2.5) * 10 * (1 + _cvH2H);
+    // Maksimum bonus lig gol averajından türeyen volatilite katsayısına bağlanır
+    if (baseline.leagueAvgGoals == null) { /* veri yok → H2H bonusu skip */ }
+    else {
+    const _maxBonus = baseline.leagueAvgGoals * 10 * (1 + _cvH2H);
 
     const h2hBonus = (h2hRatio - _neutralWinProb) * _maxBonus * h2hReliability;
     baseConfidence += h2hBonus;
+    } // end leagueAvgGoals null guard
   }
 
   // 3. Sakatlık Volatilitesi
@@ -1331,8 +1334,10 @@ function calculateConfidence(prediction, shared, home, away, baseline) {
 
   if (maxInjuryImpact > _injThresh) {
     // Her 1.0 birim sakatlık etkisi → (leagueAvgGoals * volatilite) × derinlik çarpanı
-    const _injPenaltyScale = (baseline.leagueAvgGoals || 2.5) * (1 + _injThresh);
-    baseConfidence -= maxInjuryImpact * _injPenaltyScale * depthMultiplier;
+    if (baseline.leagueAvgGoals != null) {
+      const _injPenaltyScale = baseline.leagueAvgGoals * (1 + _injThresh);
+      baseConfidence -= maxInjuryImpact * _injPenaltyScale * depthMultiplier;
+    }
   }
 
   // 4. Pazar Mutabakatı
@@ -1371,9 +1376,11 @@ function calculateConfidence(prediction, shared, home, away, baseline) {
     ? baseline.leagueGoalVolatility / baseline.leagueAvgGoals
     : 0.5;
   // Volatil ligde verinin eksikliği daha çok cezalandırılır.
-  const _completenessScale = (baseline.leagueAvgGoals || 2.5) * 10 * _cvCompleteness;
-  // completeness 0.5 nötr noktası matematiksel bir simetridir (0-1 arasında)
-  baseConfidence += (dataCompleteness - 0.5) * _completenessScale;
+  if (baseline.leagueAvgGoals != null) {
+    const _completenessScale = baseline.leagueAvgGoals * 10 * _cvCompleteness;
+    // completeness 0.5 nötr noktası matematiksel bir simetridir (0-1 arasında)
+    baseConfidence += (dataCompleteness - 0.5) * _completenessScale;
+  }
 
   return Math.min(UI_CFG.MAX_UI_PROB, Math.max(15, baseConfidence));
 }
