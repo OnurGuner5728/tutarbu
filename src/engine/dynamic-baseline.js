@@ -401,21 +401,40 @@ function getDynamicBaseline(data) {
   const awayRestDays = getRestDays(data.awayLastEvents);
   traces.push(`homeRestDays: ${homeRestDays ?? 'null'} | awayRestDays: ${awayRestDays ?? 'null'}`);
 
-  // Yorgunluk CV ölçeği: volatil liglerde yorgunluk farkı daha belirgin
-  // OPTIMAL_REST = 5 gün: standart hazırlık süresi futbol literatüründe
-  const OPTIMAL_REST = 5;
-  const _lgCV = (_standingsGoals != null && _standingsGoals > 0 && _dynBlock != null)
-    ? Math.min(0.20, Math.max(0.08, 0.12))  // veri güvenilirliği sınırlı, sabit aralık
-    : 0.12;
+  // Yorgunluk CV ölçeği: lig gol dağılımının varyans katsayısından (CV) türetilir
+  // OPTIMAL_REST: ligin ortalama maç aralığından türetilir (maç/hafta)
+  const _lgRows = data.standingsTotal?.standings?.[0]?.rows;
+  const _lgTotalMatches = Array.isArray(_lgRows) ? _lgRows.reduce((s, r) => s + (r.matches ?? 0), 0) : 0;
+  const _lgTeamCount = Array.isArray(_lgRows) ? _lgRows.length : 0;
+  // Lig sezonu boyunca takım başı maç sayısı → ortalama maç arası gün
+  const _lgMatchesPerTeam = (_lgTeamCount > 0 && _lgTotalMatches > 0) ? _lgTotalMatches / _lgTeamCount : null;
+  // Sezon ~38 hafta, maç başına gün = 38*7 / maçSayısı
+  const OPTIMAL_REST = _lgMatchesPerTeam != null ? Math.round((38 * 7) / _lgMatchesPerTeam) : null;
+
+  // Lig gol CV'si: gol dağılımının standart sapması / ortalama
+  const _lgGoalCV = (() => {
+    if (!Array.isArray(_lgRows) || _lgRows.length < 4 || _standingsGoals == null || _standingsGoals <= 0) return null;
+    const gpms = _lgRows
+      .map(r => { const g = r.scoresFor ?? r.goalsFor ?? 0; const m = r.matches ?? r.played ?? 0; return m > 0 ? g / m : null; })
+      .filter(v => v != null);
+    if (gpms.length < 4) return null;
+    const mean = gpms.reduce((s, v) => s + v, 0) / gpms.length;
+    const stdDev = Math.sqrt(gpms.reduce((s, v) => s + (v - mean) ** 2, 0) / gpms.length);
+    return mean > 0 ? stdDev / mean : null;
+  })();
+
+  // Yorgunluk etkisi doğrudan lig CV'sine bağlı — volatil lig = yorgunluk daha etkili
+  const _lgCV = _lgGoalCV; // null ise fatigue nötr (1.0) döner
 
   const computeFatigue = (restDays) => {
-    if (restDays == null) return 1.0; // veri yok → nötr
+    if (restDays == null || _lgCV == null || OPTIMAL_REST == null) return null; // veri yok → null
     if (restDays < OPTIMAL_REST) {
-      // Yorgunluk: 1.0'dan _lgCV kadar düşebilir (2 gün: ~%10-12 düşüş)
+      // Yorgunluk: CV oranında düşüş
       return 1.0 - _lgCV * (OPTIMAL_REST - restDays) / OPTIMAL_REST;
     }
-    // Dinginlik: max %30 × _lgCV yukarı (ör: 7 gün → +%2-3)
-    return Math.min(1.0 + _lgCV * 0.30, 1.0 + _lgCV * (restDays - OPTIMAL_REST) / 10);
+    // Dinginlik: fazla dinlenme CV'nin bir fraksiyonu kadar yukarı
+    const excessDays = restDays - OPTIMAL_REST;
+    return 1.0 + _lgCV * excessDays / (excessDays + OPTIMAL_REST);
   };
 
   const homeFatigue = computeFatigue(homeRestDays);
@@ -547,14 +566,44 @@ function getDynamicBaseline(data) {
     return drawRate;
   })();
 
+  // ── 19. leagueTeamCount — Standings'ten takım sayısı ──
+  const leagueTeamCount = _lgTeamCount > 0 ? _lgTeamCount : null;
+  traces.push(`leagueTeamCount: ${leagueTeamCount ?? 'null'} (${leagueTeamCount != null ? 'STANDINGS' : 'NO_DATA'})`);
+
+  // ── 20. leagueGoalVolatility — Lig gol dağılımının standart sapması ──
+  const leagueGoalVolatility = (() => {
+    if (!Array.isArray(_lgRows) || _lgRows.length < 4) return null;
+    const gpms = _lgRows
+      .map(r => { const g = r.scoresFor ?? r.goalsFor ?? 0; const m = r.matches ?? r.played ?? 0; return m > 0 ? g / m : null; })
+      .filter(v => v != null);
+    if (gpms.length < 4) return null;
+    const mean = gpms.reduce((s, v) => s + v, 0) / gpms.length;
+    const stdDev = Math.sqrt(gpms.reduce((s, v) => s + (v - mean) ** 2, 0) / gpms.length);
+    traces.push(`leagueGoalVolatility: ${stdDev.toFixed(3)} (STANDINGS, mean=${mean.toFixed(3)}, n=${gpms.length})`);
+    return stdDev;
+  })();
+
+  // ── 21. normMinRatio / normMaxRatio — Lig gol dağılımından güç çarpan aralığı ──
+  // En az gol atan takım / lig ortalaması = min ratio
+  // En çok gol atan takım / lig ortalaması = max ratio
+  const normMinRatio = (() => {
+    if (lambdaLimits == null || leagueAvgGoals == null || leagueAvgGoals <= 0) return null;
+    return lambdaLimits.min / leagueAvgGoals;
+  })();
+  const normMaxRatio = (() => {
+    if (lambdaLimits == null || leagueAvgGoals == null || leagueAvgGoals <= 0) return null;
+    return lambdaLimits.max / leagueAvgGoals;
+  })();
+  traces.push(`normMinRatio: ${normMinRatio?.toFixed(3) ?? 'null'} | normMaxRatio: ${normMaxRatio?.toFixed(3) ?? 'null'} (${normMinRatio != null ? 'LEAGUE_RATIO' : 'NO_DATA'})`);
+
   return {
     leagueAvgGoals, shotsPerMin, onTargetRate, goalConvRate,
     gkSaveRate, blockRate, cornerPerMin, yellowPerMin,
     redPerMin, penConvRate, penPerMatch, possessionBase,
     matchMinutes, homeRestDays, awayRestDays, homeFatigue, awayFatigue,
-    // Yeni dinamik alanlar
     possessionLimits, lambdaLimits, cornerGoalRate,
     leagueCompetitiveness, leagueDrawTendency,
+    leagueTeamCount, leagueGoalVolatility, normMinRatio, normMaxRatio,
     traces,
   };
 }

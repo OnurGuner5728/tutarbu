@@ -279,9 +279,14 @@ function generatePrediction(metricsResult, data, baseline, audit, rng) {
         simDist.awayWin ?? 0
       );
       const cv = (baseline?.leagueGoalVolatility != null && baseline?.leagueAvgGoals > 0)
-        ? baseline.leagueGoalVolatility / baseline.leagueAvgGoals : 0.5;
-      // Volatil ligde daha yüksek eşik — tahmin daha zor
-      const dynamicThreshold = Math.max(52.0, Math.min(62.0, 50.0 + cv * 20.0));
+        ? baseline.leagueGoalVolatility / baseline.leagueAvgGoals : null;
+      // Eşik değer: ligin en sık sonucunun gerçekleşme oranı
+      // drawTendency = toplam beraberlik oranı, bu da ligin tahmin edilebilirliğini belirler
+      // Beraberlik oranı yüksek → sonuçlar tahmin edilemez → eşik yükselir
+      const _lgDrawRate = baseline?.leagueDrawTendency; // saf oran (0.20-0.30 arası tipik)
+      const dynamicThreshold = _lgDrawRate != null
+        ? (100 / 3) + (_lgDrawRate * 100) // ligin beraberlik oranı arttıkça eşik artar
+        : (cv != null ? (100 / 3) + cv * (100 / 3) : 50); // cv varsa ondan, yoksa %50
       const tier = maxProb >= 70.0 ? 'HIGH' : maxProb >= dynamicThreshold ? 'MEDIUM' : 'LOW';
       return {
         maxProbability: round2(maxProb),
@@ -521,12 +526,15 @@ function generatePrediction(metricsResult, data, baseline, audit, rng) {
 
       // Conditional FT probs given HT outcome (simplified state-conditioned)
       // Öndeki takım savunmaya çekilir: FT2|HT1 düşer, FT1|HT1 yükselir
+      // Ayar miktarı doğrudan CV'den: volatil ligde yarı zaman sonucu daha az belirleyici
       const _dynAdj = (baseline?.leagueGoalVolatility != null && baseline?.leagueAvgGoals > 0)
-        ? Math.min(0.30, (baseline.leagueGoalVolatility / baseline.leagueAvgGoals) * 0.5)
-        : 0.15;
-      const condFT = (htResult, adj = _dynAdj) => {
-        if (htResult === 'home') return { ft1: Math.min(0.95, pFT1 + adj), ftX: Math.max(0, pFTX - adj/2), ft2: Math.max(0, pFT2 - adj/2) };
-        if (htResult === 'away') return { ft1: Math.max(0, pFT1 - adj/2), ftX: Math.max(0, pFTX - adj/2), ft2: Math.min(0.95, pFT2 + adj) };
+        ? baseline.leagueGoalVolatility / (baseline.leagueAvgGoals + baseline.leagueGoalVolatility)
+        : null;
+      const condFT = (htResult) => {
+        const adj = _dynAdj ?? 0; // veri yoksa ayar yok (HT→FT koşullu etki skip)
+        if (adj === 0) return { ft1: pFT1, ftX: pFTX, ft2: pFT2 };
+        if (htResult === 'home') return { ft1: pFT1 + adj, ftX: Math.max(0, pFTX - adj/2), ft2: Math.max(0, pFT2 - adj/2) };
+        if (htResult === 'away') return { ft1: Math.max(0, pFT1 - adj/2), ftX: Math.max(0, pFTX - adj/2), ft2: pFT2 + adj };
         return { ft1: pFT1, ftX: pFTX, ft2: pFT2 };
       };
       const normalize = (o) => { const s = o.ft1+o.ftX+o.ft2; return { ft1: o.ft1/s, ftX: o.ftX/s, ft2: o.ft2/s }; };
@@ -1012,7 +1020,7 @@ function generateFirstHalfPrediction(home, away, poissonPrediction, baseline) {
   
   const _dynHT = (baseline?.dynamicAvgs?.M005 != null && baseline?.dynamicAvgs?.M006 != null && baseline?.dynamicAvgs?.M007 != null)
     ? (baseline.dynamicAvgs.M005 + baseline.dynamicAvgs.M006 + baseline.dynamicAvgs.M007) / 100
-    : 0.45;
+    : null;
 
   const avgHTFrac = (homeHTFrac != null && awayHTFrac != null)
     ? (homeHTFrac + awayHTFrac) / 2
@@ -1099,11 +1107,16 @@ function generateCornerPrediction(home, away, shared, baseline) {
   if (lgCornerPerTeam != null && lgCornerPerTeam > 0) {
     const lgCornerTotal = lgCornerPerTeam * 2;
     const _cv = (baseline?.leagueGoalVolatility != null && baseline?.leagueAvgGoals > 0)
-      ? baseline.leagueGoalVolatility / baseline.leagueAvgGoals : 0.15;
-    const cornerStd = lgCornerTotal * _cv; // dinamik CV yaklaşımı
-    cL = Math.round((lgCornerTotal - cornerStd) * 2) / 2; // 0.5'e yuvarla
-    cM = Math.round(lgCornerTotal * 2) / 2;
-    cH = Math.round((lgCornerTotal + cornerStd) * 2) / 2;
+      ? baseline.leagueGoalVolatility / baseline.leagueAvgGoals : null;
+    if (_cv != null) {
+      const cornerStd = lgCornerTotal * _cv;
+      cL = Math.round((lgCornerTotal - cornerStd) * 2) / 2;
+      cM = Math.round(lgCornerTotal * 2) / 2;
+      cH = Math.round((lgCornerTotal + cornerStd) * 2) / 2;
+    } else {
+      cM = Math.round(lgCornerTotal * 2) / 2;
+      cL = cM - 1; cH = cM + 1;
+    }
   }
 
   // Poisson-based over/under: P(X > k) = 1 - CDF(k, lambda)
@@ -1155,10 +1168,15 @@ function generateCardPrediction(home, away, shared, baseline) {
   if (lgYellowPerTeam != null && lgYellowPerTeam > 0) {
     const lgCardTotal = lgYellowPerTeam * 2;
     const _cv = (baseline?.leagueGoalVolatility != null && baseline?.leagueAvgGoals > 0)
-      ? baseline.leagueGoalVolatility / baseline.leagueAvgGoals : 0.20;
-    const cardStd = lgCardTotal * Math.min(0.40, _cv * 1.5); // dinamik CV yaklaşımı (kartlar gole göre daha volatil)
-    cardL = Math.round((lgCardTotal - cardStd) * 2) / 2;
-    cardH = Math.round((lgCardTotal + cardStd) * 2) / 2;
+      ? baseline.leagueGoalVolatility / baseline.leagueAvgGoals : null;
+    if (_cv != null) {
+      const cardStd = lgCardTotal * Math.min(0.40, _cv * 1.5);
+      cardL = Math.round((lgCardTotal - cardStd) * 2) / 2;
+      cardH = Math.round((lgCardTotal + cardStd) * 2) / 2;
+    } else {
+      const mid = Math.round(lgCardTotal * 2) / 2;
+      cardL = mid - 0.5; cardH = mid + 0.5;
+    }
   }
 
   // Poisson-based over/under
@@ -1297,8 +1315,8 @@ function calculateConfidence(prediction, shared, home, away, baseline) {
     // H2H güvenilirlik çarpanı: ligin takımların birbirleriyle oynama sayısından veya volatiflikten
     // Daha güvenilir (stabil) liglerde daha az H2H örneği yeterli olabilir
     const _cvH2H = (baseline.leagueGoalVolatility != null && baseline.leagueAvgGoals > 0)
-      ? baseline.leagueGoalVolatility / baseline.leagueAvgGoals : 0.5;
-    const _reqSample = Math.max(4, 10 * _cvH2H);
+      ? baseline.leagueGoalVolatility / baseline.leagueAvgGoals : null;
+    const _reqSample = _cvH2H != null ? Math.max(4, 10 * _cvH2H) : 4;
     const h2hReliability = Math.min(1.0, totalH2H / _reqSample);
 
     const favH2HWins = favModel === 'home' ? homeH2HWins : (favModel === 'away' ? awayH2HWins : Math.max(homeH2HWins, awayH2HWins));
@@ -1376,9 +1394,9 @@ function calculateConfidence(prediction, shared, home, away, baseline) {
   // Tam veri bonusu ve sıfır veri cezası, ligin volatilite bandından (CV) türetilir.
   const _cvCompleteness = (baseline.leagueGoalVolatility != null && baseline.leagueAvgGoals > 0)
     ? baseline.leagueGoalVolatility / baseline.leagueAvgGoals
-    : 0.5;
+    : null;
   // Volatil ligde verinin eksikliği daha çok cezalandırılır.
-  if (baseline.leagueAvgGoals != null) {
+  if (baseline.leagueAvgGoals != null && _cvCompleteness != null) {
     const _completenessScale = baseline.leagueAvgGoals * 10 * _cvCompleteness;
     // completeness 0.5 nötr noktası matematiksel bir simetridir (0-1 arasında)
     baseConfidence += (dataCompleteness - 0.5) * _completenessScale;
@@ -1464,11 +1482,17 @@ function calculatePenaltyChance(home, away, shared, baseline, data) {
   // Ama eşikler lig volatilitesine bağlı olarak ayarlanır:
   const cv = (baseline?.leagueGoalVolatility != null && baseline?.leagueAvgGoals > 0)
     ? baseline.leagueGoalVolatility / baseline.leagueAvgGoals : null;
-  // Yüksek volatilite = daha geniş eşikler, düşük volatilite = daha dar eşikler
-  const highMult = cv != null ? (1.2 + cv * 0.5) : 1.5;
-  const medMult = cv != null ? (0.6 + cv * 0.3) : 0.8;
+  // Tier eşikleri: lig volatilitesinden türetilir
+  // Yüksek CV = daha geniş band (high için daha yüksek, med için daha düşük çarpan)
+  const highMult = cv != null ? (1 + cv) : null;
+  const medMult = cv != null ? (1 - cv) : null;
 
-  const tier = chanceRaw > _penMatchAvg * highMult ? 'High' : chanceRaw > _penMatchAvg * medMult ? 'Medium' : 'Low';
+  let tier;
+  if (highMult != null) {
+    tier = chanceRaw > _penMatchAvg * highMult ? 'High' : chanceRaw > _penMatchAvg * medMult ? 'Medium' : 'Low';
+  } else {
+    tier = chanceRaw > _penMatchAvg ? 'High' : chanceRaw > _penMatchAvg / 2 ? 'Medium' : 'Low';
+  }
   return { tier, raw: round2(chanceRaw), avg: round2(_penMatchAvg) };
 }
 
@@ -1520,10 +1544,15 @@ function calculateRedCardChance(home, away, shared, baseline, data) {
   // Tier eşikleri: lig volatilitesine bağlı
   const cv = (baseline?.leagueGoalVolatility != null && baseline?.leagueAvgGoals > 0)
     ? baseline.leagueGoalVolatility / baseline.leagueAvgGoals : null;
-  const highMult = cv != null ? (1.5 + cv * 0.5) : 1.8;
-  const medMult = cv != null ? (0.7 + cv * 0.3) : 0.9;
+  const highMult = cv != null ? (1 + cv) : null;
+  const medMult = cv != null ? (1 - cv) : null;
 
-  const tier = chanceRaw > _redMatchAvg * highMult ? 'High' : chanceRaw > _redMatchAvg * medMult ? 'Medium' : 'Low';
+  let tier;
+  if (highMult != null) {
+    tier = chanceRaw > _redMatchAvg * highMult ? 'High' : chanceRaw > _redMatchAvg * medMult ? 'Medium' : 'Low';
+  } else {
+    tier = chanceRaw > _redMatchAvg ? 'High' : chanceRaw > _redMatchAvg / 2 ? 'Medium' : 'Low';
+  }
   return { tier, raw: round2(chanceRaw), avg: round2(_redMatchAvg) };
 }
 

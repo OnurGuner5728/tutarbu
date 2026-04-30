@@ -672,7 +672,7 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
         const tournamentPressure = u.TURNUVA_BASKISI || 1.0;
 
         // Lig temposu: volatil liglerde farklar daha kolay açılır
-        const volatility = baseline.leagueGoalVolatility || 1.0;
+        const volatility = baseline.leagueGoalVolatility ?? baseline.leagueAvgGoals ?? teamExpGoalsRaw;
 
         // "Kan Kokusu" (Bloodlust) Ratio — tamamen dinamik, sıfır sabit değer
         // Yüksek → takım acımasızca basmaya devam eder (7-0 mümkün)
@@ -686,7 +686,7 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
         // Bu, (0,1) aralığında doğal bir sigmoid oluşturur — hiçbir keyfi sabit YOK.
         // Dinamik cap: lig gol ortalaması + volatilite'ye bağlı — yüksek golcü ligde daha az fren
         const _decayCapGoals = baseline?.leagueAvgGoals ?? teamExpGoals;
-        const _decayCapVol = baseline?.leagueGoalVolatility ?? 1.0;
+        const _decayCapVol = baseline?.leagueGoalVolatility ?? _decayCapGoals;
         const _decayCapLeague = _decayCapGoals + _decayCapVol;
         const _decayCap = 1.0 - 1.0 / Math.max(2, _decayCapLeague);
         const decayPerGoal = Math.min(_decayCap, bloodlustRatio / (1.0 + bloodlustRatio));
@@ -699,9 +699,10 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
     }
 
     // Yorgunluk çarpanı: baseline'dan dinlenme günü bazlı (dynamic-baseline.js hesaplar)
-    const fatigueMult = side === 'home'
-      ? (baseline?.homeFatigue ?? 1.0)
-      : (baseline?.awayFatigue ?? 1.0);
+    let fatigueMult = side === 'home'
+      ? (baseline?.homeFatigue ?? null)
+      : (baseline?.awayFatigue ?? null);
+    if (fatigueMult == null) fatigueMult = 1.0; // yorgunluk verisi yoksa nötr — sadece çarpan kimliği
 
     return clamp(atkUnit * formUnit * stateUnit * urgency * comfortBrake * fatigueMult * (1 - s.redCardPenalty), DYN_LIMITS.POWER.MIN, DYN_LIMITS.POWER.MAX);
   };
@@ -770,11 +771,11 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
 
     // Lig temposu (volatility) ve kadro derinliğine göre dinamik yorgunluk hızı
     // Yüksek tempolu ligde dar kadrolar daha çabuk yorulur.
-    const leaguePace = baseline.leagueGoalVolatility || 1.0;
-    const squadDepth = u.KADRO_DERINLIGI || 1.0;
-    const fragility = u.PSIKOLOJIK_KIRILGANLIK || 1.0;
-    const mentalToughness = u.ZİHİNSEL_DAYANIKLILIK || 1.0;
-    const leagueTeamCount = baseline.leagueTeamCount || 20; // Genelde 18-20
+    const leaguePace = baseline.leagueGoalVolatility ?? (baseline.leagueAvgGoals ?? 1);
+    const squadDepth = u.KADRO_DERINLIGI ?? 1; // BIM'den, yoksa etkisiz
+    const fragility = u.PSIKOLOJIK_KIRILGANLIK ?? 1; // BIM'den, yoksa etkisiz
+    const mentalToughness = u.ZİHİNSEL_DAYANIKLILIK ?? 1; // BIM'den, yoksa etkisiz
+    const leagueTeamCount = baseline.leagueTeamCount ?? null;
 
     // Maçın hangi safhasında olduğumuzu lateBase (dinamik gol sonları dakikası) belirler
     const matchProgress = minute / (lateBase || 90);
@@ -800,8 +801,8 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
     effective.DISIPLIN = u.DISIPLIN * rcMult * Math.max(fragility / squadDepth, 1.0 - disciplineDrop);
 
     // ── PSİKANALİZ GRUBU ──
-    const moraleMin = baseline.normMinRatio || 0.5;
-    const moraleMax = baseline.normMaxRatio || 2.0;
+    const moraleMin = baseline.normMinRatio ?? DYN_LIMITS.POWER.MIN;
+    const moraleMax = baseline.normMaxRatio ?? DYN_LIMITS.POWER.MAX;
     effective.ZİHİNSEL_DAYANIKLILIK = clamp(u.ZİHİNSEL_DAYANIKLILIK * s.morale * rcMult, moraleMin, moraleMax);
     // Kırılganlık ters çalışır: Moral düştükçe ve kırmızı kart oldukça kırılganlık üstel artar
     const moraleDeficit = Math.max(0, 1.0 - s.morale);
@@ -832,12 +833,12 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
     effective.TAKTIKSEL_UYUM = u.TAKTIKSEL_UYUM * rcMult * fatigueFactor;
     effective.BAGLANTI_OYUNU = u.BAGLANTI_OYUNU * s.momentum * rcMult * fatigueFactor;
     // Kadro derinliği, yedekler oyuna girdikçe takımın base derinliğine ve lige göre artar
-    const subImpact = subsDone[side] * (leaguePace / (squadDepth * leagueTeamCount));
+    const subImpact = (leagueTeamCount != null && squadDepth > 0) ? subsDone[side] * (leaguePace / (squadDepth * leagueTeamCount)) : 0;
     effective.KADRO_DERINLIGI = u.KADRO_DERINLIGI * (1.0 + subImpact);
     // H2H Dominasyon tarihseldir, maç içi sabittir (tek istisna)
     effective.H2H_DOMINASYON = u.H2H_DOMINASYON;
-    const momMin = baseline.normMinRatio || 0.5;
-    const momMax = baseline.normMaxRatio || 2.5;
+    const momMin = baseline.normMinRatio ?? DYN_LIMITS.MOMENTUM.MIN;
+    const momMax = baseline.normMaxRatio ?? DYN_LIMITS.MOMENTUM.MAX;
     effective.MOMENTUM_AKIŞI = clamp(u.MOMENTUM_AKIŞI * s.momentum * rcMult, momMin, momMax);
 
     // ── KALECİ GRUBU ──
@@ -861,8 +862,9 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
 
   // Dinamik zaman pencereleri: gerçek lig gol dağılımından (M005-M010) türetilir.
   // Veri yoksa makul statik fallback kullanılır.
-  const earlyBase = dynamicTimeWindows?.EARLY_GAME_END ?? 20;
-  const lateBase = dynamicTimeWindows?.LATE_GAME_START ?? 75;
+  const _matchMins = baseline.matchMinutes ?? 90;
+  const earlyBase = dynamicTimeWindows?.EARLY_GAME_END ?? Math.round(_matchMins / 4.5); // ~20 for 90min
+  const lateBase = dynamicTimeWindows?.LATE_GAME_START ?? Math.round(_matchMins * 5 / 6); // ~75 for 90min
 
   // Urgency erken faz kısaltma: density saturation formu (0.6/0.08/0.5/0.95 sabitleri kaldırıldı).
   const _urgencyEarlyFactor = (baseline.leaguePointDensity != null && baseline.leaguePointDensity >= 0)
