@@ -1149,8 +1149,11 @@ app.get('/api/backtest', async (req, res) => {
       if (!evResp?.events?.length) continue;
 
       // Kabul edilen maç durumları
-      const acceptedStatuses = new Set(['finished']);
-      if (includeUnplayed) { acceptedStatuses.add('notstarted'); acceptedStatuses.add('inprogress'); }
+      // includeUnplayed=true → SADECE oynanmamış maçlar (finished atlanır)
+      // includeUnplayed=false → SADECE oynanmış maçlar (default backtest davranışı)
+      const acceptedStatuses = includeUnplayed
+        ? new Set(['notstarted', 'inprogress'])
+        : new Set(['finished']);
 
       let dayMatches = evResp.events.filter(e => {
         if (!acceptedStatuses.has(e.status?.type)) return false;
