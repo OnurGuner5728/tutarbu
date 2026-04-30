@@ -73,13 +73,18 @@ async function main() {
 
   // 3. Sonuçları analiz et
   console.log('\n[3] SİMÜLASYON SONUÇLARI:');
-  console.log(`    Skor: ${simResult.homeGoals ?? simResult.score?.home ?? '?'} - ${simResult.awayGoals ?? simResult.score?.away ?? '?'}`);
+  // result yapısı: { result: { homeGoals, awayGoals }, stats: {home, away}, units: {home, away} }
+  const resultObj = simResult.result ?? simResult;
+  const homeGoals = resultObj.homeGoals ?? simResult.homeGoals ?? '?';
+  const awayGoals = resultObj.awayGoals ?? simResult.awayGoals ?? '?';
+  console.log(`    Skor: ${homeGoals} - ${awayGoals}`);
 
   // Stats
   const hStats = simResult.stats?.home || {};
   const aStats = simResult.stats?.away || {};
-  console.log(`    Home şut=${hStats.shots}, isabetli=${hStats.shotsOnTarget}, gol=${simResult.homeGoals ?? simResult.score?.home}`);
-  console.log(`    Away şut=${aStats.shots}, isabetli=${aStats.shotsOnTarget}, gol=${simResult.awayGoals ?? simResult.score?.away}`);
+  console.log(`    Home şut=${hStats.shots}, isabetli=${hStats.shotsOnTarget}, gol=${homeGoals}`);
+  console.log(`    Away şut=${aStats.shots}, isabetli=${aStats.shotsOnTarget}, gol=${awayGoals}`);
+
 
   // 4. Units kontrolü
   console.log('\n[4] BEHAVIORAL UNITS:');
@@ -176,13 +181,24 @@ async function main() {
     console.log('    dynamicCount:', simResult._debug.metricAudit?.dynamicCount);
   }
 
-  // 11. Baseline yeni alanlar
-  console.log('\n[11] YENİ BASELINE ALANLARI:');
-  const newKeys = ['foulRate', 'offsideRate', 'throwInRate', 'leaguePointDensity'];
+  // 11. Baseline yeni alanlar + possession dynamics kaynak
+  console.log('\n[11] YENİ BASELINE + POSSESSION DİNAMİK KAYNAKLARI:');
+  const newKeys = ['foulRate', 'offsideRate', 'throwInRate', 'leaguePointDensity', 'leagueTeamCount'];
   for (const k of newKeys) {
     const v = bp[k];
     console.log(`    ${k.padEnd(25)} = ${v ?? 'null'}`);
   }
+  // possessionLimits: territory impact scale'in ana kaynağı
+  const pLim = bp.possessionLimits;
+  console.log(`    possessionLimits.min     = ${pLim?.min ?? 'null'}`);
+  console.log(`    possessionLimits.max     = ${pLim?.max ?? 'null'}`);
+  const spread = (pLim?.min != null && pLim?.max != null) ? (pLim.max - pLim.min) : null;
+  console.log(`    possessionSpread (puan)  = ${spread ?? 'null (fallback aktif)'}`);
+  if (spread != null) {
+    console.log(`    → terrCoeff              = ${(spread * 0.5).toFixed(2)} (territory farkı × bu = possession kayması %)`);
+    console.log(`    → regRate                = ${((1 - spread/100) / (bp.leagueTeamCount ?? 20)).toFixed(4)} (dakika başı regresyon)`);
+  }
+
 
   console.log('\n=== TEŞHİS TAMAMLANDI ===');
 }

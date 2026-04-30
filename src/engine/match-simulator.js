@@ -944,8 +944,8 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
   // _mRange > 0 ise: volatil ligde momentum → possession kayması daha belirgin.
   const momentumPossCoeff = (_mRange > 1e-9)
     ? ((_lgVol != null && baseline.leagueAvgGoals != null && baseline.leagueAvgGoals > 0)
-        ? _pRange * _lgVol / (baseline.leagueAvgGoals * _mRange)
-        : _pRange / (4 * _mRange))
+      ? _pRange * _lgVol / (baseline.leagueAvgGoals * _mRange)
+      : _pRange / (4 * _mRange))
     : 0; // Lig momentum aralığı sıfır → momentum etkisiz
 
   // Dinamik zaman pencereleri: gerçek lig gol dağılımından (M005-M010) türetilir.
@@ -1009,35 +1009,48 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
     state.home.fatigue = Math.min(1, state.home.fatigue + state.home.pressing * _lgPace / (_hKadroD * 90));
     state.away.fatigue = Math.min(1, state.away.fatigue + state.away.pressing * _lgPace / (_aKadroD * 90));
 
-    // ─── Possession Belirleme (dakika başında) ───────────────────────
-    const rawHomePoss = hProb.possessionBase * 100;
-    const rawAwayPoss = aProb.possessionBase * 100;
-    const possTotal = rawHomePoss + rawAwayPoss;
-    const normalizedHomePoss = possTotal > 0 ? (rawHomePoss / possTotal) * 100 : 50;
+    // ─── Possession Belirleme — 4 Katmanlı Dinamik Model ────────────────
+    // KATMAN 1: Her takımın lig ortalamasından sezonal sapması
+    // Sapma: takım avg - lig avg → "doğal possession çekişi"
+    const _lgPossAvg100 = (baseline.possessionBase ?? 0.5) * 100;
+    const _hPoss100 = hProb.possessionBase * 100;
+    const _aPoss100 = aProb.possessionBase * 100;
+    const _hDevPct = _hPoss100 - _lgPossAvg100; // + ise lig ort. üstünde
+    const _aDevPct = _aPoss100 - _lgPossAvg100;
+
+    // KATMAN 2: Dinamik sigma — sapma büyüklüğü × lig volatilitesi
+    // UCL: lgPace=0.374, min sapma ≈0.5puan → minSigma=1.12, hSigma=1.49
+    // Büyük sapmalı takım (Pep'in City) → çok daha geniş maç içi salınım
+    const _minSigma = _lgPace * 3;
+    const _hSigma = _minSigma + Math.abs(_hDevPct) * _lgPace * 2;
+    const _aSigma = _minSigma + Math.abs(_aDevPct) * _lgPace * 2;
+
+    // KATMAN 3: Maç durumu — her etken takımın kendi sigması ile ölçeklenir
+    // territory: bölgesel kontrol (>0.5 = rakip yarısında)
+    // tacticalStance: −1=park the bus, +1=all-out attack
+    // urgency: geri kalan dakika × gol ihtiyacı baskısı
+    const _hMatchPoss = _hPoss100
+      + _hSigma * (state.home.territory - 0.5) * 4
+      + _hSigma * state.home.tacticalStance * 3
+      + _hSigma * Math.max(0, state.home.urgency - 1) * 2;
+    const _aMatchPoss = _aPoss100
+      + _aSigma * (state.away.territory - 0.5) * 4
+      + _aSigma * state.away.tacticalStance * 3
+      + _aSigma * Math.max(0, state.away.urgency - 1) * 2;
+
+    // Normalize: toplam = 100% garantisi
+    const _rawPossSum = _hMatchPoss + _aMatchPoss;
+    const _normalizedBase = _rawPossSum > 0 ? (_hMatchPoss / _rawPossSum) * 100 : 50;
+
+    // KATMAN 4: Momentum kayması (mevcut dinamik formül korunur)
     const _momShift = (state.home.momentum - state.away.momentum) * momentumPossCoeff;
-
-    // Yeni dinamik kaymalar: territory, pressing, tacticalStance
-    // Katsayılar tamamen lig verisinden türetilir
-    const _possRange = DYN_LIMITS.POSSESSION.MAX - DYN_LIMITS.POSSESSION.MIN;
-    const _lgTeamCount = baseline.leagueTeamCount ?? 20;
-    // Territory kayması: territory farkı × possRange × (lgScale / lgAvg) — volatil lig = büyük kayma
-    const _terrCoeff = _possRange * _lgPace / _s(baseline.leagueAvgGoals);
-    const _terrShift = (state.home.territory - state.away.territory) * _terrCoeff;
-    // Pressing kayması: pressing farkı × possRange × pressImpactScale
-    const _pressCoeff = _possRange * computePressingImpactScale(baseline);
-    const _pressShift = (state.home.pressing - state.away.pressing) * _pressCoeff;
-    // Stance kayması: stance farkı × possRange / lgTeamCount — büyük ligde daha az etki
-    const _stanceCoeff = _possRange / _lgTeamCount;
-    const _stanceShift = (state.home.tacticalStance - state.away.tacticalStance) * _stanceCoeff;
-
-    const _rawHomePos = normalizedHomePoss
-      + (isFinite(_momShift) ? _momShift : 0)
-      + (isFinite(_terrShift) ? _terrShift : 0)
-      + (isFinite(_pressShift) ? _pressShift : 0)
-      + (isFinite(_stanceShift) ? _stanceShift : 0);
-    const currentHomePos = clamp(_rawHomePos, DYN_LIMITS.POSSESSION.MIN, DYN_LIMITS.POSSESSION.MAX);
-    // Rastgele top sahibi: ev sahibi possession oranına göre stokastik seçim
+    const currentHomePos = clamp(
+      _normalizedBase + (isFinite(_momShift) ? _momShift : 0),
+      DYN_LIMITS.POSSESSION.MIN, DYN_LIMITS.POSSESSION.MAX
+    );
     const possessor = r() < currentHomePos / 100 ? 'home' : 'away';
+
+
 
     // Urgency başlangıcı — dinamik _ihtMax envelope'u
     const _ihtMaxLoop = (baseline.normMaxRatio != null && baseline.normMinRatio != null)
@@ -1401,11 +1414,18 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
     });
   }
 
-  // Final possession: M150-based baseline normalized between two teams, adjusted by TOPLA_OYNAMA unit delta
-  const _fpTotal = hProb.possessionBase * 100 + aProb.possessionBase * 100;
-  const _fpBase = _fpTotal > 0 ? (hProb.possessionBase * 100 / _fpTotal) * 100 : 50;
+  // Final possession — aynı 4 katmanlı model (maç sonu snapshot)
+  const _fpLgAvg = (baseline.possessionBase ?? 0.5) * 100;
+  const _fpH = hProb.possessionBase * 100;
+  const _fpA = aProb.possessionBase * 100;
+  const _fpHSigma = _lgPace * 3 + Math.abs(_fpH - _fpLgAvg) * _lgPace * 2;
+  const _fpASigma = _lgPace * 3 + Math.abs(_fpA - _fpLgAvg) * _lgPace * 2;
+  // TOPLA_OYNAMA birimi: possession dominansını final skora yansıt
+  const _fpHMatch = _fpH + _fpHSigma * (homeUnits.TOPLA_OYNAMA - 1.0) * 4;
+  const _fpAMatch = _fpA + _fpASigma * (awayUnits.TOPLA_OYNAMA - 1.0) * 4;
+  const _fpSum = _fpHMatch + _fpAMatch;
   const finalHomePoss = Math.round(clamp(
-    _fpBase + (homeUnits.TOPLA_OYNAMA - awayUnits.TOPLA_OYNAMA) * 20,
+    _fpSum > 0 ? (_fpHMatch / _fpSum) * 100 : 50,
     DYN_LIMITS.POSSESSION.MIN, DYN_LIMITS.POSSESSION.MAX
   ));
   return { result: { homeGoals: goals.home, awayGoals: goals.away, winner: goals.home > goals.away ? 'home' : (goals.away > goals.home ? 'away' : 'draw') }, stats: { home: { ...stats.home, possession: finalHomePoss }, away: { ...stats.away, possession: 100 - finalHomePoss } }, events, minuteLog, units: { home: homeUnits, away: awayUnits } };

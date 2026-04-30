@@ -27,33 +27,65 @@ function computeLeagueScale(baseline) {
 
 /**
  * computeTerritoryImpactScale — Territory güncellemelerinin büyüklüğü.
- * lgScale / sqrt(lgTeamCount) — takım sayısı arttıkça etki normalize olur.
+ * Ligteki gerçek possession yayılımından (possessionLimits spread) türetilir.
+ * Ör: ligde possession 35-70% arasında değişiyorsa spread=0.35 → güçlü etki.
+ * Veri yoksa: lgScale / sqrt(lgTeamCount) — standings-based fallback.
  */
 function computeTerritoryImpactScale(baseline) {
+  const pMin = baseline.possessionLimits?.min;
+  const pMax = baseline.possessionLimits?.max;
+  if (pMin != null && pMax != null && pMax > pMin) {
+    // Gerçek possession yayılımı: ligteki max-min farkı (0-1 aralığında)
+    const spread = (pMax - pMin) / 100;
+    // Her territory biriminin possession'a katkısı spread oranında
+    return spread;
+  }
+  // Fallback: lig volatilitesi × rekabet yoğunluğu
   const lgScale = computeLeagueScale(baseline);
-  const lgTeamCount = baseline.leagueTeamCount ?? 20;
-  return lgScale / Math.sqrt(lgTeamCount);
+  const density = baseline.leaguePointDensity ?? 1;
+  const lgAvg = baseline.leagueAvgGoals ?? 1;
+  return lgScale * density / (lgAvg + density);
 }
 
 /**
  * computePressingImpactScale — Pressing güncellemelerinin büyüklüğü.
- * lgScale × (leaguePointDensity / lgAvg) — yoğun ligde pressing daha etkili.
+ * Lig faul yoğunluğundan türetilir: agresif lig → pressing daha etkili.
+ * foulRate × lgScale: faul sıklığı ile lig volatilitesinin bileşik etkisi.
  */
 function computePressingImpactScale(baseline) {
   const lgScale = computeLeagueScale(baseline);
+  // Faul oranı lig agresifliğini temsil eder — pressing yoğunluğuyla doğrudan ilişkili
+  const foulRate = baseline.foulRate ?? null;
+  if (foulRate != null) {
+    // Normalize: faulRate × 90 = maç başı faul sayısı; lig ortalamasına böl
+    const lgAvg = baseline.leagueAvgGoals ?? 1;
+    return lgScale * (foulRate * 90) / (lgAvg * 10); // 10: faul/gol oranı normalize
+  }
   const lgAvg = baseline.leagueAvgGoals ?? 1;
   const density = baseline.leaguePointDensity ?? lgAvg;
   return lgScale * density / (lgAvg + density);
 }
 
 /**
- * computeRegressionRate — Doğal regresyon hızı.
- * 1 / (lgTeamCount × competitiveness) — rekabetçi ligde daha yavaş regresyon.
+ * computeRegressionRate — Doğal regresyon hızı (dakika başı).
+ * possessionSpread'e göre: geniş yayılım → ekipler bölgeyi uzun tutar → yavaş regresyon.
+ * Dar yayılım → rakipler hızla toparlar → hızlı regresyon.
  */
 function computeRegressionRate(baseline) {
   const lgTeamCount = baseline.leagueTeamCount ?? 20;
+  const pMin = baseline.possessionLimits?.min;
+  const pMax = baseline.possessionLimits?.max;
+  if (pMin != null && pMax != null && pMax > pMin) {
+    const spread = (pMax - pMin) / 100; // [0,1]
+    // Geniş spread → takımlar dominant, bölgeyi tutarlar → regresyon yavaş
+    // Dar spread → rekabetçi lig, hızla toparlanır → regresyon hızlı
+    // Formül: (1 - spread) / lgTeamCount
+    return (1 - spread) / lgTeamCount;
+  }
+  // Fallback: lig rekabetçilik indeksinden türet
   const comp = baseline.leagueCompetitiveness ?? 1;
-  return 1 / (lgTeamCount * Math.max(comp, 0.1));
+  const lgScale = computeLeagueScale(baseline);
+  return lgScale / (lgTeamCount * Math.max(comp, 0.1));
 }
 
 /**
@@ -212,10 +244,16 @@ function applyEventImpact(eventType, actorSide, reactorSide, minute, state, home
   const diminishing = 1 / (1 + recentCount * lgScale);
 
   // 5. Zaman çarpanı — maç sonu yaklaştıkça etkiler büyür
+  // MAC_SONU/MAC_BASLANGICI birimleri 1.0 ise (nötr), lig volatilitesi devreye girer
   const matchProgress = minute / 90;
   const macSonuUnit = actorSide === 'home' ? (homeUnits.MAC_SONU ?? 1) : (awayUnits.MAC_SONU ?? 1);
   const macBasiUnit = actorSide === 'home' ? (homeUnits.MAC_BASLANGICI ?? 1) : (awayUnits.MAC_BASLANGICI ?? 1);
-  const timeMod = 1 + matchProgress * (macSonuUnit / _s(macBasiUnit) - 1);
+  // Eğer birimler nötr (1.0), lig volatilitesi zaman amplifikasyonu üstlenir
+  const _macRatio = macSonuUnit / _s(macBasiUnit);
+  const _timeAmp = (Math.abs(_macRatio - 1.0) < 0.01)
+    ? (1.0 + lgScale * 0.5) // Nötr birim: lgScale × 0.5 ile maç sonu yoğunlaşır
+    : _macRatio;
+  const timeMod = 1 + matchProgress * (_timeAmp - 1);
 
   // 6. Toplam delta — tamamen dinamik
   const baseDelta = lgScale * eventCoeff * diminishing * timeMod;
