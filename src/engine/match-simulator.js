@@ -532,6 +532,8 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
   const hProb = computeProbBases(homeMetrics, sel, homeUnits, baseline, audit, _simQF.home);
   const aProb = computeProbBases(awayMetrics, sel, awayUnits, baseline, audit, _simQF.away);
 
+
+
   // ── Bölge-Bazlı Sim Param Ölçeklemesi ────────────────────────────────
   // ZQM behavioral unit'leri zaten modifiye etti. Burada sim parametrelerini
   // (shotsPerMin, goalConvRate, gkSaveRate, blockRate) de bölge oranlarıyla
@@ -595,9 +597,12 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
   const homeMoraleStart = clamp(1.0 + (homeUnits.FORM_KISA - 1.0) * _mScale, _mMin, _mMax);
   const awayMoraleStart = clamp(1.0 + (awayUnits.FORM_KISA - 1.0) * _mScale, _mMin, _mMax);
 
+  // NaN koruma: herhangi bir birim hesabı NaN üretirse, nötr kimlik (1.0) kullanılır.
+  // Bu veri kaybı değil — NaN demek "hesap yapılamadı" demektir, 1.0 ise "etki yok" (identity).
+  const _safeNum = (v) => (isFinite(v) ? v : 1.0);
   const state = {
-    home: { momentum: homeUnits.MOMENTUM_AKIŞI, morale: homeMoraleStart, urgency: 1.0, redCardPenalty: 0 },
-    away: { momentum: awayUnits.MOMENTUM_AKIŞI, morale: awayMoraleStart, urgency: 1.0, redCardPenalty: 0 }
+    home: { momentum: _safeNum(homeUnits.MOMENTUM_AKIŞI), morale: _safeNum(homeMoraleStart), urgency: 1.0, redCardPenalty: 0 },
+    away: { momentum: _safeNum(awayUnits.MOMENTUM_AKIŞI), morale: _safeNum(awayMoraleStart), urgency: 1.0, redCardPenalty: 0 }
   };
 
   const expelledPlayers = { home: new Set(), away: new Set() };
@@ -608,8 +613,11 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
   const awayPenBudget = getM(awayMetrics, sel, 'M019') ?? baseline.penPerMatch;
   const penCurrentBudget = { home: homePenBudget, away: awayPenBudget };
 
-  const geo3 = (a, b, c) => Math.cbrt(Math.max(a, 0.01) * Math.max(b, 0.01) * Math.max(c, 0.01));
-  const geo2 = (a, b) => Math.sqrt(Math.max(a, 0.01) * Math.max(b, 0.01));
+  // NaN-safe geometrik ortalama: isFinite kontrolü ile.
+  // Math.max(NaN, 0.01) = NaN olduğundan, açık isFinite kontrolü gerekli.
+  const _s = v => (isFinite(v) && v > 0.01) ? v : 0.01;
+  const geo3 = (a, b, c) => Math.cbrt(_s(a) * _s(b) * _s(c));
+  const geo2 = (a, b) => Math.sqrt(_s(a) * _s(b));
 
   const getAttackPower = (side, oppSide, minute) => {
     const u = side === 'home' ? homeUnits : awayUnits;
@@ -883,9 +891,14 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
   const _mRange = DYN_LIMITS.MOMENTUM.MAX - DYN_LIMITS.MOMENTUM.MIN;
   const _pRange = DYN_LIMITS.POSSESSION.MAX - DYN_LIMITS.POSSESSION.MIN;
   const _lgVol = baseline.leagueGoalVolatility ?? null;
-  const momentumPossCoeff = (_lgVol != null && baseline.leagueAvgGoals != null && baseline.leagueAvgGoals > 0)
-    ? _pRange * _lgVol / (baseline.leagueAvgGoals * _mRange)
-    : _pRange / (4 * _mRange); // saf geometri fallback: ~6.67
+  // _mRange ≈ 0 → lig takımları arasında momentum farkı yok demektir.
+  // Bu durumda momentum, possession'ı etkilememeli → katsayı sıfır.
+  // _mRange > 0 ise: volatil ligde momentum → possession kayması daha belirgin.
+  const momentumPossCoeff = (_mRange > 1e-9)
+    ? ((_lgVol != null && baseline.leagueAvgGoals != null && baseline.leagueAvgGoals > 0)
+        ? _pRange * _lgVol / (baseline.leagueAvgGoals * _mRange)
+        : _pRange / (4 * _mRange))
+    : 0; // Lig momentum aralığı sıfır → momentum etkisiz
 
   // Dinamik zaman pencereleri: gerçek lig gol dağılımından (M005-M010) türetilir.
   // Veri yoksa makul statik fallback kullanılır.
@@ -987,12 +1000,12 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
     const rawAwayPoss = aProb.possessionBase * 100;
     const possTotal = rawHomePoss + rawAwayPoss;
     const normalizedHomePoss = possTotal > 0 ? (rawHomePoss / possTotal) * 100 : 50;
-    const currentHomePos = clamp(
-      normalizedHomePoss + (state.home.momentum - state.away.momentum) * momentumPossCoeff,
-      DYN_LIMITS.POSSESSION.MIN, DYN_LIMITS.POSSESSION.MAX
-    );
+    const _momShift = (state.home.momentum - state.away.momentum) * momentumPossCoeff;
+    const _rawHomePos = normalizedHomePoss + (isFinite(_momShift) ? _momShift : 0);
+    const currentHomePos = clamp(_rawHomePos, DYN_LIMITS.POSSESSION.MIN, DYN_LIMITS.POSSESSION.MAX);
     // Rastgele top sahibi: ev sahibi possession oranına göre stokastik seçim
     const possessor = r() < currentHomePos / 100 ? 'home' : 'away';
+
     const oppSideOfPoss = possessor === 'home' ? 'away' : 'home';
 
     // ─── Hücum Fazı: Yalnızca top sahibi takım şut + korner + penaltı ──────
@@ -1013,6 +1026,7 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
       // Gerçek futbolda 5-0'dan sonra tempo ve motivasyon belirgin biçimde düşer.
       const goalVelocityCap = goals[side] >= 5 ? 0.50 : 1.0;
       const shotProb = clamp(attkProb.shotsPerMin * dampedFlow * goalVelocityCap, DYN_LIMITS.PROBABILITY.MIN, DYN_LIMITS.PROBABILITY.MAX);
+
       if (r() < shotProb) {
         stats[side].shots++;
         // KRİTİK: onTargetRate = M014/M013 (gerçek sezon SOT oranı) — BAGLANTI_OYUNU burada çift sayma olur

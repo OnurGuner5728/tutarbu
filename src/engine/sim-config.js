@@ -114,10 +114,14 @@ function getDynamicLimits(baseline) {
   // Morale: normRatio aralığından, rekabetçilik indeksi ile daraltılır/genişletilir
   const compInv = baseline?.leagueCompetitiveness; // 1/CV — yüksek = rekabetçi
   const moraleMin = compInv != null ? powerMin * compInv / (compInv + 1) : L.MORALE.MIN;
-  const moraleMax = compInv != null ? powerMax * (compInv + 1) / compInv : L.MORALE.MAX;
+  const moraleMax = (compInv != null && compInv > 0) ? powerMax * (compInv + 1) / compInv : L.MORALE.MAX;
 
-  // Possession: standings possession verisinden
-  const possession = baseline?.possessionLimits ?? L.POSSESSION;
+  // possessionLimits: dynamic-baseline.js {min, max} (küçük harf) döndürür,
+  // ancak simülasyon motoru {MIN, MAX} (büyük harf) bekler.
+  const _rawPossLimits = baseline?.possessionLimits;
+  const possession = _rawPossLimits
+    ? { MIN: _rawPossLimits.MIN ?? _rawPossLimits.min, MAX: _rawPossLimits.MAX ?? _rawPossLimits.max }
+    : L.POSSESSION;
 
   // On-target: baseline onTargetRate'ten (takım başına per-min → 90dk oran)
   const onTarget = baseline?.onTargetRate != null
@@ -144,8 +148,11 @@ function getDynamicLimits(baseline) {
     ? { YELLOW_MAX: baseline.yellowPerMin * 90 / 10, RED_MAX: baseline.redPerMin * 90 / 10 }
     : L.CARDS;
 
-  // Lambda: standings gol dağılımından
-  const lambda = baseline?.lambdaLimits ?? L.LAMBDA;
+  // Lambda: standings gol dağılımından (aynı case mismatch: {min,max} → {MIN,MAX})
+  const _rawLambda = baseline?.lambdaLimits;
+  const lambda = _rawLambda
+    ? { MIN: _rawLambda.MIN ?? _rawLambda.min, MAX: _rawLambda.MAX ?? _rawLambda.max }
+    : L.LAMBDA;
 
   // Form→Morale: normRatio'dan
   const formMorale = (baseline?.normMinRatio != null && baseline?.normMaxRatio != null)
