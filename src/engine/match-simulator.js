@@ -877,7 +877,7 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
     : 0;
 
   // Kırmızı kart ceza sınırları: RC_MAX × saturation (sabit 0.10/0.60/0.20/0.35/0.75 kaldırıldı).
-  const _rcPenMax = DYN_LIMITS.RED_CARD_POWER_PENALTY_MAX ?? 0.8;
+  const _rcPenMax = DYN_LIMITS.RED_CARD_POWER_PENALTY_MAX ?? null;
   const _rcCV = (baseline.leagueGoalVolatility != null && baseline.leagueAvgGoals > 0)
     ? baseline.leagueGoalVolatility / baseline.leagueAvgGoals : null;
   const _rcMedianCV = (baseline.medianGoalRate != null && baseline.leagueAvgGoals > 0)
@@ -1100,7 +1100,7 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
       const resilience = geo2(isHome ? homeUnits.DISIPLIN : awayUnits.DISIPLIN, isHome ? homeUnits.ZİHİNSEL_DAYANIKLILIK : awayUnits.ZİHİNSEL_DAYANIKLILIK);
       const kadroDepth = isHome ? homeUnits.KADRO_DERINLIGI : awayUnits.KADRO_DERINLIGI;
       const _rcPM = _rcMinPenalty ?? 0;
-      const _rcPX = _rcMaxPenalty ?? _rcPenMax;
+      const _rcPX = _rcMaxPenalty ?? _rcPenMax ?? 1; // 1 = matematiksel üst sınır (tam çöküş)
       const organicPenalty = clamp((1.0 / Math.max(kadroDepth, EPS) - 1.0) / Math.max(EPS, resilience), _rcPM, _rcPX);
 
       // Direct Red Card
@@ -1110,7 +1110,7 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
           expelledPlayers[side].add(cardName);
           onPitch[side].delete(cardName);
           stats[side].redCards++;
-          state[side].redCardPenalty = clamp(state[side].redCardPenalty + organicPenalty, 0, _rcPenMax);
+          state[side].redCardPenalty = clamp(state[side].redCardPenalty + organicPenalty, 0, _rcPenMax ?? 1);
           pushEvent({ minute, type: 'red_card', team: side, player: cardName, subtype: 'direct_red' });
         }
       }
@@ -1127,7 +1127,7 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
             expelledPlayers[side].add(cardName);
             onPitch[side].delete(cardName);
             stats[side].redCards++;
-            state[side].redCardPenalty = clamp(state[side].redCardPenalty + organicPenalty, 0, _rcPenMax);
+            state[side].redCardPenalty = clamp(state[side].redCardPenalty + organicPenalty, 0, _rcPenMax ?? 1);
             pushEvent({ minute, type: 'red_card', team: side, player: cardName, subtype: 'second_yellow' });
           } else {
             pushEvent({ minute, type: 'yellow_card', team: side, player: cardName });

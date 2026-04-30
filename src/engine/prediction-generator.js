@@ -162,7 +162,7 @@ function generatePrediction(metricsResult, data, baseline, audit, rng) {
     // veri azsa Simülasyon (Davranışsal) ağırlığı artar.
     result: (() => {
       const simDist = simulation.distribution;
-      const conf = (prediction.confidenceScore || 50) / 100;
+      const conf = prediction.confidenceScore != null ? prediction.confidenceScore / 100 : null;
 
       // ── Dinamik Blend Ağırlığı (MC-Poisson Agreement) ──────────────────────
       // Sabit pW=conf yerine: iki modelin anlaşma derecesi (agreement) ile ağırlıklandır.
@@ -173,7 +173,7 @@ function generatePrediction(metricsResult, data, baseline, audit, rng) {
       const avg = baseline?.leagueAvgGoals;
       const basePoissonW = (vol != null && avg != null && avg > 0)
         ? 1.0 - (vol / (vol + avg))
-        : 0.5; // Veri yoksa tam ortadan başla
+        : null; // Veri yoksa blend ağırlığı belirlenemez
 
       const pH_poiss = prediction.homeWinProbability / 100;
       const pD_poiss = prediction.drawProbability / 100;
@@ -183,7 +183,14 @@ function generatePrediction(metricsResult, data, baseline, audit, rng) {
       const pA_mc = simDist.awayWin / 100;
 
       const tvd = (Math.abs(pH_poiss - pH_mc) + Math.abs(pD_poiss - pD_mc) + Math.abs(pA_poiss - pA_mc)) / 2;
-      const pW = basePoissonW + (1.0 - basePoissonW) * conf * (1 - tvd);
+      let pW;
+      if (basePoissonW != null && conf != null) {
+        pW = basePoissonW + (1.0 - basePoissonW) * conf * (1 - tvd);
+      } else if (basePoissonW != null) {
+        pW = basePoissonW; // güven yoksa sadece lig CV baz ağırlığı
+      } else {
+        pW = 1 / 2; // hiçbir lig verisi yoksa → iki modelin aritmetik ortalaması
+      }
       const sW = 1.0 - pW;
 
       let homeWin = (prediction.homeWinProbability * pW) + (simDist.homeWin * sW);
