@@ -94,41 +94,78 @@ const SIM_CONFIG = {
 
 /**
  * Dinamik Limit Hesaplayıcı:
- * Sabit 0.5-2.0 sınırları yerine ligin kendi CV (Varyans Katsayısı)
- * değerlerini kullanarak organik sınırlar oluşturur.
+ * Tüm sınırlar baseline'daki API verisinden türetilir.
+ * Veri yoksa SIM_CONFIG.LIMITS'teki statik değerler kullanılır (ultima ratio).
  */
 function getDynamicLimits(baseline) {
-  const volAmp = baseline?.leagueGoalVolatility ? Math.max(1.0, baseline.leagueGoalVolatility) : 1.0;
-  
+  const L = SIM_CONFIG.LIMITS;
+
+  // normMinRatio / normMaxRatio: ligteki en az ve en çok gol atan takımın lig ortalamasına oranı
+  // Bu doğrudan güç çarpan aralığını belirler
+  const powerMin = baseline?.normMinRatio ?? L.POWER.MIN;
+  const powerMax = baseline?.normMaxRatio ?? L.POWER.MAX;
+
+  // Momentum: güç aralığıyla aynı kaynak, volatiliteye göre genişler
+  const lgCV = (baseline?.leagueGoalVolatility != null && baseline?.leagueAvgGoals > 0)
+    ? baseline.leagueGoalVolatility / baseline.leagueAvgGoals : null;
+  const momMin = lgCV != null ? powerMin / (1 + lgCV) : L.MOMENTUM.MIN;
+  const momMax = lgCV != null ? powerMax * (1 + lgCV) : L.MOMENTUM.MAX;
+
+  // Morale: normRatio aralığından, rekabetçilik indeksi ile daraltılır/genişletilir
+  const compInv = baseline?.leagueCompetitiveness; // 1/CV — yüksek = rekabetçi
+  const moraleMin = compInv != null ? powerMin * compInv / (compInv + 1) : L.MORALE.MIN;
+  const moraleMax = compInv != null ? powerMax * (compInv + 1) / compInv : L.MORALE.MAX;
+
+  // Possession: standings possession verisinden
+  const possession = baseline?.possessionLimits ?? L.POSSESSION;
+
+  // On-target: baseline onTargetRate'ten (takım başına per-min → 90dk oran)
+  const onTarget = baseline?.onTargetRate != null
+    ? { MIN: Math.max(0, baseline.onTargetRate / 3), MAX: Math.min(1, baseline.onTargetRate * 3) }
+    : L.ON_TARGET;
+
+  // Block: baseline blockRate'ten
+  const block = baseline?.blockRate != null
+    ? { MIN: Math.max(0, baseline.blockRate / 3), MAX: Math.min(1, baseline.blockRate * 3) }
+    : L.BLOCK;
+
+  // Corner: baseline cornerPerMin'den
+  const corner = baseline?.cornerPerMin != null
+    ? { MIN: Math.max(0, baseline.cornerPerMin / 3), MAX: baseline.cornerPerMin * 3 }
+    : L.CORNER;
+
+  // Corner→Goal: baseline cornerGoalRate'ten
+  const cornerGoal = baseline?.cornerGoalRate != null
+    ? { MIN: Math.max(0, baseline.cornerGoalRate / 3), MAX: baseline.cornerGoalRate * 3 }
+    : L.CORNER_GOAL;
+
+  // Cards: baseline yellowPerMin / redPerMin'den (per-minute → per-play olasılık)
+  const cards = (baseline?.yellowPerMin != null && baseline?.redPerMin != null)
+    ? { YELLOW_MAX: baseline.yellowPerMin * 90 / 10, RED_MAX: baseline.redPerMin * 90 / 10 }
+    : L.CARDS;
+
+  // Lambda: standings gol dağılımından
+  const lambda = baseline?.lambdaLimits ?? L.LAMBDA;
+
+  // Form→Morale: normRatio'dan
+  const formMorale = (baseline?.normMinRatio != null && baseline?.normMaxRatio != null)
+    ? { MIN: baseline.normMinRatio, MAX: baseline.normMaxRatio, SCALE: baseline.normMaxRatio - baseline.normMinRatio }
+    : L.FORM_MORALE;
+
   return {
-    POWER: {
-      MIN: baseline?.normMinRatio ? Math.min(0.5, baseline.normMinRatio) : 0.5,
-      MAX: baseline?.normMaxRatio ? Math.max(2.0, baseline.normMaxRatio) : 2.0
-    },
-    MOMENTUM: {
-      MIN: Math.max(0.1, 0.5 / volAmp),
-      MAX: Math.min(4.0, 2.0 * volAmp)
-    },
-    MORALE: {
-      MIN: Math.max(0.1, 0.4 / volAmp),
-      MAX: Math.min(3.0, 1.6 * volAmp)
-    },
-    // Possession: standings/takım verisinden dinamik, yoksa fiziksel limit
-    POSSESSION: baseline?.possessionLimits
-      ? { MIN: baseline.possessionLimits.min, MAX: baseline.possessionLimits.max }
-      : SIM_CONFIG.LIMITS.POSSESSION,
-    PROBABILITY: SIM_CONFIG.LIMITS.PROBABILITY,
-    ON_TARGET: SIM_CONFIG.LIMITS.ON_TARGET,
-    BLOCK: SIM_CONFIG.LIMITS.BLOCK,
-    CORNER: SIM_CONFIG.LIMITS.CORNER,
-    CORNER_GOAL: SIM_CONFIG.LIMITS.CORNER_GOAL,
-    CARDS: SIM_CONFIG.LIMITS.CARDS,
-    // Lambda: standings gol dağılımından dinamik, yoksa genel futbol aralığı
-    LAMBDA: baseline?.lambdaLimits
-      ? { MIN: baseline.lambdaLimits.min, MAX: baseline.lambdaLimits.max }
-      : SIM_CONFIG.LIMITS.LAMBDA,
-    FORM_MORALE: SIM_CONFIG.LIMITS.FORM_MORALE,
-    RED_CARD_POWER_PENALTY_MAX: SIM_CONFIG.LIMITS.RED_CARD_POWER_PENALTY_MAX
+    POWER: { MIN: powerMin, MAX: powerMax },
+    MOMENTUM: { MIN: momMin, MAX: momMax },
+    MORALE: { MIN: moraleMin, MAX: moraleMax },
+    POSSESSION: possession,
+    PROBABILITY: L.PROBABILITY, // p ∈ [0,1] — matematiksel, veriyle değişmez
+    ON_TARGET: onTarget,
+    BLOCK: block,
+    CORNER: corner,
+    CORNER_GOAL: cornerGoal,
+    CARDS: cards,
+    LAMBDA: lambda,
+    FORM_MORALE: formMorale,
+    RED_CARD_POWER_PENALTY_MAX: lgCV != null ? lgCV / (1 + lgCV) : (L.RED_CARD_POWER_PENALTY_MAX ?? null),
   };
 }
 

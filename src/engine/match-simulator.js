@@ -182,7 +182,7 @@ function computeProbBases(metrics, sel, units, baseline, audit, posQF) {
   const m150_for_shots = gm('M150'); // erken okuma — shots'tan önce gerekli
   const possMinutes = m150_for_shots != null
     ? (m150_for_shots / 100) * 90                          // gerçek possession dakikası
-    : (baseline.possessionBase ?? 0.50) * 90;              // baseline veya nötr (%50→45)
+    : baseline.possessionBase != null ? baseline.possessionBase * 90 : null; // veri yoksa null
   const shotsPerMin = shotsPerMatch != null
     ? shotsPerMatch / possMinutes
     : baseline.shotsPerMin * (units.SUT_URETIMI ?? ND.UNIT_IDENTITY);
@@ -395,10 +395,15 @@ function calculateUnitImpact(blockId, metrics, selected, audit, dynamicAvgs, bas
     }
     // normalized = 1.0 at league average; clamp sınırları liğin kendi min/max takım dağılımı.
     // DİNAMİK VARYANS BÜYÜTECİ: lig volatilitesine göre farklılıkları matematiksel olarak belirginleştir
-    const amplify = baseline.leagueGoalVolatility ? Math.max(1.0, baseline.leagueGoalVolatility) : 1.2;
+    const amplify = baseline.leagueGoalVolatility ?? null;
     const rawRatio = val / leagueAvg;
-    const variance = rawRatio - 1.0;
-    let normalized = clamp(1.0 + (variance * amplify), nMin, nMax);
+    let normalized;
+    if (amplify != null) {
+      const variance = rawRatio - 1.0;
+      normalized = clamp(1.0 + (variance * amplify), nMin, nMax);
+    } else {
+      normalized = rawRatio; // volatilite yoksa ham oran
+    }
 
     if (sign === -1) normalized = 2.0 - normalized;
     weightedFactor += normalized * weight;
@@ -778,7 +783,7 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
     const leagueTeamCount = baseline.leagueTeamCount ?? null;
 
     // Maçın hangi safhasında olduğumuzu lateBase (dinamik gol sonları dakikası) belirler
-    const matchProgress = minute / (lateBase || 90);
+    const matchProgress = minute / (lateBase || _matchMins);
 
     // Yorgunluk Çarpanı: Takımın yorgunluk eşiği kadro derinliği ve zihinsel dirence göre esner
     const fatigueRate = (leaguePace * fragility) / (squadDepth * mentalToughness);
