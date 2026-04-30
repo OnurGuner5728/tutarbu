@@ -24,9 +24,9 @@ const LEAGUES = [
 ];
 
 const Ico = ({ ok }) =>
-  ok === true  ? <CheckCircle size={13} color="#22c55e" /> :
-  ok === false ? <XCircle size={13} color="#ef4444" /> :
-  <Minus size={13} color="#4b5563" />;
+  ok === true  ? <CheckCircle size={16} color="#22c55e" /> :
+  ok === false ? <XCircle size={16} color="#ef4444" /> :
+  <Minus size={16} color="#4b5563" />;
 
 const pct = (n, d) => d > 0 ? +((n / d) * 100).toFixed(1) : null;
 const fmtPct = (v) => v == null ? '—' : `${v}%`;
@@ -35,11 +35,11 @@ const brierClr = (v) => v == null ? '#6b7280' : v < 0.35 ? '#22c55e' : v < 0.5 ?
 
 function StatCard({ label, value, sub, color, sub2 }) {
   return (
-    <div style={{ background: '#0d0d0d', border: `1px solid ${color || '#222'}40`, borderRadius: 8, padding: '10px 14px', minWidth: 80 }}>
-      <div style={{ fontSize: 10, color: '#666', marginBottom: 2 }}>{label}</div>
-      <div style={{ fontSize: 20, fontWeight: 700, color: color || '#e5e7eb' }}>{value}</div>
-      {sub  && <div style={{ fontSize: 10, color: '#555', marginTop: 1 }}>{sub}</div>}
-      {sub2 && <div style={{ fontSize: 10, color: '#444', marginTop: 1 }}>{sub2}</div>}
+    <div style={{ background: '#0d0d0d', border: `1px solid ${color || '#222'}40`, borderRadius: 10, padding: '12px 18px', minWidth: 90 }}>
+      <div style={{ fontSize: 11, color: '#777', marginBottom: 3, fontWeight: 500 }}>{label}</div>
+      <div style={{ fontSize: 24, fontWeight: 700, color: color || '#e5e7eb', letterSpacing: '-0.5px' }}>{value}</div>
+      {sub  && <div style={{ fontSize: 11, color: '#555', marginTop: 2 }}>{sub}</div>}
+      {sub2 && <div style={{ fontSize: 11, color: '#444', marginTop: 2 }}>{sub2}</div>}
     </div>
   );
 }
@@ -47,10 +47,10 @@ function StatCard({ label, value, sub, color, sub2 }) {
 function TierChip({ tier, count, acc }) {
   if (!count) return null;
   return (
-    <div style={{ padding:'5px 10px', borderRadius:6, background:TB[tier]||TB.UNKNOWN, border:`1px solid ${TC[tier]||TC.UNKNOWN}30`, display:'flex', alignItems:'center', gap:6 }}>
-      <span style={{ fontSize:10, fontWeight:700, color:TC[tier]||TC.UNKNOWN }}>{tier}</span>
-      <span style={{ fontSize:13, fontWeight:700, color:TC[tier]||TC.UNKNOWN }}>{fmtPct(acc)}</span>
-      <span style={{ fontSize:10, color:'#555' }}>{count}m</span>
+    <div style={{ padding:'6px 14px', borderRadius:8, background:TB[tier]||TB.UNKNOWN, border:`1px solid ${TC[tier]||TC.UNKNOWN}30`, display:'flex', alignItems:'center', gap:8 }}>
+      <span style={{ fontSize:12, fontWeight:700, color:TC[tier]||TC.UNKNOWN }}>{tier}</span>
+      <span style={{ fontSize:16, fontWeight:700, color:TC[tier]||TC.UNKNOWN }}>{fmtPct(acc)}</span>
+      <span style={{ fontSize:11, color:'#555' }}>{count} maç</span>
     </div>
   );
 }
@@ -277,11 +277,21 @@ export default function BacktestPage({ onBack }) {
       <div style={{display:'flex',flex:1,overflow:'hidden'}}>
 
         {/* Sol: Log */}
-        <div style={{width:240,borderRight:'1px solid #111',padding:10,overflowY:'auto',background:'#060606',flexShrink:0}}>
-          <div style={{fontSize:9,color:'#444',marginBottom:6,textTransform:'uppercase',letterSpacing:1}}>Log</div>
-          {progress.map((m,i)=>(
-            <div key={i} style={{fontSize:10,color:i===progress.length-1?'#a5b4fc':'#374151',marginBottom:2,lineHeight:1.4}}>{m}</div>
-          ))}
+        <div style={{width:320,borderRight:'1px solid #1a1a1a',padding:'12px 14px',overflowY:'auto',background:'#060606',flexShrink:0}}>
+          <div style={{fontSize:10,color:'#555',marginBottom:8,textTransform:'uppercase',letterSpacing:1.5,fontWeight:600}}>Log</div>
+          {progress.map((m,i)=>{
+            const isResult = m.startsWith('  →');
+            const isSkip = m.includes('atlandı');
+            return <div key={i} style={{
+              fontSize: isResult ? 12 : 11,
+              color: isSkip ? '#4b5563' : isResult ? '#c4b5fd' : i===progress.length-1 ? '#a5b4fc' : '#555',
+              marginBottom: isResult ? 4 : 2,
+              lineHeight: 1.5,
+              fontWeight: isResult ? 600 : 400,
+              padding: isResult ? '2px 0 2px 8px' : 0,
+              borderLeft: isResult ? '2px solid #6366f140' : 'none',
+            }}>{m}</div>;
+          })}
           {error&&<div style={{fontSize:10,color:'#f87171',padding:6,background:'#1f0000',borderRadius:4,marginTop:6}}>⚠ {error}</div>}
           <div ref={logEndRef}/>
 
@@ -371,11 +381,11 @@ export default function BacktestPage({ onBack }) {
           {/* Tablo */}
           {filteredResults.length>0&&(
             <div style={{overflowX:'auto',flex:1}}>
-              <table style={{width:'100%',borderCollapse:'collapse',fontSize:11}}>
+              <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
                 <thead>
-                  <tr style={{background:'#0a0a0a',borderBottom:'1px solid #1a1a1a',color:'#555',position:'sticky',top:0,zIndex:1}}>
+                  <tr style={{background:'#0d0d0d',borderBottom:'2px solid #1f1f3a',color:'#888',position:'sticky',top:0,zIndex:1}}>
                     <th style={th}>#</th>
-                    <th style={{...th,textAlign:'left',minWidth:160}}>Maç</th>
+                    <th style={{...th,textAlign:'left',minWidth:200}}>Maç</th>
                     <th style={th}><SortBtn col="order" label="Turnuva"/></th>
                     <th style={th}>Gerçek FT</th>
                     <th style={th}>Tahmin FT</th>
@@ -398,18 +408,21 @@ export default function BacktestPage({ onBack }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredResults.map((r, i) => (
-                    <tr key={r.matchId||i} style={{borderBottom:'1px solid #0d0d0d',background:i%2===0?'#0a0a0a':'#080808',opacity:r.matchStatus!=='finished'?0.85:1}}>
-                      <td style={{...td,color:'#374151'}}>{r._order+1}</td>
-                      <td style={{...td,maxWidth:170,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',color:'#d1d5db'}} title={r.match}>
-                        <span style={{marginRight:4,fontSize:10}} title={(MS[r.matchStatus]||MS.unknown).label}>{(MS[r.matchStatus]||MS.unknown).icon}</span>
+                  {filteredResults.map((r, i) => {
+                    const isUp = r.matchStatus !== 'finished';
+                    const statusColor = (MS[r.matchStatus]||MS.unknown).color;
+                    return (
+                    <tr key={r.matchId||i} style={{borderBottom:'1px solid #141414',background:i%2===0?'#0b0b0b':'#090909',borderLeft:`3px solid ${isUp ? statusColor + '60' : 'transparent'}`}}>
+                      <td style={{...td,color:'#4b5563',fontSize:11}}>{r._order+1}</td>
+                      <td style={{...td,maxWidth:220,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',color:isUp?'#a5b4fc':'#e5e7eb',fontWeight:500}} title={r.match}>
+                        <span style={{marginRight:5,fontSize:13}} title={(MS[r.matchStatus]||MS.unknown).label}>{(MS[r.matchStatus]||MS.unknown).icon}</span>
                         {r.match}
-                        {r.matchTime&&<span style={{fontSize:9,color:'#4b5563',marginLeft:4}}>{r.matchTime}</span>}
+                        {r.matchTime&&<span style={{fontSize:10,color:'#6366f1',marginLeft:6,fontWeight:400}}>{r.matchTime}</span>}
                       </td>
-                      <td style={{...td,maxWidth:110,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',color:'#6b7280',fontSize:10}} title={r.tournament}>{r.tournament}</td>
-                      <td style={{...td,fontWeight:600,color:r.actual?'#9ca3af':'#2d2d2d'}}>{r.actual||'—'} {r.actualResult&&<span style={{fontSize:9,color:TC[r.actualResult==='1'?'HIGH':r.actualResult==='2'?'LOW':'MEDIUM']}}>{r.actualResult}</span>}</td>
-                      <td style={{...td,color:r.hit1X2===true?'#86efac':r.hit1X2===false?'#fca5a5':'#6b7280'}}>{r.predicted} <span style={{fontSize:9}}>{r.predictedResult}</span></td>
-                      <td style={{...td,color:'#6b7280',fontSize:10}}>{r.simTopScore||'—'}</td>
+                      <td style={{...td,maxWidth:130,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',color:'#888',fontSize:11}} title={r.tournament}>{r.tournament}</td>
+                      <td style={{...td,fontWeight:700,color:r.actual?'#d1d5db':'#2d2d2d',fontSize:14}}>{r.actual||'—'} {r.actualResult&&<span style={{fontSize:10,fontWeight:500,color:TC[r.actualResult==='1'?'HIGH':r.actualResult==='2'?'LOW':'MEDIUM']}}>{r.actualResult}</span>}</td>
+                      <td style={{...td,fontWeight:700,fontSize:14,color:r.hit1X2===true?'#86efac':r.hit1X2===false?'#fca5a5':isUp?'#c4b5fd':'#9ca3af',background:isUp?'#6366f108':'transparent'}}>{r.predicted} <span style={{fontSize:10,fontWeight:500}}>{r.predictedResult}</span></td>
+                      <td style={{...td,color:'#888',fontSize:11}}>{r.simTopScore||'—'}</td>
                       {showHTFT&&<>
                         <td style={{...td,color:r.actualHT?'#9ca3af':'#374151'}}>{r.actualHT||'—'} {r.actualHTResult&&<span style={{fontSize:9}}>{r.actualHTResult}</span>}</td>
                         <td style={{...td,color:r.hitHTResult===true?'#86efac':r.hitHTResult===false?'#fca5a5':'#6b7280',fontSize:10}}>{r.predictedHT||'—'} {r.predictedHTResult&&<span style={{fontSize:9}}>{r.predictedHTResult}</span>}</td>
@@ -421,9 +434,9 @@ export default function BacktestPage({ onBack }) {
                       <td style={td}>{r.hitBTTS!=null?<Ico ok={r.hitBTTS}/>:<span style={{color:'#1f2937'}}>—</span>}</td>
                       <td style={td}>{r.hitScore!=null?<Ico ok={r.hitScore}/>:<span style={{color:'#1f2937'}}>—</span>}</td>
                       {showHTFT&&<td style={td}><Ico ok={r.hitHTResult}/></td>}
-                      <td style={{...td,color:brierClr(r.brierScore)}}>{r.brierScore?.toFixed(3)}</td>
+                      <td style={{...td,color:brierClr(r.brierScore),fontSize:12}}>{r.brierScore?.toFixed(3)||'—'}</td>
                       <td style={td}>
-                        <span style={{fontSize:10,fontWeight:600,color:TC[r.confidenceTier]||TC.UNKNOWN,padding:'2px 5px',borderRadius:3,background:(TB[r.confidenceTier]||TB.UNKNOWN)}}>
+                        <span style={{fontSize:11,fontWeight:700,color:TC[r.confidenceTier]||TC.UNKNOWN,padding:'3px 8px',borderRadius:4,background:(TB[r.confidenceTier]||TB.UNKNOWN),letterSpacing:'0.5px'}}>
                           {r.confidenceTier?.slice(0,3)}
                         </span>
                       </td>
@@ -434,7 +447,8 @@ export default function BacktestPage({ onBack }) {
                       </td>}
                       <td style={td}>{r.isValueBet?<span style={{color:'#f59e0b',fontSize:10}}>+{r.modelEdge}%</span>:<span style={{color:'#1f2937'}}>—</span>}</td>
                     </tr>
-                  ))}
+                  );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -453,7 +467,7 @@ export default function BacktestPage({ onBack }) {
   );
 }
 
-const inputStyle = { background:'#111', border:'1px solid #2d2d2d', borderRadius:5, color:'#d1d5db', padding:'6px 9px', fontSize:12 };
-const chipStyle  = { border:'1px solid #222', borderRadius:4, padding:'3px 8px', cursor:'pointer', fontSize:10, fontWeight:600 };
-const th = { padding:'6px 8px', fontWeight:500, textAlign:'center', fontSize:10, whiteSpace:'nowrap' };
-const td = { padding:'6px 7px', textAlign:'center', whiteSpace:'nowrap' };
+const inputStyle = { background:'#111', border:'1px solid #2d2d2d', borderRadius:6, color:'#d1d5db', padding:'7px 11px', fontSize:13 };
+const chipStyle  = { border:'1px solid #222', borderRadius:5, padding:'5px 10px', cursor:'pointer', fontSize:11, fontWeight:600 };
+const th = { padding:'8px 10px', fontWeight:600, textAlign:'center', fontSize:11, whiteSpace:'nowrap', color:'#777', letterSpacing:'0.3px' };
+const td = { padding:'8px 9px', textAlign:'center', whiteSpace:'nowrap' };
