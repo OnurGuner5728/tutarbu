@@ -985,6 +985,23 @@ function generatePrediction(metricsResult, data, baseline, audit, rng) {
     console.error("[PredictionGenerator] Edge DB application failed:", e.message);
   }
 
+  // ── NaN/Infinity Sanitizer ─────────────────────────────────────────────────
+  // API verisi eksik veya sıfıra bölme durumunda NaN/Infinity sızabilir.
+  // Tüm sayısal çıktıları tarayıp null'a çeviriyoruz — sessiz hata yerine açık yokluk.
+  const sanitize = (obj) => {
+    if (obj == null || typeof obj !== 'object') return obj;
+    for (const key of Object.keys(obj)) {
+      const v = obj[key];
+      if (typeof v === 'number' && (!isFinite(v) || isNaN(v))) {
+        obj[key] = null;
+      } else if (typeof v === 'object' && v !== null) {
+        sanitize(v);
+      }
+    }
+    return obj;
+  };
+  sanitize(report);
+
   return report;
 }
 

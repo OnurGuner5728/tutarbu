@@ -408,8 +408,13 @@ function getDynamicBaseline(data) {
   const _lgTeamCount = Array.isArray(_lgRows) ? _lgRows.length : 0;
   // Lig sezonu boyunca takım başı maç sayısı → ortalama maç arası gün
   const _lgMatchesPerTeam = (_lgTeamCount > 0 && _lgTotalMatches > 0) ? _lgTotalMatches / _lgTeamCount : null;
-  // Sezon ~38 hafta, maç başına gün = 38*7 / maçSayısı
-  const OPTIMAL_REST = _lgMatchesPerTeam != null ? Math.round((38 * 7) / _lgMatchesPerTeam) : null;
+  // Sezon uzunluğu: round-robin ligde (N-1)*2 hafta × 7 gün. N bilinmiyorsa maç sayısından türet.
+  // Statik "38" yerine lig takım sayısından dinamik hesaplama.
+  const _seasonDays = _lgTeamCount >= 4
+    ? (_lgTeamCount - 1) * 2 * 7  // N takımlı lig: (N-1)*2 hafta
+    : (_lgMatchesPerTeam != null ? _lgMatchesPerTeam * 7 : null); // kupa/CL: maç başı ~7 gün varsayımı
+  const OPTIMAL_REST = (_lgMatchesPerTeam != null && _seasonDays != null)
+    ? Math.round(_seasonDays / _lgMatchesPerTeam) : null;
 
   // Lig gol CV'si: gol dağılımının standart sapması / ortalama
   const _lgGoalCV = (() => {
@@ -596,6 +601,19 @@ function getDynamicBaseline(data) {
   })();
   traces.push(`normMinRatio: ${normMinRatio?.toFixed(3) ?? 'null'} | normMaxRatio: ${normMaxRatio?.toFixed(3) ?? 'null'} (${normMinRatio != null ? 'LEAGUE_RATIO' : 'NO_DATA'})`);
 
+  // ── Data Quality Flag ──────────────────────────────────────────────────────
+  // Kullanıcıya veri kalitesini göstermek için: kaç kritik alan API'den geldi?
+  const _criticalFields = [leagueAvgGoals, shotsPerMin, onTargetRate, goalConvRate,
+    gkSaveRate, blockRate, cornerPerMin, yellowPerMin, redPerMin,
+    penConvRate, lambdaLimits, leagueGoalVolatility, normMinRatio, normMaxRatio];
+  const _filledCount = _criticalFields.filter(v => v != null).length;
+  const _totalCritical = _criticalFields.length;
+  const dataQuality = _filledCount === _totalCritical ? 'FULL'
+    : _filledCount >= _totalCritical * 0.7 ? 'PARTIAL'
+    : _filledCount > 0 ? 'MINIMAL'
+    : 'NO_DATA';
+  traces.push(`dataQuality: ${dataQuality} (${_filledCount}/${_totalCritical} critical fields populated)`);
+
   return {
     leagueAvgGoals, shotsPerMin, onTargetRate, goalConvRate,
     gkSaveRate, blockRate, cornerPerMin, yellowPerMin,
@@ -604,6 +622,7 @@ function getDynamicBaseline(data) {
     possessionLimits, lambdaLimits, cornerGoalRate,
     leagueCompetitiveness, leagueDrawTendency,
     leagueTeamCount, leagueGoalVolatility, normMinRatio, normMaxRatio,
+    dataQuality, dataQualityDetail: { filled: _filledCount, total: _totalCritical },
     traces,
   };
 }
