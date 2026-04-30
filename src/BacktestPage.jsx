@@ -6,6 +6,7 @@ import {
 
 const TC = { HIGH: '#22c55e', MEDIUM: '#f59e0b', LOW: '#ef4444', UNKNOWN: '#6b7280' };
 const TB = { HIGH: '#052e1612', MEDIUM: '#451a0312', LOW: '#450a0a12', UNKNOWN: '#11111120' };
+const MS = { finished: { icon: '🏁', color: '#6b7280', label: 'Oynanmış' }, notstarted: { icon: '⏳', color: '#6366f1', label: 'Oynanmamış' }, inprogress: { icon: '🟢', color: '#22c55e', label: 'Canlı' }, unknown: { icon: '❓', color: '#4b5563', label: 'Bilinmiyor' } };
 
 const LEAGUES = [
   { id: 'top',  label: 'Top Ligler (PL/LaLiga/BL/L1/SA)' },
@@ -77,6 +78,9 @@ export default function BacktestPage({ onBack }) {
   const [showHTFT, setShowHTFT] = useState(true);
   const [showEngines, setShowEngines] = useState(true);
   const [showTournamentBreakdown, setShowTournamentBreakdown] = useState(false);
+  const [includeUnplayed, setIncludeUnplayed] = useState(false);
+  const [minConfidence, setMinConfidence] = useState('');
+  const [filterStatus, setFilterStatus] = useState('ALL'); // ALL | FINISHED | UPCOMING
 
   // Data
   const [progress, setProgress] = useState([]);
@@ -104,6 +108,8 @@ export default function BacktestPage({ onBack }) {
     setRunning(true);
 
     const params = new URLSearchParams({ date, endDate, limit: String(limit), tournament: tFilter });
+    if (includeUnplayed) params.set('includeUnplayed', 'true');
+    if (minConfidence && parseFloat(minConfidence) > 0) params.set('minConfidence', minConfidence);
     const es = new EventSource(`/api/backtest?${params}`);
     esRef.current = es;
 
@@ -121,7 +127,7 @@ export default function BacktestPage({ onBack }) {
     });
     es.addEventListener('error', e => { try { const d=JSON.parse(e.data); setError(d.error||'Hata'); } catch(_){} stop(); });
     es.onerror = () => { setError('Bağlantı hatası'); stop(); };
-  }, [date, endDate, limitInput, tournamentFilter, customTournamentIds, stop]);
+  }, [date, endDate, limitInput, tournamentFilter, customTournamentIds, includeUnplayed, minConfidence, stop]);
 
   useEffect(() => () => stop(), [stop]);
 
@@ -147,6 +153,8 @@ export default function BacktestPage({ onBack }) {
     if (filterValueBet) r = r.filter(x => x.isValueBet);
     if (filterHTAvail) r = r.filter(x => x.actualHT != null);
     if (searchTeam) { const q=searchTeam.toLowerCase(); r=r.filter(x=>x.match?.toLowerCase().includes(q)||x.tournament?.toLowerCase().includes(q)); }
+    if (filterStatus === 'FINISHED') r = r.filter(x => x.matchStatus === 'finished');
+    if (filterStatus === 'UPCOMING') r = r.filter(x => x.matchStatus !== 'finished');
     r = [...r].sort((a,b) => {
       let diff = 0;
       if (sortBy==='brier') diff = (a.brierScore||0)-(b.brierScore||0);
@@ -156,9 +164,11 @@ export default function BacktestPage({ onBack }) {
       return sortAsc ? diff : -diff;
     });
     return r;
-  }, [results, filterTier, filterHit, filterMarket, filterValueBet, filterHTAvail, searchTeam, sortBy, sortAsc]);
+  }, [results, filterTier, filterHit, filterMarket, filterValueBet, filterHTAvail, searchTeam, filterStatus, sortBy, sortAsc]);
 
-  const live = { total: results.length, hits1X2: results.filter(r=>r.hit1X2).length, hitsOU25: results.filter(r=>r.hitOU25).length, hitsBTTS: results.filter(r=>r.hitBTTS).length, hitsScore: results.filter(r=>r.hitScore).length, avgBrier: results.length>0 ? (results.reduce((s,r)=>s+r.brierScore,0)/results.length) : null };
+  const finishedResults = results.filter(r => r.matchStatus === 'finished');
+  const live = { total: finishedResults.length, hits1X2: finishedResults.filter(r=>r.hit1X2).length, hitsOU25: finishedResults.filter(r=>r.hitOU25).length, hitsBTTS: finishedResults.filter(r=>r.hitBTTS).length, hitsScore: finishedResults.filter(r=>r.hitScore).length, avgBrier: finishedResults.length>0 ? (finishedResults.reduce((s,r)=>s+(r.brierScore||0),0)/finishedResults.length) : null };
+  const upcomingCount = results.length - finishedResults.length;
 
   const SortBtn = ({col, label}) => (
     <button onClick={() => { if(sortBy===col) setSortAsc(!sortAsc); else { setSortBy(col); setSortAsc(false); } }}
@@ -213,6 +223,15 @@ export default function BacktestPage({ onBack }) {
           <div style={{fontSize:10,color:'#666',marginBottom:3}}>Tournament ID'leri</div>
           <input value={customTournamentIds} onChange={e=>setCustomTournamentIds(e.target.value)} placeholder="17,8,23" style={{...inputStyle,width:120}}/>
         </div>}
+        <div>
+          <div style={{fontSize:10,color:'#666',marginBottom:3}}>Min Güven %</div>
+          <input type="number" value={minConfidence} onChange={e=>setMinConfidence(e.target.value)} min="0" max="100" placeholder="0" style={{...inputStyle,width:60,fontSize:11}}/>
+        </div>
+        <div style={{display:'flex',alignItems:'flex-end',paddingBottom:1}}>
+          <button onClick={()=>setIncludeUnplayed(!includeUnplayed)} style={{...chipStyle, background:includeUnplayed?'#6366f122':'#111', borderColor:includeUnplayed?'#6366f1':'#222', color:includeUnplayed?'#a5b4fc':'#666', fontSize:11, padding:'7px 10px'}}>
+            {includeUnplayed?'✅':'◻'} Oynanmamış
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -239,6 +258,12 @@ export default function BacktestPage({ onBack }) {
         </button>
         <input placeholder="Takım/Turnuva ara..." value={searchTeam} onChange={e=>setSearchTeam(e.target.value)}
           style={{...inputStyle,width:140,fontSize:11}}/>
+        <div style={{width:1,height:14,background:'#222'}}/>
+        {['ALL','FINISHED','UPCOMING'].map(s=>(
+          <button key={s} onClick={()=>setFilterStatus(s)} style={{...chipStyle, background:filterStatus===s?'#6366f122':'#111', borderColor:filterStatus===s?'#6366f1':'#222', color:filterStatus===s?'#a5b4fc':'#666'}}>
+            {s==='ALL'?'Tümü':s==='FINISHED'?'🏁 Oynanmış':'⏳ Oynanmamış'}
+          </button>
+        ))}
         <div style={{marginLeft:'auto',display:'flex',gap:6}}>
           <button onClick={()=>setShowHTFT(!showHTFT)} style={{...chipStyle, color:'#666', background:showHTFT?'#06b6d412':'#111', borderColor:showHTFT?'#06b6d4':'#222'}}>
             {showHTFT?'▾':'▸'} İY/MS
@@ -306,6 +331,7 @@ export default function BacktestPage({ onBack }) {
                 <StatCard label="O/U 2.5" value={fmtPct(pct(live.hitsOU25,live.total))} sub={`${live.hitsOU25}/${live.total}`} color="#06b6d4"/>
                 <StatCard label="BTTS" value={fmtPct(pct(live.hitsBTTS,live.total))} sub={`${live.hitsBTTS}/${live.total}`} color="#a78bfa"/>
                 <StatCard label="Exact FT" value={fmtPct(pct(live.hitsScore,live.total))} sub={`${live.hitsScore}/${live.total}`} color="#f97316"/>
+                {upcomingCount>0&&<StatCard label="Oynanmamış" value={upcomingCount} sub="tahmin yapıldı" color="#6366f1"/>}
                 {showHTFT&&summary?.htTotal>0&&<StatCard label="HT 1X2" value={fmtPct(summary.htAccuracy1X2)} sub={`/${summary.htTotal}`} color="#34d399"/>}
                 {showHTFT&&summary?.htTotal>0&&<StatCard label="HT Exact" value={fmtPct(summary.htAccuracyScore)} sub={`/${summary.htTotal}`} color="#6ee7b7"/>}
                 {live.avgBrier!=null&&<StatCard label="Avg Brier" value={live.avgBrier.toFixed(4)} sub="ref: 0.667" color={brierClr(live.avgBrier)}/>}
@@ -373,12 +399,16 @@ export default function BacktestPage({ onBack }) {
                 </thead>
                 <tbody>
                   {filteredResults.map((r, i) => (
-                    <tr key={r.matchId||i} style={{borderBottom:'1px solid #0d0d0d',background:i%2===0?'#0a0a0a':'#080808'}}>
+                    <tr key={r.matchId||i} style={{borderBottom:'1px solid #0d0d0d',background:i%2===0?'#0a0a0a':'#080808',opacity:r.matchStatus!=='finished'?0.85:1}}>
                       <td style={{...td,color:'#374151'}}>{r._order+1}</td>
-                      <td style={{...td,maxWidth:170,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',color:'#d1d5db'}} title={r.match}>{r.match}</td>
+                      <td style={{...td,maxWidth:170,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',color:'#d1d5db'}} title={r.match}>
+                        <span style={{marginRight:4,fontSize:10}} title={(MS[r.matchStatus]||MS.unknown).label}>{(MS[r.matchStatus]||MS.unknown).icon}</span>
+                        {r.match}
+                        {r.matchTime&&<span style={{fontSize:9,color:'#4b5563',marginLeft:4}}>{r.matchTime}</span>}
+                      </td>
                       <td style={{...td,maxWidth:110,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',color:'#6b7280',fontSize:10}} title={r.tournament}>{r.tournament}</td>
-                      <td style={{...td,fontWeight:600,color:'#9ca3af'}}>{r.actual} <span style={{fontSize:9,color:TC[r.actualResult==='1'?'HIGH':r.actualResult==='2'?'LOW':'MEDIUM']}}>{r.actualResult}</span></td>
-                      <td style={{...td,color:r.hit1X2?'#86efac':'#fca5a5'}}>{r.predicted} <span style={{fontSize:9}}>{r.predictedResult}</span></td>
+                      <td style={{...td,fontWeight:600,color:r.actual?'#9ca3af':'#2d2d2d'}}>{r.actual||'—'} {r.actualResult&&<span style={{fontSize:9,color:TC[r.actualResult==='1'?'HIGH':r.actualResult==='2'?'LOW':'MEDIUM']}}>{r.actualResult}</span>}</td>
+                      <td style={{...td,color:r.hit1X2===true?'#86efac':r.hit1X2===false?'#fca5a5':'#6b7280'}}>{r.predicted} <span style={{fontSize:9}}>{r.predictedResult}</span></td>
                       <td style={{...td,color:'#6b7280',fontSize:10}}>{r.simTopScore||'—'}</td>
                       {showHTFT&&<>
                         <td style={{...td,color:r.actualHT?'#9ca3af':'#374151'}}>{r.actualHT||'—'} {r.actualHTResult&&<span style={{fontSize:9}}>{r.actualHTResult}</span>}</td>
@@ -386,10 +416,10 @@ export default function BacktestPage({ onBack }) {
                         <td style={{...td,color:'#6b7280',fontSize:10}}>{r.simHTTopScore||'—'}</td>
                         <td style={{...td,color:'#6b7280',fontSize:10}}>{r.htft?.top1||'—'}</td>
                       </>}
-                      <td style={td}><Ico ok={r.hit1X2}/></td>
-                      <td style={td}><Ico ok={r.hitOU25}/></td>
-                      <td style={td}><Ico ok={r.hitBTTS}/></td>
-                      <td style={td}><Ico ok={r.hitScore}/></td>
+                      <td style={td}>{r.hit1X2!=null?<Ico ok={r.hit1X2}/>:<span style={{color:'#1f2937'}}>—</span>}</td>
+                      <td style={td}>{r.hitOU25!=null?<Ico ok={r.hitOU25}/>:<span style={{color:'#1f2937'}}>—</span>}</td>
+                      <td style={td}>{r.hitBTTS!=null?<Ico ok={r.hitBTTS}/>:<span style={{color:'#1f2937'}}>—</span>}</td>
+                      <td style={td}>{r.hitScore!=null?<Ico ok={r.hitScore}/>:<span style={{color:'#1f2937'}}>—</span>}</td>
                       {showHTFT&&<td style={td}><Ico ok={r.hitHTResult}/></td>}
                       <td style={{...td,color:brierClr(r.brierScore)}}>{r.brierScore?.toFixed(3)}</td>
                       <td style={td}>

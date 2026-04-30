@@ -1091,7 +1091,7 @@ app.get('/api/match-debug/:eventId', async (req, res) => {
 // Gerçek server pipeline: fetchAllMatchData → metrics → baseline → generatePrediction
 // SSE stream: her maç anlık gönderilir
 const TOP_TOURNAMENT_IDS_BT = new Set([17, 8, 23, 35, 34, 7, 679, 52, 325, 37, 132, 23651]);
-const MAX_BACKTEST_DAYS_BACK = 30;
+const MAX_BACKTEST_DAYS_RANGE = 60;
 const BACKTEST_INTER_DELAY_MS = 4000;
 
 function buildTournamentFilter(tournamentParam) {
@@ -1104,10 +1104,12 @@ function buildTournamentFilter(tournamentParam) {
 
 app.get('/api/backtest', async (req, res) => {
   const date = req.query.date || new Date(Date.now() - 86400000).toISOString().split('T')[0];
-  const endDate = req.query.endDate || date; // date range support
+  const endDate = req.query.endDate || date;
   const rawLimit = parseInt(req.query.limit, 10);
   const matchLimit = (!isNaN(rawLimit) && rawLimit >= 1) ? Math.min(rawLimit, 9999) : 10;
   const tournamentFilter = req.query.tournament || 'top';
+  const includeUnplayed = req.query.includeUnplayed === 'true';
+  const minConfidence = parseFloat(req.query.minConfidence) || 0;
 
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
     return res.status(400).json({ error: 'Invalid date format. Use YYYY-MM-DD.' });
@@ -1123,49 +1125,66 @@ app.get('/api/backtest', async (req, res) => {
   const progress = (msg) => send('progress', { message: msg });
 
   try {
-    progress(`Backtest: ${date}${endDate !== date ? ' → ' + endDate : ''} | limit: ${matchLimit} | turnuva: ${tournamentFilter}`);
+    progress(`Backtest: ${date}${endDate !== date ? ' → ' + endDate : ''} | limit: ${matchLimit} | turnuva: ${tournamentFilter}${includeUnplayed ? ' | +oynanmamış' : ''}`);
 
-    // ── 1. Maç toplama (date range + dedup) ──────────────────────────────
+    // ── 1. Maç toplama (date range + dedup + unplayed support) ────────────
     const filterFn = buildTournamentFilter(tournamentFilter);
     let collected = [];
-    const processedIds = new Set();
+    const processedIds = new Set();     // eventId bazlı dedup
+    const compositeKeys = new Set();    // homeTeamId-awayTeamId-date bazlı güçlendirilmiş dedup
 
-    // Tarih aralığını hesapla: endDate → date (geriye doğru)
-    const endMs = new Date(endDate).getTime();
+    // Tarih aralığı: date → endDate (ileriye doğru)
     const startMs = new Date(date).getTime();
-    let cursor = endDate;
-    let daysBack = 0;
-    const maxDays = Math.min(MAX_BACKTEST_DAYS_BACK, Math.ceil((endMs - startMs) / 86400000) + 14);
+    const endMs = new Date(endDate).getTime();
+    const totalDaySpan = Math.ceil(Math.abs(endMs - startMs) / 86400000) + 1;
+    const maxDays = Math.min(MAX_BACKTEST_DAYS_RANGE, totalDaySpan);
 
-    while (collected.length < matchLimit && daysBack < maxDays) {
-      const cursorMs = new Date(cursor).getTime();
-      if (cursorMs < startMs) break; // Başlangıç tarihinin öncesine geçme
+    for (let dayIdx = 0; dayIdx < maxDays && collected.length < matchLimit; dayIdx++) {
+      const cursorMs = startMs + dayIdx * 86400000;
+      if (cursorMs > endMs) break;
+      const cursor = new Date(cursorMs).toISOString().split('T')[0];
 
       let evResp;
-      try { evResp = await playwrightClient.getScheduledEvents(cursor); } catch (_) { break; }
+      try { evResp = await playwrightClient.getScheduledEvents(cursor); } catch (_) { continue; }
+      if (!evResp?.events?.length) continue;
 
-      if (evResp?.events?.length) {
-        let dayFinished = evResp.events.filter(e =>
-          e.status?.type === 'finished' &&
-          e.homeScore?.current != null &&
-          e.awayScore?.current != null &&
-          e.tournament?.uniqueTournament?.id
-        );
-        dayFinished = dayFinished.filter(e => filterFn(e.tournament.uniqueTournament.id));
-        dayFinished = dayFinished.filter(e => !processedIds.has(String(e.id)));
-        dayFinished.forEach(e => processedIds.add(String(e.id)));
-        collected.push(...dayFinished);
-        if (dayFinished.length > 0) progress(`${cursor}: ${dayFinished.length} maç (+${collected.length})`);
+      // Kabul edilen maç durumları
+      const acceptedStatuses = new Set(['finished']);
+      if (includeUnplayed) { acceptedStatuses.add('notstarted'); acceptedStatuses.add('inprogress'); }
+
+      let dayMatches = evResp.events.filter(e => {
+        if (!acceptedStatuses.has(e.status?.type)) return false;
+        if (!e.tournament?.uniqueTournament?.id) return false;
+        // Oynanmış maçlar için skor kontrolü
+        if (e.status?.type === 'finished' && (e.homeScore?.current == null || e.awayScore?.current == null)) return false;
+        return true;
+      });
+
+      // Turnuva filtresi
+      dayMatches = dayMatches.filter(e => filterFn(e.tournament.uniqueTournament.id));
+
+      // Çift dedup: eventId + composite key (homeTeamId-awayTeamId-date)
+      dayMatches = dayMatches.filter(e => {
+        const eid = String(e.id);
+        const ck = `${e.homeTeam?.id}-${e.awayTeam?.id}-${cursor}`;
+        if (processedIds.has(eid) || compositeKeys.has(ck)) return false;
+        processedIds.add(eid);
+        compositeKeys.add(ck);
+        return true;
+      });
+
+      if (dayMatches.length > 0) {
+        collected.push(...dayMatches);
+        const finCount = dayMatches.filter(e => e.status?.type === 'finished').length;
+        const upCount = dayMatches.length - finCount;
+        progress(`${cursor}: ${finCount} oynanmış${upCount > 0 ? ` + ${upCount} oynanmamış` : ''} (+${collected.length})`);
       }
-      if (collected.length >= matchLimit) break;
-      const prev = new Date(cursor);
-      prev.setDate(prev.getDate() - 1);
-      cursor = prev.toISOString().split('T')[0];
-      daysBack++;
     }
 
-    const finishedMatches = collected.slice(0, matchLimit);
-    progress(`${finishedMatches.length} unique maç işlenecek.`);
+    const allMatches = collected.slice(0, matchLimit);
+    const finishedCount = allMatches.filter(e => e.status?.type === 'finished').length;
+    const upcomingCount = allMatches.length - finishedCount;
+    progress(`${allMatches.length} unique maç işlenecek (${finishedCount} oynanmış${upcomingCount > 0 ? `, ${upcomingCount} oynanmamış` : ''}).`);
 
     // ── 2. Pipeline ───────────────────────────────────────────────────────
     const results = [];
@@ -1176,15 +1195,24 @@ app.get('/api/backtest', async (req, res) => {
     const tournamentStats = {}; // { [tournamentId]: { name, total, hits1X2, hitsOU25, hitsBTTS } }
     let totalDrawActual = 0, totalDrawPredicted = 0;
 
-    for (let mi = 0; mi < finishedMatches.length; mi++) {
-      const match = finishedMatches[mi];
+    for (let mi = 0; mi < allMatches.length; mi++) {
+      const match = allMatches[mi];
       if (mi > 0) await new Promise(r => setTimeout(r, BACKTEST_INTER_DELAY_MS));
 
+      const isFinished = match.status?.type === 'finished';
       const matchLabel = `${match.homeTeam.name} vs ${match.awayTeam.name}`;
-      progress(`(${mi + 1}/${finishedMatches.length}) ${matchLabel}`);
+      const statusIcon = isFinished ? '🏁' : '⏳';
+      progress(`${statusIcon} (${mi + 1}/${allMatches.length}) ${matchLabel}`);
 
       try {
         const data = await fetchAllMatchData(match.id);
+
+        // ── Pipeline eşitleme: /api/predict ile aynı sırada ──────────
+        // Dynamic Block Weights: ORİJİNAL kadrodan hesaplanır
+        const { computeDynamicBlockWeights: _btDbw } = require('./engine/lineup-impact');
+        data._homeDynamicBlockWeights = _btDbw(data.lineups?.home?.players || []);
+        data._awayDynamicBlockWeights = _btDbw(data.lineups?.away?.players || []);
+
         const metrics = calculateAllMetrics(data);
         const baseline = getDynamicBaseline(data);
         baseline.leagueGoalVolatility = metrics.meta?.leagueGoalVolatility ?? null;
@@ -1197,15 +1225,22 @@ app.get('/api/backtest', async (req, res) => {
         baseline.homeMVBreakdown = computePositionMVBreakdown(data.homePlayers || []);
         baseline.awayMVBreakdown = computePositionMVBreakdown(data.awayPlayers || []);
 
-        const report = generatePrediction(metrics, data, baseline, metrics.metricAudit, Math.random);
+        // LQR ve ZQM: backtest'te modified lineup yok → identity
+        baseline.homeLineupQualityRatio = 1.0;
+        baseline.awayLineupQualityRatio = 1.0;
+        baseline.homeDynamicBlockWeights = _btDbw(data.lineups?.home?.players || []);
+        baseline.awayDynamicBlockWeights = _btDbw(data.lineups?.away?.players || []);
 
-        // ── Gerçek FT skoru ──
-        const realHS = match.homeScore.current;
-        const realAS = match.awayScore.current;
-        const realTotal = realHS + realAS;
-        const realResult = realHS > realAS ? '1' : realHS < realAS ? '2' : 'X';
-        const realOU25 = realTotal > 2.5 ? 'Over' : 'Under';
-        const realBTTS = (realHS > 0 && realAS > 0) ? 'Yes' : 'No';
+        const rng = createRNG(match.id); // Deterministik RNG: aynı maç = aynı simülasyon
+        const report = generatePrediction(metrics, data, baseline, metrics.metricAudit, rng);
+
+        // ── Gerçek FT skoru (oynanmış maçlarda) ──
+        const realHS = isFinished ? match.homeScore.current : null;
+        const realAS = isFinished ? match.awayScore.current : null;
+        const realTotal = (realHS != null && realAS != null) ? realHS + realAS : null;
+        const realResult = (realHS != null && realAS != null) ? (realHS > realAS ? '1' : realHS < realAS ? '2' : 'X') : null;
+        const realOU25 = realTotal != null ? (realTotal > 2.5 ? 'Over' : 'Under') : null;
+        const realBTTS = (realHS != null && realAS != null) ? ((realHS > 0 && realAS > 0) ? 'Yes' : 'No') : null;
         if (realResult === 'X') totalDrawActual++;
 
         // ── Gerçek HT skoru (period1 varsa) ──
@@ -1258,29 +1293,32 @@ app.get('/api/backtest', async (req, res) => {
         })();
         const simHTTopScore = simHTDist?.topScore ?? null;
 
-        // ── Hit hesapları ──
-        const hit1X2 = predicted === realResult;
-        const hitOU25 = predictedOU25 === realOU25;
-        const hitBTTS = predictedBTTS === realBTTS;
-        const hitScore = predictedScore === `${realHS}-${realAS}`;
-        const hitHTResult = (htPredResult && realHTResult) ? htPredResult === realHTResult : null;
-        const hitHTScore = (htPredScore && realHTScore) ? htPredScore === realHTScore : null;
+        // ── Hit hesapları (sadece oynanmış maçlar) ──
+        const hit1X2 = isFinished ? (predicted === realResult) : null;
+        const hitOU25 = isFinished ? (predictedOU25 === realOU25) : null;
+        const hitBTTS = isFinished ? (predictedBTTS === realBTTS) : null;
+        const hitScore = isFinished ? (predictedScore === `${realHS}-${realAS}`) : null;
+        const hitHTResult = (isFinished && htPredResult && realHTResult) ? htPredResult === realHTResult : null;
+        const hitHTScore = (isFinished && htPredScore && realHTScore) ? htPredScore === realHTScore : null;
 
-        if (hit1X2) hits1X2++;
-        if (hitOU25) hitsOU25++;
-        if (hitBTTS) hitsBTTS++;
-        if (hitScore) hitsScore++;
+        if (hit1X2 === true) hits1X2++;
+        if (hitOU25 === true) hitsOU25++;
+        if (hitBTTS === true) hitsBTTS++;
+        if (hitScore === true) hitsScore++;
         if (hitHTResult !== null) { htTotal++; if (hitHTResult) hitsHT1X2++; }
         if (hitHTScore === true) hitsHTScore++;
 
-        // ── Brier + LogLoss ──
-        const eps = 1e-10;
-        const pH_n = pHome / 100, pD_n = pDraw / 100, pA_n = pAway / 100;
-        const oH = realResult === '1' ? 1 : 0, oD = realResult === 'X' ? 1 : 0, oA = realResult === '2' ? 1 : 0;
-        const brierScore = (pH_n - oH) ** 2 + (pD_n - oD) ** 2 + (pA_n - oA) ** 2;
-        const logLoss = -(oH * Math.log(pH_n + eps) + oD * Math.log(pD_n + eps) + oA * Math.log(pA_n + eps));
-        totalBrier += brierScore;
-        totalLogLoss += logLoss;
+        // ── Brier + LogLoss (sadece oynanmış maçlar) ──
+        let brierScore = null, logLoss = null;
+        if (isFinished) {
+          const eps = 1e-10;
+          const pH_n = pHome / 100, pD_n = pDraw / 100, pA_n = pAway / 100;
+          const oH = realResult === '1' ? 1 : 0, oD = realResult === 'X' ? 1 : 0, oA = realResult === '2' ? 1 : 0;
+          brierScore = (pH_n - oH) ** 2 + (pD_n - oD) ** 2 + (pA_n - oA) ** 2;
+          logLoss = -(oH * Math.log(pH_n + eps) + oD * Math.log(pD_n + eps) + oA * Math.log(pA_n + eps));
+          totalBrier += brierScore;
+          totalLogLoss += logLoss;
+        }
 
         // ── Motor karşılaştırması ──
         const poissonRes = report.poissonResult;
@@ -1298,7 +1336,14 @@ app.get('/api/backtest', async (req, res) => {
           if (predicted === '2') return +(pAway - marketAway).toFixed(1);
           return null;
         })();
-        const isValueBet = modelEdge != null && modelEdge > 5; // %5'ten fazla kenar
+        const isValueBet = modelEdge != null && modelEdge > 5;
+
+        // ── Confidence filtresi (minConfidence) ──
+        const maxProb = Math.max(pHome, pDraw, pAway);
+        if (minConfidence > 0 && maxProb < minConfidence) {
+          progress(`⏭ ${matchLabel} → confidence ${maxProb.toFixed(0)}% < ${minConfidence}% (atlandı)`);
+          continue;
+        }
 
         // ── Turnuva istatistikleri ──
         const tid = match.tournament?.uniqueTournament?.id;
@@ -1314,13 +1359,16 @@ app.get('/api/backtest', async (req, res) => {
         const coverageCtrl = report.coverageControl || {};
         const entry = {
           matchId: match.id,
+          matchStatus: isFinished ? 'finished' : (match.status?.type || 'unknown'),
           match: matchLabel,
           homeTeam: match.homeTeam?.name,
           awayTeam: match.awayTeam?.name,
           tournament: tname, tournamentId: tid || null,
           matchDate: match.startTimestamp ? new Date(match.startTimestamp * 1000).toISOString().split('T')[0] : date,
-          // FT gerçek
-          actual: `${realHS}-${realAS}`, actualResult: realResult, actualOU25: realOU25, actualBTTS: realBTTS,
+          matchTime: match.startTimestamp ? new Date(match.startTimestamp * 1000).toISOString().split('T')[1]?.slice(0,5) : null,
+          // FT gerçek (null for unplayed)
+          actual: isFinished ? `${realHS}-${realAS}` : null,
+          actualResult: realResult, actualOU25: realOU25, actualBTTS: realBTTS,
           // FT tahmin
           predicted: predictedScore, predictedResult: predicted, predictedOU25, predictedBTTS,
           simTopScore,
@@ -1342,7 +1390,8 @@ app.get('/api/backtest', async (req, res) => {
           // Hit'ler
           hit1X2, hitOU25, hitBTTS, hitScore, hitHTResult, hitHTScore,
           // Kalibrasyon
-          brierScore: +brierScore.toFixed(4), logLoss: +logLoss.toFixed(4),
+          brierScore: brierScore != null ? +brierScore.toFixed(4) : null,
+          logLoss: logLoss != null ? +logLoss.toFixed(4) : null,
           // Güven
           confidenceTier: coverageCtrl.confidenceTier || 'UNKNOWN',
           maxProbability: coverageCtrl.maxProbability || 0,
@@ -1365,6 +1414,8 @@ app.get('/api/backtest', async (req, res) => {
 
     // ── 3. Özet ──────────────────────────────────────────────────────────
     const total = results.length;
+    const finishedTotal = results.filter(r => r.matchStatus === 'finished').length;
+    const upcomingTotal = results.filter(r => r.matchStatus !== 'finished').length;
     if (total === 0) { send('summary', { error: 'Hiç maç işlenemedi.' }); res.end(); return; }
 
     const tierStats = (tier) => {
@@ -1394,15 +1445,15 @@ app.get('/api/backtest', async (req, res) => {
     const valueBetHits = valueBets.filter(r => r.hit1X2).length;
 
     const summary = {
-      date, endDate, total, tournamentFilter,
-      // Genel doğruluk
-      accuracy1X2: +((hits1X2 / total) * 100).toFixed(1),
-      accuracyOU25: +((hitsOU25 / total) * 100).toFixed(1),
-      accuracyBTTS: +((hitsBTTS / total) * 100).toFixed(1),
-      accuracyScore: +((hitsScore / total) * 100).toFixed(1),
+      date, endDate, total, finishedTotal, upcomingTotal, tournamentFilter,
+      // Genel doğruluk (sadece oynanmış maçlardan)
+      accuracy1X2: finishedTotal > 0 ? +((hits1X2 / finishedTotal) * 100).toFixed(1) : null,
+      accuracyOU25: finishedTotal > 0 ? +((hitsOU25 / finishedTotal) * 100).toFixed(1) : null,
+      accuracyBTTS: finishedTotal > 0 ? +((hitsBTTS / finishedTotal) * 100).toFixed(1) : null,
+      accuracyScore: finishedTotal > 0 ? +((hitsScore / finishedTotal) * 100).toFixed(1) : null,
       // Kalibrasyon
-      avgBrierScore: +(totalBrier / total).toFixed(4),
-      avgLogLoss: +(totalLogLoss / total).toFixed(4),
+      avgBrierScore: finishedTotal > 0 ? +(totalBrier / finishedTotal).toFixed(4) : null,
+      avgLogLoss: finishedTotal > 0 ? +(totalLogLoss / finishedTotal).toFixed(4) : null,
       // HT
       htAccuracy1X2: htTotal > 0 ? +((hitsHT1X2 / htTotal) * 100).toFixed(1) : null,
       htAccuracyScore: htTotal > 0 ? +((hitsHTScore / htTotal) * 100).toFixed(1) : null,
