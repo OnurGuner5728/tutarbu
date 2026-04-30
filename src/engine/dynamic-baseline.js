@@ -614,6 +614,42 @@ function getDynamicBaseline(data) {
     : 'NO_DATA';
   traces.push(`dataQuality: ${dataQuality} (${_filledCount}/${_totalCritical} critical fields populated)`);
 
+  // ── 22. foulRate — Lig ortalaması faul/dakika ──
+  const _hFouls = (homeStats?.fouls != null && homeStats?.matches > 0) ? homeStats.fouls / homeStats.matches : null;
+  const _aFouls = (awayStats?.fouls != null && awayStats?.matches > 0) ? awayStats.fouls / awayStats.matches : null;
+  const _standingsFouls = computeLeagueAvgFromStandings(data.standingsTotal, 'foulsPerGame')
+    ?? computeLeagueAvgFromStandings(data.standingsTotal, 'foulsCommittedPerGame');
+  const avgFouls = _standingsFouls ?? ((_hFouls != null && _aFouls != null) ? (_hFouls + _aFouls) / 2 : (_hFouls ?? _aFouls));
+  const foulRate = avgFouls != null ? avgFouls / 90 : null;
+  traces.push(`foulRate: ${foulRate?.toFixed(4) ?? 'null'} (${avgFouls != null ? (_standingsFouls != null ? 'STANDINGS' : 'TEAM_PROXY') : 'NO_DATA'})`);
+
+  // ── 23. offsideRate — Lig ortalaması ofsayt/dakika ──
+  const _hOffsides = (homeStats?.offsides != null && homeStats?.matches > 0) ? homeStats.offsides / homeStats.matches : null;
+  const _aOffsides = (awayStats?.offsides != null && awayStats?.matches > 0) ? awayStats.offsides / awayStats.matches : null;
+  const _standingsOffsides = computeLeagueAvgFromStandings(data.standingsTotal, 'offsidesPerGame');
+  const avgOffsides = _standingsOffsides ?? ((_hOffsides != null && _aOffsides != null) ? (_hOffsides + _aOffsides) / 2 : (_hOffsides ?? _aOffsides));
+  const offsideRate = avgOffsides != null ? avgOffsides / 90 : null;
+  traces.push(`offsideRate: ${offsideRate?.toFixed(4) ?? 'null'} (${avgOffsides != null ? (_standingsOffsides != null ? 'STANDINGS' : 'TEAM_PROXY') : 'NO_DATA'})`);
+
+  // ── 24. throwInRate — Türetilmiş: faullerden proxy (faul sayısı × 1.5 ≈ taç atışı) ──
+  // Gerçek taç atışı verisi nadiren mevcut olduğundan, lig faul oranından oransal türetme.
+  // Oran: takımların topu kenar çizgisinden kaybetme sıklığı ∝ faul sıklığı
+  const _standingsThrowIns = computeLeagueAvgFromStandings(data.standingsTotal, 'throwInsPerGame');
+  const throwInRate = _standingsThrowIns != null
+    ? _standingsThrowIns / 90
+    : (avgFouls != null ? (avgFouls * 1.5) / 90 : null); // proxy: faul×1.5 ≈ taç
+  traces.push(`throwInRate: ${throwInRate?.toFixed(4) ?? 'null'} (${_standingsThrowIns != null ? 'STANDINGS' : avgFouls != null ? 'FOUL_PROXY' : 'NO_DATA'})`);
+
+  // ── 25. leaguePointDensity — Puan yoğunluğu (maç başı ortalama puan) ──
+  const leaguePointDensity = (() => {
+    const rows = data.standingsTotal?.standings?.[0]?.rows;
+    if (!Array.isArray(rows) || rows.length < 4) return null;
+    const totalPts = rows.reduce((s, r) => s + (r.points ?? 0), 0);
+    const totalMatches = rows.reduce((s, r) => s + (r.matches ?? r.played ?? 0), 0);
+    return totalMatches > 0 ? totalPts / totalMatches : null;
+  })();
+  traces.push(`leaguePointDensity: ${leaguePointDensity?.toFixed(3) ?? 'null'}`);
+
   return {
     leagueAvgGoals, shotsPerMin, onTargetRate, goalConvRate,
     gkSaveRate, blockRate, cornerPerMin, yellowPerMin,
@@ -622,6 +658,7 @@ function getDynamicBaseline(data) {
     possessionLimits, lambdaLimits, cornerGoalRate,
     leagueCompetitiveness, leagueDrawTendency,
     leagueTeamCount, leagueGoalVolatility, normMinRatio, normMaxRatio,
+    foulRate, offsideRate, throwInRate, leaguePointDensity,
     dataQuality, dataQualityDetail: { filled: _filledCount, total: _totalCritical },
     traces,
   };

@@ -139,41 +139,50 @@ async function main() {
     console.log(`    ${k.padEnd(30)} = ${v}${flag}`);
   }
 
-  // 7. MinuteLog analizi — possession ve ilk 3 dakikayı göster
-  console.log('\n[7] İLK 5 DAKİKA ANALİZİ:');
+  // 7. Tüm 95 dakikayı possession + olaylarla göster
+  console.log('\n[7] 95 DAKİKA POSSESSION + OLAYLAR:');
   const minuteLog = simResult.minuteLog || [];
-  for (let i = 0; i < Math.min(5, minuteLog.length); i++) {
-    const ml = minuteLog[i];
+  let minPoss = 100, maxPoss = 0;
+  const eventCounts = {};
+  for (const ml of minuteLog) {
     const poss = ml.possession || {};
-    const events = (ml.events || []).map(e => `${e.type}(${e.team})`).join(', ') || 'yok';
-    console.log(`    dk ${ml.minute}: homePoss=${poss.home}%, awayPoss=${poss.away}% | olaylar: ${events}`);
+    const hP = poss.home ?? 50;
+    if (hP < minPoss) minPoss = hP;
+    if (hP > maxPoss) maxPoss = hP;
+    const events = (ml.events || []).map(e => `${e.type}(${e.team})`).join(', ') || '-';
+    for (const ev of (ml.events || [])) {
+      const key = `${ev.type}`;
+      eventCounts[key] = (eventCounts[key] || 0) + 1;
+    }
+    // State bilgisi (varsa)
+    const bs = ml.behavioralState || {};
+    const hState = simResult._stateLog?.[ml.minute]?.home;
+    const aState = simResult._stateLog?.[ml.minute]?.away;
+    console.log(`    dk ${String(ml.minute).padStart(2)}: H:${hP}% A:${100 - hP}% | ${events}`);
   }
 
-  // 8. DYN_LIMITS (varsa response'ta)
+  console.log(`\n[8] POSSESSION ARALIĞI: min=${minPoss}%, max=${maxPoss}%, fark=${maxPoss - minPoss}%`);
+
+  console.log('\n[9] OLAY TİPİ DAĞILIMI:');
+  const sortedEvents = Object.entries(eventCounts).sort((a, b) => b[1] - a[1]);
+  for (const [type, count] of sortedEvents) {
+    console.log(`    ${type.padEnd(25)} = ${count}`);
+  }
+
+  // 10. DYN_LIMITS (varsa response'ta)
   if (simResult._debug) {
-    console.log('\n[8] DEBUG PAYLOAD:');
+    console.log('\n[10] DEBUG PAYLOAD:');
     console.log('    metricAudit toplam:', simResult._debug.metricAudit?.totalMetrics);
     console.log('    dynamicCount:', simResult._debug.metricAudit?.dynamicCount);
   }
 
-  // Son 5 dakikayı da göster
-  console.log('\n[9] SON 5 DAKİKA ANALİZİ:');
-  for (let i = Math.max(0, minuteLog.length - 5); i < minuteLog.length; i++) {
-    const ml = minuteLog[i];
-    const poss = ml.possession || {};
-    const events = (ml.events || []).map(e => `${e.type}(${e.team})`).join(', ') || 'yok';
-    console.log(`    dk ${ml.minute}: homePoss=${poss.home}%, awayPoss=${poss.away}% | olaylar: ${events}`);
+  // 11. Baseline yeni alanlar
+  console.log('\n[11] YENİ BASELINE ALANLARI:');
+  const newKeys = ['foulRate', 'offsideRate', 'throwInRate', 'leaguePointDensity'];
+  for (const k of newKeys) {
+    const v = bp[k];
+    console.log(`    ${k.padEnd(25)} = ${v ?? 'null'}`);
   }
-
-  // Toplam home olayları say
-  let homeEvents = 0, awayEvents = 0;
-  for (const ml of minuteLog) {
-    for (const ev of (ml.events || [])) {
-      if (ev.team === 'home') homeEvents++;
-      else if (ev.team === 'away') awayEvents++;
-    }
-  }
-  console.log(`\n[10] TOPLAM OLAYLAR: home=${homeEvents}, away=${awayEvents}`);
 
   console.log('\n=== TEŞHİS TAMAMLANDI ===');
 }

@@ -11,6 +11,7 @@ const { recordBaselineTrace, recordSimWarning } = require('./audit-helper');
 const { computeWeatherMultipliers } = require('../services/weather-service');
 const { BLOCK_QF_MAP, computeAlpha, computeQualityFactors } = require('./quality-factors');
 const { applyZoneModifiers } = require('./lineup-impact');
+const { applyEventImpact, applyNaturalRegression, applyHalftimeRegression, updateTacticalStance, computeLeagueScale, computePressingImpactScale } = require('./event-impact');
 // METRIC_METADATA artık kullanılmıyor — tüm lig ortalamaları dinamik.
 
 // Merkezi nötr sabitler referansı
@@ -600,9 +601,56 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
   // NaN koruma: herhangi bir birim hesabı NaN üretirse, nötr kimlik (1.0) kullanılır.
   // Bu veri kaybı değil — NaN demek "hesap yapılamadı" demektir, 1.0 ise "etki yok" (identity).
   const _safeNum = (v) => (isFinite(v) ? v : 1.0);
+
+  // ── Genişletilmiş Game State ──────────────────────────────────────────────────
+  // M177: pressing yoğunluğu, M178: territorial control, M096b: yorgunluk endeksi
+  const _hPressing = getM(homeMetrics, sel, 'M177');
+  const _aPressing = getM(awayMetrics, sel, 'M177');
+  const _hTerritory = getM(homeMetrics, sel, 'M178');
+  const _aTerritory = getM(awayMetrics, sel, 'M178');
+  const _hFatigue = getM(homeMetrics, sel, 'M096b');
+  const _aFatigue = getM(awayMetrics, sel, 'M096b');
+
+  // Territory ve pressing başlangıç fallback: possessionBase'den türetilir (0.5 statik değil)
+  const _hTerritoryInit = _hTerritory != null ? _hTerritory / 100 : hProb.possessionBase;
+  const _aTerritoryInit = _aTerritory != null ? _aTerritory / 100 : aProb.possessionBase;
+  const _hPressingInit = _hPressing != null ? _hPressing / 100 : (hProb.pressIntensity ?? hProb.possessionBase);
+  const _aPressingInit = _aPressing != null ? _aPressing / 100 : (aProb.pressIntensity ?? aProb.possessionBase);
+  // Fatigue başlangıç: dinlenme günü ve yorgunluk endeksinden türetilir
+  const _hFatigueInit = _hFatigue != null ? _hFatigue / 100 : (baseline.homeFatigue != null ? (1 - baseline.homeFatigue) : 0);
+  const _aFatigueInit = _aFatigue != null ? _aFatigue / 100 : (baseline.awayFatigue != null ? (1 - baseline.awayFatigue) : 0);
+
   const state = {
-    home: { momentum: _safeNum(homeUnits.MOMENTUM_AKIŞI), morale: _safeNum(homeMoraleStart), urgency: 1.0, redCardPenalty: 0 },
-    away: { momentum: _safeNum(awayUnits.MOMENTUM_AKIŞI), morale: _safeNum(awayMoraleStart), urgency: 1.0, redCardPenalty: 0 }
+    home: {
+      momentum: _safeNum(homeUnits.MOMENTUM_AKIŞI),
+      morale: _safeNum(homeMoraleStart),
+      urgency: 1.0,
+      redCardPenalty: 0,
+      tacticalStance: 0.0,                  // [-1, +1]: park the bus ↔ all-out attack
+      territory: _hTerritoryInit,            // [0, 1]: possessionBase'den türetilir
+      pressing: _hPressingInit,              // [0, 1]: pressing verisi veya possessionBase
+      fatigue: _hFatigueInit,                // [0, 1]: yorgunluk endeksi veya rest days
+      recentActions: [],
+      _initialTerritory: _hTerritoryInit,    // regresyon hedefi için
+    },
+    away: {
+      momentum: _safeNum(awayUnits.MOMENTUM_AKIŞI),
+      morale: _safeNum(awayMoraleStart),
+      urgency: 1.0,
+      redCardPenalty: 0,
+      tacticalStance: 0.0,
+      territory: _aTerritoryInit,
+      pressing: _aPressingInit,
+      fatigue: _aFatigueInit,
+      recentActions: [],
+      _initialTerritory: _aTerritoryInit,
+    }
+  };
+
+  // Başlangıç değerleri — regresyon sistemi için saklama
+  const initialState = {
+    home: { momentum: state.home.momentum, morale: state.home.morale, pressing: state.home.pressing },
+    away: { momentum: state.away.momentum, morale: state.away.morale, pressing: state.away.pressing },
   };
 
   const expelledPlayers = { home: new Set(), away: new Set() };
@@ -936,7 +984,60 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
 
     if (minute === 46) {
       pushEvent({ minute: 45, type: 'halftime', homeGoals: goals.home, awayGoals: goals.away });
+      // Devre arası regresyon: menajer etkisi
+      applyHalftimeRegression(state.home, homeUnits, baseline,
+        initialState.home.momentum, initialState.home.morale, initialState.home.pressing);
+      applyHalftimeRegression(state.away, awayUnits, baseline,
+        initialState.away.momentum, initialState.away.morale, initialState.away.pressing);
+      // Devre arası tacticalStance: menajer skor farkına göre revize eder
+      const _htExpGoalsH = hProb.shotsPerMin * 90 * hProb.onTargetRate * hProb.goalConvRate;
+      const _htExpGoalsA = aProb.shotsPerMin * 90 * aProb.onTargetRate * aProb.goalConvRate;
+      updateTacticalStance(state.home, homeUnits, goals.home - goals.away, _htExpGoalsH, awayUnits, baseline);
+      updateTacticalStance(state.away, awayUnits, goals.away - goals.home, _htExpGoalsA, homeUnits, baseline);
     }
+
+    // ─── Doğal Regresyon + Yorgunluk (her dakika başında) ──────────────────
+    applyNaturalRegression(state.home, homeUnits, baseline,
+      initialState.home.momentum, initialState.home.morale);
+    applyNaturalRegression(state.away, awayUnits, baseline,
+      initialState.away.momentum, initialState.away.morale);
+
+    // Yorgunluk artışı: pressing × lgScale / KADRO_DERINLIGI — tamamen dinamik
+    const _lgPace = computeLeagueScale(baseline);
+    const _hKadroD = _s(homeUnits.KADRO_DERINLIGI);
+    const _aKadroD = _s(awayUnits.KADRO_DERINLIGI);
+    state.home.fatigue = Math.min(1, state.home.fatigue + state.home.pressing * _lgPace / (_hKadroD * 90));
+    state.away.fatigue = Math.min(1, state.away.fatigue + state.away.pressing * _lgPace / (_aKadroD * 90));
+
+    // ─── Possession Belirleme (dakika başında) ───────────────────────
+    const rawHomePoss = hProb.possessionBase * 100;
+    const rawAwayPoss = aProb.possessionBase * 100;
+    const possTotal = rawHomePoss + rawAwayPoss;
+    const normalizedHomePoss = possTotal > 0 ? (rawHomePoss / possTotal) * 100 : 50;
+    const _momShift = (state.home.momentum - state.away.momentum) * momentumPossCoeff;
+
+    // Yeni dinamik kaymalar: territory, pressing, tacticalStance
+    // Katsayılar tamamen lig verisinden türetilir
+    const _possRange = DYN_LIMITS.POSSESSION.MAX - DYN_LIMITS.POSSESSION.MIN;
+    const _lgTeamCount = baseline.leagueTeamCount ?? 20;
+    // Territory kayması: territory farkı × possRange × (lgScale / lgAvg) — volatil lig = büyük kayma
+    const _terrCoeff = _possRange * _lgPace / _s(baseline.leagueAvgGoals);
+    const _terrShift = (state.home.territory - state.away.territory) * _terrCoeff;
+    // Pressing kayması: pressing farkı × possRange × pressImpactScale
+    const _pressCoeff = _possRange * computePressingImpactScale(baseline);
+    const _pressShift = (state.home.pressing - state.away.pressing) * _pressCoeff;
+    // Stance kayması: stance farkı × possRange / lgTeamCount — büyük ligde daha az etki
+    const _stanceCoeff = _possRange / _lgTeamCount;
+    const _stanceShift = (state.home.tacticalStance - state.away.tacticalStance) * _stanceCoeff;
+
+    const _rawHomePos = normalizedHomePoss
+      + (isFinite(_momShift) ? _momShift : 0)
+      + (isFinite(_terrShift) ? _terrShift : 0)
+      + (isFinite(_pressShift) ? _pressShift : 0)
+      + (isFinite(_stanceShift) ? _stanceShift : 0);
+    const currentHomePos = clamp(_rawHomePos, DYN_LIMITS.POSSESSION.MIN, DYN_LIMITS.POSSESSION.MAX);
+    // Rastgele top sahibi: ev sahibi possession oranına göre stokastik seçim
+    const possessor = r() < currentHomePos / 100 ? 'home' : 'away';
 
     // Urgency başlangıcı — dinamik _ihtMax envelope'u
     const _ihtMaxLoop = (baseline.normMaxRatio != null && baseline.normMinRatio != null)
@@ -956,18 +1057,6 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
       }
 
       // ── Agrega Urgency: mevcut maçta önde AMA hâlâ gol ihtiyacı olan takım ──
-      // GOL_IHTIYACI > 1.0 ise takımın "daha fazla gol lazım" baskısı var demektir.
-      // Bu baskı M171 (birikmiş skor açığı), M172 (önem skoru), M141 (sezon aşaması) gibi
-      // tamamen dinamik verilerden türetilir. 1.0 = nötr (baskı yok).
-      //
-      // Senaryo: İlk maçta 0-4 kaybeden takım, rövanşta 3-0 önde.
-      // GOL_IHTIYACI ≈ 2.5 (M171 weight:4 → çok yüksek).
-      // Klasik urgency devreye GİRMEZ (çünkü takım önde).
-      // Agrega urgency devreye GİRER → takım 4. gol için basmaya devam eder.
-      //
-      // Formül: aggregateExcess = GOL_IHTIYACI - 1.0 (sıfır sabit, sadece nötr nokta)
-      // aggregateUrgency = 1.0 + aggregateExcess × timeRatio
-      // Sadece takım mevcut maçta önde veya berabere iken VE GOL_IHTIYACI > 1.0 iken aktif.
       if (goals.home >= goals.away && minute > homeUrgencyStart) {
         const homeAggExcess = Math.max(0, homeUnits.GOL_IHTIYACI - 1.0);
         if (homeAggExcess > 0) {
@@ -992,19 +1081,6 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
     const awayEarlyEnd = Math.max(0, earlyBase - earlyBase * _urgencyEarlyFactor * Math.max(0, awayUnits.GOL_IHTIYACI - 1.0));
     const twHome = minute <= homeEarlyEnd ? homeUnits.MAC_BASLANGICI : (minute > homeUrgencyStart ? homeUnits.MAC_SONU : 1.0);
     const twAway = minute <= awayEarlyEnd ? awayUnits.MAC_BASLANGICI : (minute > awayUrgencyStart ? awayUnits.MAC_SONU : 1.0);
-
-    // ─── Possession Belirleme (dakika başında) ──────────────────────────────
-    // Şut ve korner yalnızca top sahibi takım için hesaplanır — fizik gerçeği.
-    // Kart ve oyuncu değişikliği possession'dan bağımsız her iki takım için çalışır.
-    const rawHomePoss = hProb.possessionBase * 100;
-    const rawAwayPoss = aProb.possessionBase * 100;
-    const possTotal = rawHomePoss + rawAwayPoss;
-    const normalizedHomePoss = possTotal > 0 ? (rawHomePoss / possTotal) * 100 : 50;
-    const _momShift = (state.home.momentum - state.away.momentum) * momentumPossCoeff;
-    const _rawHomePos = normalizedHomePoss + (isFinite(_momShift) ? _momShift : 0);
-    const currentHomePos = clamp(_rawHomePos, DYN_LIMITS.POSSESSION.MIN, DYN_LIMITS.POSSESSION.MAX);
-    // Rastgele top sahibi: ev sahibi possession oranına göre stokastik seçim
-    const possessor = r() < currentHomePos / 100 ? 'home' : 'away';
 
     const oppSideOfPoss = possessor === 'home' ? 'away' : 'home';
 
@@ -1038,6 +1114,7 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
 
         if (r() < blockProb) {
           pushEvent({ minute, type: 'shot_blocked', team: side, player: pickActivePlayer(isHome ? hPlayers : aPlayers, ['F', 'M', 'A'], side) });
+          applyEventImpact('shot_blocked', oppSideOfPoss, side, minute, state, homeUnits, awayUnits, baseline, DYN_LIMITS);
         } else if (r() < onTargetProb) {
           stats[side].shotsOnTarget++;
           // Gol dönüşüm oranı — kaleci performansına göre adjust, flow çarpanı YOK
@@ -1073,11 +1150,33 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
               state.away.momentum = clamp(state.away.momentum + posBoost * attkProb.onTargetRate, DYN_LIMITS.MOMENTUM.MIN, DYN_LIMITS.MOMENTUM.MAX);
               state.home.morale = clamp(state.home.morale - negDrop, DYN_LIMITS.MORALE.MIN, DYN_LIMITS.MORALE.MAX);
             }
+            // Gol sonrası merkezi etki motoru + taktik stance gücelleme
+            applyEventImpact('goal', side, oppSideOfPoss, minute, state, homeUnits, awayUnits, baseline, DYN_LIMITS);
+            const _geH = hProb.shotsPerMin * 90 * hProb.onTargetRate * hProb.goalConvRate;
+            const _geA = aProb.shotsPerMin * 90 * aProb.onTargetRate * aProb.goalConvRate;
+            updateTacticalStance(state.home, homeUnits, goals.home - goals.away, _geH, awayUnits, baseline);
+            updateTacticalStance(state.away, awayUnits, goals.away - goals.home, _geA, homeUnits, baseline);
           } else {
             pushEvent({ minute, type: 'shot_on_target', team: side, player: pickActivePlayer(isHome ? hPlayers : aPlayers, ['F', 'M', 'A'], side) });
+            applyEventImpact('shot_on_target', side, oppSideOfPoss, minute, state, homeUnits, awayUnits, baseline, DYN_LIMITS);
+            // Big save kontrolü: isabetli şut gol olmadıysa, GK performansına göre
+            const _defSavePctAbove = (isHome ? aProb : hProb).savePctAboveExpected;
+            const _gkRefleksUnit = isHome ? awayUnits.GK_REFLEKS : homeUnits.GK_REFLEKS;
+            if (_defSavePctAbove != null && _defSavePctAbove > 0 && r() < _defSavePctAbove * (_gkRefleksUnit ?? 1)) {
+              pushEvent({ minute, type: 'big_save', team: oppSideOfPoss });
+              applyEventImpact('big_save', side, oppSideOfPoss, minute, state, homeUnits, awayUnits, baseline, DYN_LIMITS);
+            }
           }
         } else {
           pushEvent({ minute, type: 'shot_off_target', team: side, player: pickActivePlayer(isHome ? hPlayers : aPlayers, ['F', 'M', 'A'], side) });
+          applyEventImpact('shot_off_target', side, oppSideOfPoss, minute, state, homeUnits, awayUnits, baseline, DYN_LIMITS);
+          // Goal kick kontrolü: isabetsiz şut aut olabilir — oran lig verilerinden
+          const _gkRatio = (baseline.leagueAvgGoals ?? 1) / ((baseline.shotsPerMin ?? 0.15) * 90); // gol/şut oranı
+          const _goalKickProb = (1 - attkProb.onTargetRate) * (1 - defProb.blockRate) * _gkRatio;
+          if (r() < _goalKickProb) {
+            pushEvent({ minute, type: 'goal_kick', team: oppSideOfPoss });
+            applyEventImpact('goal_kick', side, oppSideOfPoss, minute, state, homeUnits, awayUnits, baseline, DYN_LIMITS);
+          }
         }
       }
 
@@ -1124,8 +1223,10 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
           if (r() < attkProb.penConvRate) {
             goals[side]++;
             pushEvent({ minute, type: 'goal', team: side, player: penPlayer, subtype: 'penalty' });
+            applyEventImpact('penalty_scored', side, oppSideOfPoss, minute, state, homeUnits, awayUnits, baseline, DYN_LIMITS);
           } else {
             pushEvent({ minute, type: 'penalty_missed', team: side, player: penPlayer });
+            applyEventImpact('penalty_missed', side, oppSideOfPoss, minute, state, homeUnits, awayUnits, baseline, DYN_LIMITS);
           }
         }
       }
@@ -1154,6 +1255,7 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
           stats[side].redCards++;
           state[side].redCardPenalty = clamp(state[side].redCardPenalty + organicPenalty, 0, _rcPenMax ?? 1);
           pushEvent({ minute, type: 'red_card', team: side, player: cardName, subtype: 'direct_red' });
+          applyEventImpact('red_card', side, side === 'home' ? 'away' : 'home', minute, state, homeUnits, awayUnits, baseline, DYN_LIMITS);
         }
       }
       // Yellow Card
@@ -1171,8 +1273,10 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
             stats[side].redCards++;
             state[side].redCardPenalty = clamp(state[side].redCardPenalty + organicPenalty, 0, _rcPenMax ?? 1);
             pushEvent({ minute, type: 'red_card', team: side, player: cardName, subtype: 'second_yellow' });
+            applyEventImpact('red_card', side, side === 'home' ? 'away' : 'home', minute, state, homeUnits, awayUnits, baseline, DYN_LIMITS);
           } else {
             pushEvent({ minute, type: 'yellow_card', team: side, player: cardName });
+            applyEventImpact('yellow_card', side, side === 'home' ? 'away' : 'home', minute, state, homeUnits, awayUnits, baseline, DYN_LIMITS);
           }
         }
       }
@@ -1224,9 +1328,67 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
                 if (sqImpact !== 0) {
                   state[side].morale = clamp(state[side].morale + sqImpact, DYN_LIMITS.MORALE.MIN, DYN_LIMITS.MORALE.MAX);
                 }
+                applyEventImpact('substitution', side, side === 'home' ? 'away' : 'home', minute, state, homeUnits, awayUnits, baseline, DYN_LIMITS);
               }
             }
           }
+        }
+      }
+    }
+
+    // ─── Yeni Olay Türleri: Faul, Taç, Ofsayt (her dakika, her iki takım) ───
+    for (const side of ['home', 'away']) {
+      const isHome = side === 'home';
+      const oppSide = isHome ? 'away' : 'home';
+      const sideUnits = isHome ? homeUnits : awayUnits;
+      const sProb = isHome ? hProb : aProb;
+
+      // Faul: foulRate × (1/DISIPLIN) × urgency × pressing
+      const _baseFoulRate = sProb.foulRate ?? baseline.foulRate ?? null;
+      if (_baseFoulRate != null) {
+        const _discFactor = 1 / Math.max(sideUnits.DISIPLIN ?? 1, EPS);
+        const _urgFactor = 1 + Math.max(0, state[side].urgency - 1);
+        const _pressFactor = 1 + state[side].pressing * _lgPace; // lgScale yerine statik 0.5 yoktu
+        const foulProb = clamp(_baseFoulRate * _discFactor * _urgFactor * _pressFactor, 0, 1);
+        if (r() < foulProb) {
+          pushEvent({ minute, type: 'foul', team: side });
+          applyEventImpact('foul', oppSide, side, minute, state, homeUnits, awayUnits, baseline, DYN_LIMITS);
+
+          // Faul sonrası: serbest vuruş tehlikesi (rakip sahasında)
+          const _fkThreat = (isHome ? aProb : hProb).freeKickThreatRate ?? null;
+          if (_fkThreat != null && state[oppSide].territory > (aProb.possessionBase ?? hProb.possessionBase)) {
+            const fkProb = clamp(_fkThreat * ((isHome ? awayUnits : homeUnits).DURAN_TOP ?? 1) * state[oppSide].territory, 0, 1);
+            if (r() < fkProb) {
+              pushEvent({ minute, type: 'free_kick', team: oppSide });
+              applyEventImpact('free_kick', oppSide, side, minute, state, homeUnits, awayUnits, baseline, DYN_LIMITS);
+            }
+          }
+        }
+      }
+
+      // Taç atışı: (1 - TOPLA_OYNAMA) × (1 - BAGLANTI_OYUNU) × throwInRate
+      const _baseThrowIn = baseline.throwInRate ?? null;
+      if (_baseThrowIn != null) {
+        const _topKontrol = 1 / _s(sideUnits.TOPLA_OYNAMA); // birim üzerinden, statik 0.5 değil
+        const _baglantiKayip = 1 / _s(sideUnits.BAGLANTI_OYUNU); // birim üzerinden, statik 0.3 değil
+        const throwInProb = clamp(_baseThrowIn * (_topKontrol / (_topKontrol + 1)) * (_baglantiKayip / (_baglantiKayip + 1)), 0, 1);
+        if (r() < throwInProb) {
+          pushEvent({ minute, type: 'throw_in', team: side });
+          applyEventImpact('throw_in', side, oppSide, minute, state, homeUnits, awayUnits, baseline, DYN_LIMITS);
+        }
+      }
+
+      // Ofsayt: territory × (1/TAKTIKSEL_UYUM) × oppDefLine × offsideRate
+      const _baseOffside = baseline.offsideRate ?? null;
+      if (_baseOffside != null) {
+        const _terrFactor = state[side].territory;
+        const _taktikFactor = 1 / Math.max(sideUnits.TAKTIKSEL_UYUM ?? 1, EPS);
+        const _oppDefLine = getM(isHome ? awayMetrics : homeMetrics, sel, 'M179');
+        const _defLineFactor = _oppDefLine != null ? (_oppDefLine / 100) : (isHome ? aProb.possessionBase : hProb.possessionBase); // possessionBase'den türetilir, 0.5 değil
+        const offsideProb = clamp(_baseOffside * _terrFactor * _taktikFactor * _defLineFactor, 0, 1);
+        if (r() < offsideProb) {
+          pushEvent({ minute, type: 'offside', team: side });
+          applyEventImpact('offside', side, oppSide, minute, state, homeUnits, awayUnits, baseline, DYN_LIMITS);
         }
       }
     }

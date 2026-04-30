@@ -7,26 +7,22 @@
 'use strict';
 
 const SIM_CONFIG = {
-  // ─── Clamps & Limits ─────────────────────────────────────────────────────────
+  // ─── Clamps & Limits (ULTIMA RATIO FALLBACKS) ──────────────────────────────
+  // getDynamicLimits() lig verisinden TÜM sınırları türetir.
+  // Bu değerler YALNIZCA tüm dinamik katmanlar başarısız olduğunda kullanılır.
   LIMITS: {
     POWER: { MIN: 0.5, MAX: 2.0 },
     MOMENTUM: { MIN: 0.5, MAX: 2.0 },
     MORALE: { MIN: 0.4, MAX: 1.6 },
-    POSSESSION: { MIN: 30, MAX: 70 },       // Matematiksel: %100 top kontrolü imkansız
-    PROBABILITY: { MIN: 0.001, MAX: 0.90 },  // Olasılık sınırı: p ∈ [0,1]
-    ON_TARGET: { MIN: 0.01, MAX: 0.90 },     // İsabet oranı: oran sınırı
-    BLOCK: { MIN: 0.001, MAX: 0.60 },         // Blok oranı: her şutu bloklayamazsın
-    // GK_ADJ: kaldırıldı — artık sqrt() doğal sönümleme kullanılıyor
-    // URGENCY: kaldırıldı — GOL_IHTIYACI [0.75,1.35] doğal sınır yeterli
-    CORNER: { MIN: 0.001, MAX: 0.50 },
-    CORNER_GOAL: { MIN: 0.01, MAX: 0.20 }, // Korner → gol olasılığı sınırları
-    CARDS: { YELLOW_MAX: 0.20, RED_MAX: 0.10 },
-    // Poisson lambda — gerçekçi futbol aralığı (takım başı beklenen gol/maç)
-    // Kaynak: UEFA/FIFA istatistikleri, top 5 lig ortalaması 0.8–2.8 arası
-    LAMBDA: { MIN: 0.3, MAX: 3.5 },
-    // Form bazlı morale başlangıç sınırları
-    // 1.0 = nötr (lig ortalaması form), SCALE = form sapmasının morale etkisi
-    FORM_MORALE: { MIN: 0.7, MAX: 1.3, SCALE: 0.3 },
+    POSSESSION: { MIN: 0, MAX: 100 },          // Matematiksel: [0, 100] — lig verisi daraltır
+    PROBABILITY: { MIN: 0, MAX: 1 },            // Matematiksel kural: p ∈ [0,1]
+    ON_TARGET: { MIN: 0, MAX: 1 },               // Matematiksel kural: oran ∈ [0,1]
+    BLOCK: { MIN: 0, MAX: 1 },                   // Matematiksel kural: oran ∈ [0,1]
+    CORNER: { MIN: 0, MAX: 1 },                  // Matematiksel kural: oran ∈ [0,1]
+    CORNER_GOAL: { MIN: 0, MAX: 1 },             // Matematiksel kural: oran ∈ [0,1]
+    CARDS: { YELLOW_MAX: 1, RED_MAX: 1 },         // Matematiksel kural: oran ∈ [0,1]
+    LAMBDA: { MIN: 0.01, MAX: 20 },               // Matematiksel: Poisson λ > 0
+    FORM_MORALE: { MIN: 0.1, MAX: 3.0, SCALE: 1.0 },
   },
 
   // ─── Model Sabitler (Matematiksel — Statik Veri Değil) ─────────────────────
@@ -123,32 +119,32 @@ function getDynamicLimits(baseline) {
     ? { MIN: _rawPossLimits.MIN ?? _rawPossLimits.min, MAX: _rawPossLimits.MAX ?? _rawPossLimits.max }
     : L.POSSESSION;
 
-  // On-target: baseline onTargetRate'ten (takım başına per-min → 90dk oran)
+  // On-target: baseline onTargetRate'ten — geniş dinamik aralık
   const onTarget = baseline?.onTargetRate != null
-    ? { MIN: Math.max(0, baseline.onTargetRate / 3), MAX: Math.min(1, baseline.onTargetRate * 3) }
+    ? { MIN: Math.max(0, baseline.onTargetRate / 4), MAX: Math.min(1, baseline.onTargetRate * 4) }
     : L.ON_TARGET;
 
-  // Block: baseline blockRate'ten
+  // Block: baseline blockRate'ten — geniş dinamik aralık
   const block = baseline?.blockRate != null
-    ? { MIN: Math.max(0, baseline.blockRate / 3), MAX: Math.min(1, baseline.blockRate * 3) }
+    ? { MIN: Math.max(0, baseline.blockRate / 4), MAX: Math.min(1, baseline.blockRate * 4) }
     : L.BLOCK;
 
-  // Corner: baseline cornerPerMin'den
+  // Corner: baseline cornerPerMin'den — geniş dinamik aralık
   const corner = baseline?.cornerPerMin != null
-    ? { MIN: Math.max(0, baseline.cornerPerMin / 3), MAX: baseline.cornerPerMin * 3 }
+    ? { MIN: Math.max(0, baseline.cornerPerMin / 4), MAX: Math.min(1, baseline.cornerPerMin * 4) }
     : L.CORNER;
 
-  // Corner→Goal: baseline cornerGoalRate'ten
+  // Corner→Goal: baseline cornerGoalRate'ten — geniş dinamik aralık
   const cornerGoal = baseline?.cornerGoalRate != null
-    ? { MIN: Math.max(0, baseline.cornerGoalRate / 3), MAX: baseline.cornerGoalRate * 3 }
+    ? { MIN: Math.max(0, baseline.cornerGoalRate / 4), MAX: Math.min(1, baseline.cornerGoalRate * 4) }
     : L.CORNER_GOAL;
 
-  // Cards: baseline yellowPerMin / redPerMin'den (per-minute → per-play olasılık)
+  // Cards: baseline'dan türetilir — lig ortalamasının geniş katları
   const cards = (baseline?.yellowPerMin != null && baseline?.redPerMin != null)
-    ? { YELLOW_MAX: baseline.yellowPerMin * 90 / 10, RED_MAX: baseline.redPerMin * 90 / 10 }
+    ? { YELLOW_MAX: Math.min(1, baseline.yellowPerMin * 90 / 5), RED_MAX: Math.min(1, baseline.redPerMin * 90 / 2) }
     : L.CARDS;
 
-  // Lambda: standings gol dağılımından (aynı case mismatch: {min,max} → {MIN,MAX})
+  // Lambda: standings gol dağılımından (case mismatch: {min,max} → {MIN,MAX})
   const _rawLambda = baseline?.lambdaLimits;
   const lambda = _rawLambda
     ? { MIN: _rawLambda.MIN ?? _rawLambda.min, MAX: _rawLambda.MAX ?? _rawLambda.max }
@@ -164,7 +160,7 @@ function getDynamicLimits(baseline) {
     MOMENTUM: { MIN: momMin, MAX: momMax },
     MORALE: { MIN: moraleMin, MAX: moraleMax },
     POSSESSION: possession,
-    PROBABILITY: L.PROBABILITY, // p ∈ [0,1] — matematiksel, veriyle değişmez
+    PROBABILITY: { MIN: 0, MAX: 1 },  // p ∈ [0,1] — matematiksel kural, veriyle değişmez
     ON_TARGET: onTarget,
     BLOCK: block,
     CORNER: corner,
@@ -172,7 +168,7 @@ function getDynamicLimits(baseline) {
     CARDS: cards,
     LAMBDA: lambda,
     FORM_MORALE: formMorale,
-    RED_CARD_POWER_PENALTY_MAX: lgCV != null ? lgCV / (1 + lgCV) : (L.RED_CARD_POWER_PENALTY_MAX ?? null),
+    RED_CARD_POWER_PENALTY_MAX: lgCV != null ? lgCV / (1 + lgCV) : null,
   };
 }
 
