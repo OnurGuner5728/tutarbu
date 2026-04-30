@@ -15,7 +15,7 @@ function createRNG(seed) {
     // String seed to numeric
     s = seed.split('').reduce((a, b) => { a = ((a << 5) - a) + b.charCodeAt(0); return a & a; }, 0);
   }
-  return function() {
+  return function () {
     s = (s * 16807) % 2147483647;
     return (s - 1) / 2147483646;
   };
@@ -43,7 +43,7 @@ function enrichMatchResponse(prediction, metrics, baseline, data, reqQuery) {
   }
 
   prediction.leagueBaseline = baseline;
-  
+
   const enrichedTraces = {};
   if (metrics.leagueAvgTraces) {
     Object.entries(metrics.leagueAvgTraces).forEach(([id, trace]) => {
@@ -140,7 +140,7 @@ const MAX_REQUESTS = 100; // 15 dakikada 100 istek
 function rateLimitMiddleware(req, res, next) {
   const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
   const now = Date.now();
-  
+
   if (!rateLimitStore.has(ip)) {
     rateLimitStore.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW });
     return next();
@@ -156,12 +156,12 @@ function rateLimitMiddleware(req, res, next) {
   record.count++;
   if (record.count > MAX_REQUESTS) {
     console.warn(`[Security] Rate limit exceeded for IP: ${ip}`);
-    return res.status(429).json({ 
+    return res.status(429).json({
       error: 'Too many requests. Please try again later.',
       retryAfter: Math.ceil((record.resetAt - now) / 1000)
     });
   }
-  
+
   next();
 }
 
@@ -211,7 +211,7 @@ app.get('/api/matches', async (req, res) => {
   try {
     console.log(`[API] Fetching real match list for ${targetDate} via Playwright...`);
     const data = await playwrightClient.getScheduledEvents(targetDate);
-    
+
     if (!data || !Array.isArray(data.events) || data.events.length === 0) {
       console.warn('[API] No events found or API blocked even with Playwright.');
       return res.json([]);
@@ -327,12 +327,12 @@ app.post('/api/predict/:eventId', async (req, res) => {
     const baseline = getDynamicBaseline(data);
     // Lig fizik parametrelerini baseline'a enjekte et — match-simulator ve simulatorEngine tarafından kullanılır
     baseline.leagueGoalVolatility = metrics.meta?.leagueGoalVolatility ?? null;
-    baseline.leaguePointDensity   = metrics.meta?.leaguePointDensity   ?? null;
-    baseline.medianGoalRate       = metrics.meta?.medianGoalRate       ?? null;
-    baseline.leagueTeamCount      = metrics.meta?.leagueTeamCount      ?? null;
-    baseline.ptsCV                = metrics.meta?.ptsCV                ?? null;
-    baseline.normMinRatio         = metrics.meta?.normMinRatio         ?? null;
-    baseline.normMaxRatio         = metrics.meta?.normMaxRatio         ?? null;
+    baseline.leaguePointDensity = metrics.meta?.leaguePointDensity ?? null;
+    baseline.medianGoalRate = metrics.meta?.medianGoalRate ?? null;
+    baseline.leagueTeamCount = metrics.meta?.leagueTeamCount ?? null;
+    baseline.ptsCV = metrics.meta?.ptsCV ?? null;
+    baseline.normMinRatio = metrics.meta?.normMinRatio ?? null;
+    baseline.normMaxRatio = metrics.meta?.normMaxRatio ?? null;
 
     // Mevki Bazlı Piyasa Değeri Kalite Düzeltmesi (PVKD) — MC simülasyonu için
     // Workshop lineup varsa, assignedPosition'ları içeren lineup oyuncuları kullanılır.
@@ -547,12 +547,12 @@ app.post('/api/workshop/:eventId', async (req, res) => {
 
     // Inject league physical parameters into baseline
     baseline.leagueGoalVolatility = metrics.meta?.leagueGoalVolatility ?? null;
-    baseline.leaguePointDensity   = metrics.meta?.leaguePointDensity   ?? null;
-    baseline.medianGoalRate       = metrics.meta?.medianGoalRate       ?? null;
-    baseline.leagueTeamCount      = metrics.meta?.leagueTeamCount      ?? null;
-    baseline.ptsCV                = metrics.meta?.ptsCV                ?? null;
-    baseline.normMinRatio         = metrics.meta?.normMinRatio         ?? null;
-    baseline.normMaxRatio         = metrics.meta?.normMaxRatio         ?? null;
+    baseline.leaguePointDensity = metrics.meta?.leaguePointDensity ?? null;
+    baseline.medianGoalRate = metrics.meta?.medianGoalRate ?? null;
+    baseline.leagueTeamCount = metrics.meta?.leagueTeamCount ?? null;
+    baseline.ptsCV = metrics.meta?.ptsCV ?? null;
+    baseline.normMinRatio = metrics.meta?.normMinRatio ?? null;
+    baseline.normMaxRatio = metrics.meta?.normMaxRatio ?? null;
 
     // Inject Position-based Market Value Breakdown (PVKD)
     // Workshop lineup'ında assignedPosition değiştirilmiş olabilir — lineup oyuncuları kullan
@@ -563,7 +563,7 @@ app.post('/api/workshop/:eventId', async (req, res) => {
       ? { players: data.lineups.away.players } : (data.awayPlayers || []);
     baseline.homeMVBreakdown = computePositionMVBreakdown(pvkdHomeSrc);
     baseline.awayMVBreakdown = computePositionMVBreakdown(pvkdAwaySrc);
-    
+
     console.log(`[API WORKSHOP] PVKD Enjeksiyonu başarılı. home: ${baseline.homeMVBreakdown?.total}, away: ${baseline.awayMVBreakdown?.total}`);
 
     // ── Lineup Quality Ratio (LQR) — Poisson lambda düzeltmesi ──
@@ -805,15 +805,15 @@ app.post('/api/simulate/:eventId', async (req, res) => {
     const awayMetrics = Object.assign(flattenSide(metrics.away), sharedFlat);
 
     const baseline = getDynamicBaseline(data);
-    
+
     // Inject league physical parameters into baseline for match-simulator
     baseline.leagueGoalVolatility = metrics.meta?.leagueGoalVolatility ?? null;
-    baseline.leaguePointDensity   = metrics.meta?.leaguePointDensity   ?? null;
-    baseline.medianGoalRate       = metrics.meta?.medianGoalRate       ?? null;
-    baseline.leagueTeamCount      = metrics.meta?.leagueTeamCount      ?? null;
-    baseline.ptsCV                = metrics.meta?.ptsCV                ?? null;
-    baseline.normMinRatio         = metrics.meta?.normMinRatio         ?? null;
-    baseline.normMaxRatio         = metrics.meta?.normMaxRatio         ?? null;
+    baseline.leaguePointDensity = metrics.meta?.leaguePointDensity ?? null;
+    baseline.medianGoalRate = metrics.meta?.medianGoalRate ?? null;
+    baseline.leagueTeamCount = metrics.meta?.leagueTeamCount ?? null;
+    baseline.ptsCV = metrics.meta?.ptsCV ?? null;
+    baseline.normMinRatio = metrics.meta?.normMinRatio ?? null;
+    baseline.normMaxRatio = metrics.meta?.normMaxRatio ?? null;
 
     // Inject Position-based Market Value Breakdown (PVKD) for Monte Carlo simulation
     // Workshop lineup varsa, assignedPosition'ları içeren lineup oyuncuları kullanılır.
@@ -824,7 +824,7 @@ app.post('/api/simulate/:eventId', async (req, res) => {
       ? { players: data.lineups.away.players } : data.awayPlayers;
     baseline.homeMVBreakdown = computePositionMVBreakdown(pvkdHomeSrc);
     baseline.awayMVBreakdown = computePositionMVBreakdown(pvkdAwaySrc);
-    
+
     console.log(`[API SIMULATE] PVKD Enjeksiyonu başarılı. home: ${baseline.homeMVBreakdown?.total}, away: ${baseline.awayMVBreakdown?.total}`);
 
     // ── Lineup Quality Ratio (LQR) ──────────────────────────────────────────
@@ -979,7 +979,7 @@ app.post('/api/simulate/:eventId', async (req, res) => {
     }
 
     result.leagueBaseline = baseline;
-    
+
     // Enrich traces for UI transparency (same as predict endpoint)
     const enrichedTraces = {};
     if (metrics.leagueAvgTraces) {
@@ -1090,9 +1090,9 @@ app.get('/api/match-debug/:eventId', async (req, res) => {
 // GET /api/backtest?date=YYYY-MM-DD&endDate=YYYY-MM-DD&limit=1-9999&tournament=all|top|custom
 // Gerçek server pipeline: fetchAllMatchData → metrics → baseline → generatePrediction
 // SSE stream: her maç anlık gönderilir
-const TOP_TOURNAMENT_IDS_BT = new Set([17,8,23,35,34,7,679,52,325,37,132,23651]);
+const TOP_TOURNAMENT_IDS_BT = new Set([17, 8, 23, 35, 34, 7, 679, 52, 325, 37, 132, 23651]);
 const MAX_BACKTEST_DAYS_BACK = 30;
-const BACKTEST_INTER_DELAY_MS = 3000;
+const BACKTEST_INTER_DELAY_MS = 4000;
 
 function buildTournamentFilter(tournamentParam) {
   if (tournamentParam === 'top') return (id) => TOP_TOURNAMENT_IDS_BT.has(id);
@@ -1103,7 +1103,7 @@ function buildTournamentFilter(tournamentParam) {
 }
 
 app.get('/api/backtest', async (req, res) => {
-  const date    = req.query.date    || new Date(Date.now() - 86400000).toISOString().split('T')[0];
+  const date = req.query.date || new Date(Date.now() - 86400000).toISOString().split('T')[0];
   const endDate = req.query.endDate || date; // date range support
   const rawLimit = parseInt(req.query.limit, 10);
   const matchLimit = (!isNaN(rawLimit) && rawLimit >= 1) ? Math.min(rawLimit, 9999) : 10;
@@ -1123,7 +1123,7 @@ app.get('/api/backtest', async (req, res) => {
   const progress = (msg) => send('progress', { message: msg });
 
   try {
-    progress(`Backtest: ${date}${endDate !== date ? ' → '+endDate : ''} | limit: ${matchLimit} | turnuva: ${tournamentFilter}`);
+    progress(`Backtest: ${date}${endDate !== date ? ' → ' + endDate : ''} | limit: ${matchLimit} | turnuva: ${tournamentFilter}`);
 
     // ── 1. Maç toplama (date range + dedup) ──────────────────────────────
     const filterFn = buildTournamentFilter(tournamentFilter);
@@ -1181,21 +1181,21 @@ app.get('/api/backtest', async (req, res) => {
       if (mi > 0) await new Promise(r => setTimeout(r, BACKTEST_INTER_DELAY_MS));
 
       const matchLabel = `${match.homeTeam.name} vs ${match.awayTeam.name}`;
-      progress(`(${mi+1}/${finishedMatches.length}) ${matchLabel}`);
+      progress(`(${mi + 1}/${finishedMatches.length}) ${matchLabel}`);
 
       try {
         const data = await fetchAllMatchData(match.id);
         const metrics = calculateAllMetrics(data);
         const baseline = getDynamicBaseline(data);
         baseline.leagueGoalVolatility = metrics.meta?.leagueGoalVolatility ?? null;
-        baseline.leaguePointDensity   = metrics.meta?.leaguePointDensity   ?? null;
-        baseline.medianGoalRate       = metrics.meta?.medianGoalRate       ?? null;
-        baseline.leagueTeamCount      = metrics.meta?.leagueTeamCount      ?? null;
-        baseline.ptsCV                = metrics.meta?.ptsCV                ?? null;
-        baseline.normMinRatio         = metrics.meta?.normMinRatio         ?? null;
-        baseline.normMaxRatio         = metrics.meta?.normMaxRatio         ?? null;
-        baseline.homeMVBreakdown      = computePositionMVBreakdown(data.homePlayers || []);
-        baseline.awayMVBreakdown      = computePositionMVBreakdown(data.awayPlayers || []);
+        baseline.leaguePointDensity = metrics.meta?.leaguePointDensity ?? null;
+        baseline.medianGoalRate = metrics.meta?.medianGoalRate ?? null;
+        baseline.leagueTeamCount = metrics.meta?.leagueTeamCount ?? null;
+        baseline.ptsCV = metrics.meta?.ptsCV ?? null;
+        baseline.normMinRatio = metrics.meta?.normMinRatio ?? null;
+        baseline.normMaxRatio = metrics.meta?.normMaxRatio ?? null;
+        baseline.homeMVBreakdown = computePositionMVBreakdown(data.homePlayers || []);
+        baseline.awayMVBreakdown = computePositionMVBreakdown(data.awayPlayers || []);
 
         const report = generatePrediction(metrics, data, baseline, metrics.metricAudit, Math.random);
 
@@ -1264,18 +1264,18 @@ app.get('/api/backtest', async (req, res) => {
 
         // ── Brier + LogLoss ──
         const eps = 1e-10;
-        const pH_n = pHome/100, pD_n = pDraw/100, pA_n = pAway/100;
-        const oH = realResult==='1'?1:0, oD = realResult==='X'?1:0, oA = realResult==='2'?1:0;
-        const brierScore = (pH_n-oH)**2 + (pD_n-oD)**2 + (pA_n-oA)**2;
-        const logLoss = -(oH*Math.log(pH_n+eps)+oD*Math.log(pD_n+eps)+oA*Math.log(pA_n+eps));
+        const pH_n = pHome / 100, pD_n = pDraw / 100, pA_n = pAway / 100;
+        const oH = realResult === '1' ? 1 : 0, oD = realResult === 'X' ? 1 : 0, oA = realResult === '2' ? 1 : 0;
+        const brierScore = (pH_n - oH) ** 2 + (pD_n - oD) ** 2 + (pA_n - oA) ** 2;
+        const logLoss = -(oH * Math.log(pH_n + eps) + oD * Math.log(pD_n + eps) + oA * Math.log(pA_n + eps));
         totalBrier += brierScore;
         totalLogLoss += logLoss;
 
         // ── Motor karşılaştırması ──
         const poissonRes = report.poissonResult;
         const simRes = report.simulationResult;
-        if (poissonRes?.predicted) { poissonTotal++; if (poissonRes.predicted===realResult) poissonHits++; }
-        if (simRes?.predicted) { simTotal++; if (simRes.predicted===realResult) simHits++; }
+        if (poissonRes?.predicted) { poissonTotal++; if (poissonRes.predicted === realResult) poissonHits++; }
+        if (simRes?.predicted) { simTotal++; if (simRes.predicted === realResult) simHits++; }
 
         // ── Value bet göstergesi (model vs market) ──
         const marketHome = metrics.shared?.contextual?.M131 ?? null;
@@ -1293,7 +1293,7 @@ app.get('/api/backtest', async (req, res) => {
         const tid = match.tournament?.uniqueTournament?.id;
         const tname = match.tournament?.name || 'Unknown';
         if (tid) {
-          if (!tournamentStats[tid]) tournamentStats[tid] = { name: tname, total:0, hits1X2:0, hitsOU25:0, hitsBTTS:0, hitsScore:0, totalBrier:0 };
+          if (!tournamentStats[tid]) tournamentStats[tid] = { name: tname, total: 0, hits1X2: 0, hitsOU25: 0, hitsBTTS: 0, hitsScore: 0, totalBrier: 0 };
           const ts = tournamentStats[tid];
           ts.total++; if (hit1X2) ts.hits1X2++; if (hitOU25) ts.hitsOU25++;
           if (hitBTTS) ts.hitsBTTS++; if (hitScore) ts.hitsScore++;
@@ -1307,7 +1307,7 @@ app.get('/api/backtest', async (req, res) => {
           homeTeam: match.homeTeam?.name,
           awayTeam: match.awayTeam?.name,
           tournament: tname, tournamentId: tid || null,
-          matchDate: match.startTimestamp ? new Date(match.startTimestamp*1000).toISOString().split('T')[0] : date,
+          matchDate: match.startTimestamp ? new Date(match.startTimestamp * 1000).toISOString().split('T')[0] : date,
           // FT gerçek
           actual: `${realHS}-${realAS}`, actualResult: realResult, actualOU25: realOU25, actualBTTS: realBTTS,
           // FT tahmin
@@ -1337,10 +1337,10 @@ app.get('/api/backtest', async (req, res) => {
           maxProbability: coverageCtrl.maxProbability || 0,
           isHighConfidence: coverageCtrl.isHighConfidence || false,
           // Motor karşılaştırması
-          poisson: poissonRes ? { predicted:poissonRes.predicted, homeWin:poissonRes.homeWin, draw:poissonRes.draw, awayWin:poissonRes.awayWin, topScore:poissonRes.topScore, hit:poissonRes.predicted===realResult, lambdaHome:poissonRes.lambdaHome, lambdaAway:poissonRes.lambdaAway } : null,
-          simulation: simRes ? { predicted:simRes.predicted, homeWin:simRes.homeWin, draw:simRes.draw, awayWin:simRes.awayWin, hit:simRes.predicted===realResult } : null,
+          poisson: poissonRes ? { predicted: poissonRes.predicted, homeWin: poissonRes.homeWin, draw: poissonRes.draw, awayWin: poissonRes.awayWin, topScore: poissonRes.topScore, hit: poissonRes.predicted === realResult, lambdaHome: poissonRes.lambdaHome, lambdaAway: poissonRes.lambdaAway } : null,
+          simulation: simRes ? { predicted: simRes.predicted, homeWin: simRes.homeWin, draw: simRes.draw, awayWin: simRes.awayWin, hit: simRes.predicted === realResult } : null,
           // Ek metrikler
-          restDays: { home: baseline.homeRestDays??null, away: baseline.awayRestDays??null },
+          restDays: { home: baseline.homeRestDays ?? null, away: baseline.awayRestDays ?? null },
           isValueBet, modelEdge,
           marketHome, marketAway,
         };
@@ -1361,23 +1361,23 @@ app.get('/api/backtest', async (req, res) => {
       if (!t.length) return null;
       return {
         count: t.length,
-        accuracy1X2: +((t.filter(r=>r.hit1X2).length/t.length)*100).toFixed(1),
-        accuracyOU25: +((t.filter(r=>r.hitOU25).length/t.length)*100).toFixed(1),
-        accuracyBTTS: +((t.filter(r=>r.hitBTTS).length/t.length)*100).toFixed(1),
-        accuracyScore: +((t.filter(r=>r.hitScore).length/t.length)*100).toFixed(1),
-        avgBrier: +(t.reduce((s,r)=>s+r.brierScore,0)/t.length).toFixed(4),
+        accuracy1X2: +((t.filter(r => r.hit1X2).length / t.length) * 100).toFixed(1),
+        accuracyOU25: +((t.filter(r => r.hitOU25).length / t.length) * 100).toFixed(1),
+        accuracyBTTS: +((t.filter(r => r.hitBTTS).length / t.length) * 100).toFixed(1),
+        accuracyScore: +((t.filter(r => r.hitScore).length / t.length) * 100).toFixed(1),
+        avgBrier: +(t.reduce((s, r) => s + r.brierScore, 0) / t.length).toFixed(4),
       };
     };
 
     // Turnuva özeti
     const tournamentSummary = Object.entries(tournamentStats).map(([tid, ts]) => ({
       tournamentId: +tid, name: ts.name, total: ts.total,
-      accuracy1X2: +((ts.hits1X2/ts.total)*100).toFixed(1),
-      accuracyOU25: +((ts.hitsOU25/ts.total)*100).toFixed(1),
-      accuracyBTTS: +((ts.hitsBTTS/ts.total)*100).toFixed(1),
-      accuracyScore: +((ts.hitsScore/ts.total)*100).toFixed(1),
-      avgBrier: +(ts.totalBrier/ts.total).toFixed(4),
-    })).sort((a,b) => b.total - a.total);
+      accuracy1X2: +((ts.hits1X2 / ts.total) * 100).toFixed(1),
+      accuracyOU25: +((ts.hitsOU25 / ts.total) * 100).toFixed(1),
+      accuracyBTTS: +((ts.hitsBTTS / ts.total) * 100).toFixed(1),
+      accuracyScore: +((ts.hitsScore / ts.total) * 100).toFixed(1),
+      avgBrier: +(ts.totalBrier / ts.total).toFixed(4),
+    })).sort((a, b) => b.total - a.total);
 
     const valueBets = results.filter(r => r.isValueBet);
     const valueBetHits = valueBets.filter(r => r.hit1X2).length;
@@ -1385,30 +1385,30 @@ app.get('/api/backtest', async (req, res) => {
     const summary = {
       date, endDate, total, tournamentFilter,
       // Genel doğruluk
-      accuracy1X2: +((hits1X2/total)*100).toFixed(1),
-      accuracyOU25: +((hitsOU25/total)*100).toFixed(1),
-      accuracyBTTS: +((hitsBTTS/total)*100).toFixed(1),
-      accuracyScore: +((hitsScore/total)*100).toFixed(1),
+      accuracy1X2: +((hits1X2 / total) * 100).toFixed(1),
+      accuracyOU25: +((hitsOU25 / total) * 100).toFixed(1),
+      accuracyBTTS: +((hitsBTTS / total) * 100).toFixed(1),
+      accuracyScore: +((hitsScore / total) * 100).toFixed(1),
       // Kalibrasyon
-      avgBrierScore: +(totalBrier/total).toFixed(4),
-      avgLogLoss: +(totalLogLoss/total).toFixed(4),
+      avgBrierScore: +(totalBrier / total).toFixed(4),
+      avgLogLoss: +(totalLogLoss / total).toFixed(4),
       // HT
-      htAccuracy1X2: htTotal>0 ? +((hitsHT1X2/htTotal)*100).toFixed(1) : null,
-      htAccuracyScore: htTotal>0 ? +((hitsHTScore/htTotal)*100).toFixed(1) : null,
+      htAccuracy1X2: htTotal > 0 ? +((hitsHT1X2 / htTotal) * 100).toFixed(1) : null,
+      htAccuracyScore: htTotal > 0 ? +((hitsHTScore / htTotal) * 100).toFixed(1) : null,
       htTotal,
       // Tier breakdown
       high: tierStats('HIGH'), medium: tierStats('MEDIUM'), low: tierStats('LOW'),
       // Motor karşılaştırması
-      poissonAccuracy1X2: poissonTotal>0 ? +((poissonHits/poissonTotal)*100).toFixed(1) : null,
-      simulationAccuracy1X2: simTotal>0 ? +((simHits/simTotal)*100).toFixed(1) : null,
+      poissonAccuracy1X2: poissonTotal > 0 ? +((poissonHits / poissonTotal) * 100).toFixed(1) : null,
+      simulationAccuracy1X2: simTotal > 0 ? +((simHits / simTotal) * 100).toFixed(1) : null,
       // Beraberlik tespiti
       drawDetection: {
         actual: totalDrawActual, predicted: totalDrawPredicted,
-        recallRate: totalDrawActual>0 ? +((results.filter(r=>r.actualResult==='X'&&r.predictedResult==='X').length/totalDrawActual)*100).toFixed(1) : null,
-        precisionRate: totalDrawPredicted>0 ? +((results.filter(r=>r.actualResult==='X'&&r.predictedResult==='X').length/totalDrawPredicted)*100).toFixed(1) : null,
+        recallRate: totalDrawActual > 0 ? +((results.filter(r => r.actualResult === 'X' && r.predictedResult === 'X').length / totalDrawActual) * 100).toFixed(1) : null,
+        precisionRate: totalDrawPredicted > 0 ? +((results.filter(r => r.actualResult === 'X' && r.predictedResult === 'X').length / totalDrawPredicted) * 100).toFixed(1) : null,
       },
       // Value bet
-      valueBets: { count: valueBets.length, accuracy1X2: valueBets.length>0 ? +((valueBetHits/valueBets.length)*100).toFixed(1) : null },
+      valueBets: { count: valueBets.length, accuracy1X2: valueBets.length > 0 ? +((valueBetHits / valueBets.length) * 100).toFixed(1) : null },
       // Turnuva bazlı
       byTournament: tournamentSummary,
       results,

@@ -138,19 +138,17 @@ process.on('exit', () => {
   }
 });
 
-// ─── RATE LIMITER ─────────────────────────────────────────────
-let nextRequestTime = 0;
-const RATE_LIMIT_MS = 200; // Browsers are more trusted, 200ms interval is ok
+// ─── RATE LIMITER (Sequential Queue) ──────────────────────────
+// Paralel Promise.allSettled çağrılarında bile tüm istekler sıraya girer
+let rateLimitQueue = Promise.resolve();
+const RATE_LIMIT_MS = 350; // Her istek arası minimum bekleme
 
-async function waitForRateLimit() {
-  const now = Date.now();
-  if (now < nextRequestTime) {
-    const delay = nextRequestTime - now;
-    nextRequestTime += RATE_LIMIT_MS;
-    await new Promise(resolve => setTimeout(resolve, delay));
-  } else {
-    nextRequestTime = now + RATE_LIMIT_MS;
-  }
+function waitForRateLimit() {
+  return new Promise(resolve => {
+    rateLimitQueue = rateLimitQueue.then(() =>
+      new Promise(r => setTimeout(r, RATE_LIMIT_MS))
+    ).then(resolve);
+  });
 }
 
 // ─── FETCH METHOD ─────────────────────────────────────────────
@@ -209,7 +207,7 @@ async function fetchAPI(path, ttlCategory = 'default', skipCache = false) {
 
   await waitForRateLimit();
 
-  const MAX_RETRIES = 2;
+  const MAX_RETRIES = 3;
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
       const data = await executeBrowserFetch(path);
@@ -218,9 +216,11 @@ async function fetchAPI(path, ttlCategory = 'default', skipCache = false) {
       }
       return data;
     } catch (error) {
-      if (error.message.includes('403') || error.message.includes('503') || error.message.includes('Failed to fetch')) {
-        console.warn(`[Playwright] Rate limited / Blocked on ${path} (attempt ${attempt + 1}/${MAX_RETRIES + 1}), waiting 5s...`);
-        await new Promise(r => setTimeout(r, 5000));
+      if (error.message.includes('403') || error.message.includes('429') || error.message.includes('503') || error.message.includes('Failed to fetch')) {
+        // Exponential backoff: 3s, 8s, 18s
+        const backoff = Math.min(3000 * Math.pow(2, attempt) + Math.random() * 2000, 30000);
+        console.warn(`[Playwright] Rate limited / Blocked on ${path} (attempt ${attempt + 1}/${MAX_RETRIES + 1}), waiting ${(backoff/1000).toFixed(1)}s...`);
+        await new Promise(r => setTimeout(r, backoff));
         continue;
       }
       console.error(`[Playwright] Error fetching ${path}: ${error.message}`);
