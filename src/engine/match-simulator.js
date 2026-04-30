@@ -182,9 +182,9 @@ function computeProbBases(metrics, sel, units, baseline, audit, posQF) {
   const m150_for_shots = gm('M150'); // erken okuma — shots'tan önce gerekli
   const possMinutes = m150_for_shots != null
     ? (m150_for_shots / 100) * 90                          // gerçek possession dakikası
-    : baseline.possessionBase != null ? baseline.possessionBase * 90 : null; // veri yoksa null
+    : baseline.possessionBase != null ? baseline.possessionBase * 90 : 45; // veri yoksa %50 → 45dk
   const shotsPerMin = shotsPerMatch != null
-    ? shotsPerMatch / possMinutes
+    ? shotsPerMatch / Math.max(possMinutes, 1) // sıfıra bölme koruması
     : baseline.shotsPerMin * (units.SUT_URETIMI ?? ND.UNIT_IDENTITY);
 
   const m014 = gm('M014');
