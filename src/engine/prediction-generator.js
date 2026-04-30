@@ -294,12 +294,19 @@ function generatePrediction(metricsResult, data, baseline, audit, rng) {
       const dynamicThreshold = _lgDrawRate != null
         ? (100 / 3) + (_lgDrawRate * 100) // ligin beraberlik oranı arttıkça eşik artar
         : (cv != null ? (100 / 3) + cv * (100 / 3) : 50); // cv varsa ondan, yoksa %50
-      const tier = maxProb >= 70.0 ? 'HIGH' : maxProb >= dynamicThreshold ? 'MEDIUM' : 'LOW';
+      // HIGH eşiği: ligin dominant sonuç oranından türetilir
+      // Rekabetçi lig (yüksek compIndex) → HIGH eşiği yükselir (tahmin zor)
+      // compIndex null ise: drawTendency'den türet (beraberlik oranı yüksek → eşik yükselir)
+      const _compIdx = baseline?.leagueCompetitiveness;
+      const _highThreshold = _compIdx != null
+        ? (100 / 3) * (1 + 1 / _compIdx) // compIndex=3 → 44.4, compIndex=5 → 40
+        : (_lgDrawRate != null ? (100 / 3) + (_lgDrawRate * 200) : (100 / 3) * 2); // drawRate=0.25 → 83.3
+      const tier = maxProb >= _highThreshold ? 'HIGH' : maxProb >= dynamicThreshold ? 'MEDIUM' : 'LOW';
       return {
         maxProbability: round2(maxProb),
         confidenceTier: tier,
         dynamicThreshold: round2(dynamicThreshold),
-        isHighConfidence: maxProb >= 70.0,
+        isHighConfidence: maxProb >= _highThreshold,
         shouldPredict: true,
       };
     })(),
@@ -372,7 +379,17 @@ function generatePrediction(metricsResult, data, baseline, audit, rng) {
       // pW_goals dinamik: leagueFingerprint.reliability yüksekse Poisson kalibrasyonuna daha az
       // güven, simülasyon biraz daha ağır. reliability null/düşükse eşit ağırlık.
       const _lfRel_goals = leagueFingerprint?.reliability ?? 0;
-      const pW_goals = 0.50 - (_lfRel_goals * 0.10); // [0.40, 0.50] aralığı — reliability arttıkça Poisson hafif azalır
+      // Blend ağırlığı: lgCV'den türetilir. Volatil lig → MC'ye daha çok güven.
+      // lgCV = 0 (sabit lig) → pW = 1/(1+0) = 1.0 (tam Poisson)
+      // lgCV = 0.3 (orta) → pW = 1/(1+0.3) = 0.77
+      // lgCV = 0.5 (kaotik) → pW = 1/(1+0.5) = 0.67
+      // reliability arttıkça → Poisson güveni biraz düşer (fingerprint MC'yi doğruladı)
+      const _lgCV_goals = (baseline?.leagueGoalVolatility != null && baseline?.leagueAvgGoals > 0)
+        ? baseline.leagueGoalVolatility / baseline.leagueAvgGoals : null;
+      const _basePW = _lgCV_goals != null ? 1 / (1 + _lgCV_goals) : null;
+      const pW_goals = _basePW != null
+        ? _basePW * (1 - _lfRel_goals * _lgCV_goals) // reliability × lgCV kadar Poisson azalır
+        : (1 / 2); // hiçbir veri yoksa eşit ağırlık
       const sW_goals = 1.0 - pW_goals;
 
       const mix = (p, s) => (p != null && s != null) ? (p * pW_goals + s * sW_goals) : (p ?? s);
@@ -431,12 +448,20 @@ function generatePrediction(metricsResult, data, baseline, audit, rng) {
         // H2H Over25 oranı: bu iki takımın birlikte geçmişi — en güçlü sinyal
         _ou25Sources.push({ val: _matchOver25Rate * 100, w: matchScoreProfile.n * 2 });
       }
-      let over25DynamicThreshold = 50.0; // default: mevcut davranış
+      // O/U eşik default: league fingerprint over25 oranı varsa ondan, yoksa 50 (belirsizlik noktası)
+      let over25DynamicThreshold = (leagueFingerprint?.over25Rate != null)
+        ? leagueFingerprint.over25Rate * 100 : (100 / 2);
       if (_ou25Sources.length > 0) {
         const _ouTotalW = _ou25Sources.reduce((s, x) => s + x.w, 0);
         const _ouBlend = _ou25Sources.reduce((s, x) => s + x.val * x.w, 0) / _ouTotalW;
-        // Eşik = ligin/takımın gerçekleşen oranı. %40–%65 aralığında tutulur (güvenlik sınırı).
-        over25DynamicThreshold = Math.max(40.0, Math.min(65.0, _ouBlend));
+        // Clamp sınırları: league fingerprint'in O2.5 dağılımından ±2σ türetilir
+        // σ = over25Rate × (1 - over25Rate) → binomial varyans
+        // Yoksa lgCV'den: düşük CV → dar clamp, yüksek CV → geniş clamp
+        const _ouBase = leagueFingerprint?.over25Rate ?? (baseline?.leagueAvgGoals != null ? baseline.leagueAvgGoals / 5 : null);
+        const _ouSigma = _ouBase != null ? Math.sqrt(_ouBase * (1 - _ouBase)) * 100 : null;
+        const _ouLow = _ouSigma != null ? Math.max(5, _ouBlend - 2 * _ouSigma) : _ouBlend * 0.6;
+        const _ouHigh = _ouSigma != null ? Math.min(95, _ouBlend + 2 * _ouSigma) : _ouBlend * 1.4;
+        over25DynamicThreshold = Math.max(_ouLow, Math.min(_ouHigh, _ouBlend));
       }
 
       // ── Öneri D: KG (BTTS) Dinamik Eşik ──────────────────────────────────
@@ -467,11 +492,18 @@ function generatePrediction(metricsResult, data, baseline, audit, rng) {
         const _teamN = Math.min(homeScoreProfile?.n || 0, awayScoreProfile?.n || 0);
         if (_teamN >= 3) _bttsSources.push({ val: _bttsTeamSignal, w: _teamN * 0.5 });
       }
-      let bttsDynamicThreshold = 50.0; // default: mevcut davranış
+      // BTTS eşik default: league fingerprint btts oranı varsa ondan
+      let bttsDynamicThreshold = (leagueFingerprint?.bttsRate != null)
+        ? leagueFingerprint.bttsRate * 100 : (100 / 2);
       if (_bttsSources.length > 0) {
         const _bttsTotalW = _bttsSources.reduce((s, x) => s + x.w, 0);
         const _bttsBlend = _bttsSources.reduce((s, x) => s + x.val * x.w, 0) / _bttsTotalW;
-        bttsDynamicThreshold = Math.max(35.0, Math.min(70.0, _bttsBlend));
+        // Clamp: binomial varyans ±2σ
+        const _bttsBase = leagueFingerprint?.bttsRate ?? (baseline?.leagueAvgGoals != null ? baseline.leagueAvgGoals / 5 : null);
+        const _bttsSigma = _bttsBase != null ? Math.sqrt(_bttsBase * (1 - _bttsBase)) * 100 : null;
+        const _bttsLow = _bttsSigma != null ? Math.max(5, _bttsBlend - 2 * _bttsSigma) : _bttsBlend * 0.5;
+        const _bttsHigh = _bttsSigma != null ? Math.min(95, _bttsBlend + 2 * _bttsSigma) : _bttsBlend * 1.5;
+        bttsDynamicThreshold = Math.max(_bttsLow, Math.min(_bttsHigh, _bttsBlend));
       }
 
       return {
@@ -915,14 +947,18 @@ function generatePrediction(metricsResult, data, baseline, audit, rng) {
       if (leagueId && edgeDb.leagues && edgeDb.leagues[leagueId]) {
         const lgData = edgeDb.leagues[leagueId];
         // Negative edge means model is BETTER than bookmaker. Positive means bookmaker is better.
-        if (lgData.edge > 0.02 && lgData.n >= 5) {
+        // Edge anlamlılığı: statik 0.02 eşiği yerine standard error kullan
+        // SE = sqrt(edge_variance / n). Tipik Brier variance ~0.05 → SE = sqrt(0.05/n)
+        // Anlamlılık: |edge| > 1.5 × SE ise sinyal var
+        const _seEdge = Math.sqrt(0.05 / Math.max(lgData.n, 1)); // standard error
+        if (lgData.edge > 1.5 * _seEdge && lgData.n >= 5) {
           // Dinamik Ceza Skalası: Brier farkını 500 çarpanıyla Confidence eksenine map'le
           const penalty = Math.min(50, Math.round(lgData.edge * 500));
           report.result.confidence = Math.max(10, report.result.confidence - penalty);
           edgeMeta.leaguePenalty = true;
           edgeMeta.messages.push(`Toxic League: Model Brier is behind bookmaker by +${lgData.edge.toFixed(3)}. Confidence penalized by -${penalty}.`);
           report.meta.recommendation = "NO BET (Toxic League)";
-        } else if (lgData.edge < -0.015 && lgData.n >= 5) {
+        } else if (lgData.edge < -1.5 * _seEdge && lgData.n >= 5) {
           // Dinamik Ödül Skalası
           const boost = Math.min(25, Math.round(Math.abs(lgData.edge) * 300));
           edgeMeta.messages.push(`Strong League: Model historically beats bookmaker by ${Math.abs(lgData.edge).toFixed(3)}. Confidence boosted by +${boost}.`);
@@ -954,7 +990,10 @@ function generatePrediction(metricsResult, data, baseline, audit, rng) {
 
         // OU xG Ratio Drift Adjustment (Gerçekleşen / Beklenen)
         if (tData.xgRatio && Math.abs(tData.xgRatio - 1.0) > 0.1 && tData.n >= 2) {
-          const safeXgRatio = Math.max(0.6, Math.min(1.4, tData.xgRatio));
+          // xG ratio clamp: ligin normMinRatio/normMaxRatio'sından türetilir
+          const _xgClampMin = baseline?.normMinRatio ?? tData.xgRatio;
+          const _xgClampMax = baseline?.normMaxRatio ?? tData.xgRatio;
+          const safeXgRatio = Math.max(_xgClampMin, Math.min(_xgClampMax, tData.xgRatio));
           ouMultipliers.push(safeXgRatio);
           ouMessages.push(`xG Drift: ${t} scores ${(safeXgRatio).toFixed(2)}x of expected goals.`);
         }
@@ -1127,7 +1166,7 @@ function generateCornerPrediction(home, away, shared, baseline) {
   // leagueCornerAvg = M022 lig ortalaması × 2 (iki takım)
   // threshold = avg ± std (std yoksa avg × 0.15 yaklaşımı)
   const lgCornerPerTeam = baseline?.dynamicAvgs?.M022 ?? null;
-  let cL = PT.CORNER_L, cM = PT.CORNER_M, cH = PT.CORNER_H;
+  let cL, cM, cH;
   if (lgCornerPerTeam != null && lgCornerPerTeam > 0) {
     const lgCornerTotal = lgCornerPerTeam * 2;
     const _cv = (baseline?.leagueGoalVolatility != null && baseline?.leagueAvgGoals > 0)
@@ -1141,6 +1180,10 @@ function generateCornerPrediction(home, away, shared, baseline) {
       cM = Math.round(lgCornerTotal * 2) / 2;
       cL = cM - 1; cH = cM + 1;
     }
+  } else {
+    // Lig korner verisi yok → takımların kendi verisinden türet
+    cM = Math.round(totalCorners * 2) / 2;
+    cL = cM - 1; cH = cM + 1;
   }
 
   // Poisson-based over/under: P(X > k) = 1 - CDF(k, lambda)
@@ -1194,12 +1237,16 @@ function generateCardPrediction(home, away, shared, baseline) {
     const _cv = (baseline?.leagueGoalVolatility != null && baseline?.leagueAvgGoals > 0)
       ? baseline.leagueGoalVolatility / baseline.leagueAvgGoals : null;
     if (_cv != null) {
-      const cardStd = lgCardTotal * Math.min(0.40, _cv * 1.5);
+      // Kart std: lgCV doğrudan kullanılır, clamp sınırı da lgCV'den türetilir
+      // lgCV küçük → dar aralık, lgCV büyük → geniş aralık
+      const _cvSaturation = _cv / (_cv + 1); // sigmoid satürasyon: 0-1 arası, clamp gereksiz
+      const cardStd = lgCardTotal * _cvSaturation;
       cardL = Math.round((lgCardTotal - cardStd) * 2) / 2;
       cardH = Math.round((lgCardTotal + cardStd) * 2) / 2;
     } else {
+      // CV yoksa sadece yuvarlama — statik offset kullanılmaz
       const mid = Math.round(lgCardTotal * 2) / 2;
-      cardL = mid - 0.5; cardH = mid + 0.5;
+      cardL = mid; cardH = mid;
     }
   }
 
@@ -1274,7 +1321,10 @@ function generateHighlights(home, away, shared, prediction, baseline) {
   const aCor = away.attack.M022 ?? null;
   const totalCorners = (hCor != null || aCor != null) ? (hCor ?? aCor) + (aCor ?? hCor) : null;
   if (totalCorners != null) {
-    const pOver105 = Math.min(UI_CFG.MAX_UI_PROB, poissonExceed(totalCorners, PT.CORNER_H) * 100);
+    // Dinamik korner eşiği: lig korner ortalamasından türet, yoksa totalCorners + 1 kullan
+    const _lgCorHigh = (baseline?.dynamicAvgs?.M022 != null && baseline.dynamicAvgs.M022 > 0)
+      ? baseline.dynamicAvgs.M022 * 2 + 1 : totalCorners + 1;
+    const pOver105 = Math.min(UI_CFG.MAX_UI_PROB, poissonExceed(totalCorners, _lgCorHigh) * 100);
     if (pOver105 > UI_CFG.SURPRISE_HIGH) {
       highlights.push(`🚩 Maçta her iki takımın temposuyla yoğun korner trafiği bekleniyor`);
     }

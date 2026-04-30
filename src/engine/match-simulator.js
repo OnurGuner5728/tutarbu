@@ -365,7 +365,7 @@ function computeProbBases(metrics, sel, units, baseline, audit, posQF) {
   };
 }
 
-function calculateUnitImpact(blockId, metrics, selected, audit, dynamicAvgs, baseline) {
+function calculateUnitImpact(blockId, metrics, selected, audit, dynamicAvgs, baseline, dynamicLimits) {
   const block = SIM_BLOCKS[blockId];
   if (!block) return 1.0;
 
@@ -373,8 +373,8 @@ function calculateUnitImpact(blockId, metrics, selected, audit, dynamicAvgs, bas
   // normMinRatio = min takım gol/maç ÷ lig ort., normMaxRatio = max takım ÷ lig ort.
   // Veri yoksa 1.0 kimliği (normalizasyon uygulanmaz — identity clamp).
   // İKİ MOTOR (match-simulator + simulatorEngine) AYNI BU DEĞERLERİ KULLANIR.
-  const nMin = (baseline && baseline.normMinRatio != null && baseline.normMinRatio > 0) ? baseline.normMinRatio : 0.5;
-  const nMax = (baseline && baseline.normMaxRatio != null && baseline.normMaxRatio > 0) ? baseline.normMaxRatio : 2.0;
+  const nMin = (baseline && baseline.normMinRatio != null && baseline.normMinRatio > 0) ? baseline.normMinRatio : (dynamicLimits?.POWER?.MIN ?? 1.0);
+  const nMax = (baseline && baseline.normMaxRatio != null && baseline.normMaxRatio > 0) ? baseline.normMaxRatio : (dynamicLimits?.POWER?.MAX ?? 1.0);
 
   let totalWeight = 0;
   let weightedFactor = 0;
@@ -469,11 +469,14 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
   const events = [];
   const minuteLog = [];
 
+  // Dinamik limitler — calculateUnitImpact'a parametre olarak geçirilir
+  const DYN_LIMITS = getDynamicLimits ? getDynamicLimits(baseline) : SIM_CONFIG.LIMITS;
+
   const homeUnits = {};
   const awayUnits = {};
   for (const blockId in SIM_BLOCKS) {
-    homeUnits[blockId] = calculateUnitImpact(blockId, homeMetrics, sel, audit, dynamicAvgs, baseline);
-    awayUnits[blockId] = calculateUnitImpact(blockId, awayMetrics, sel, audit, dynamicAvgs, baseline);
+    homeUnits[blockId] = calculateUnitImpact(blockId, homeMetrics, sel, audit, dynamicAvgs, baseline, DYN_LIMITS);
+    awayUnits[blockId] = calculateUnitImpact(blockId, awayMetrics, sel, audit, dynamicAvgs, baseline, DYN_LIMITS);
   }
 
   // Mevki Bazlı PVKD — birimler kalite ile ölçeklenmeden ÖNCE computeProbBases'e geçilir
@@ -509,17 +512,21 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
   // Küme düşme veya şampiyonluk baskısı GOL_IHTIYACI birimini güçlendirir.
   // M180: ev küme düşme [0-1], M182: ev şampiyonluk [0-1]
   // M181: dep küme düşme [0-1], M183: dep şampiyonluk [0-1]
+  // Baskı çarpanı: lgCV'den türetilir. Volatil lig → baskı daha etkili
+  const _lgCVForPressure = (baseline?.leagueGoalVolatility != null && baseline?.leagueAvgGoals > 0)
+    ? baseline.leagueGoalVolatility / baseline.leagueAvgGoals : null;
+  const _pressureMult = _lgCVForPressure != null ? _lgCVForPressure / (1 + _lgCVForPressure) : null;
   const _hRelP = homeMetrics.M180 ?? null;
   const _hTitP = homeMetrics.M182 ?? null;
-  if (homeUnits.GOL_IHTIYACI != null && (_hRelP != null || _hTitP != null)) {
+  if (homeUnits.GOL_IHTIYACI != null && (_hRelP != null || _hTitP != null) && _pressureMult != null) {
     const maxPressure = Math.max(_hRelP ?? 0, _hTitP ?? 0);
-    homeUnits.GOL_IHTIYACI *= (1.0 + maxPressure * 0.5);
+    homeUnits.GOL_IHTIYACI *= (1.0 + maxPressure * _pressureMult);
   }
   const _aRelP = awayMetrics.M181 ?? null;
   const _aTitP = awayMetrics.M183 ?? null;
-  if (awayUnits.GOL_IHTIYACI != null && (_aRelP != null || _aTitP != null)) {
+  if (awayUnits.GOL_IHTIYACI != null && (_aRelP != null || _aTitP != null) && _pressureMult != null) {
     const maxPressure = Math.max(_aRelP ?? 0, _aTitP ?? 0);
-    awayUnits.GOL_IHTIYACI *= (1.0 + maxPressure * 0.5);
+    awayUnits.GOL_IHTIYACI *= (1.0 + maxPressure * _pressureMult);
   }
 
   const hProb = computeProbBases(homeMetrics, sel, homeUnits, baseline, audit, _simQF.home);
@@ -573,7 +580,7 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
 
   // Morale başlangıcı: FORM_KISA birimine göre. normLimits envelope'undan (dinamik).
   // Scale: lig CV'si (vol/avg) — volatil lig daha sert morale kayması.
-  const DYN_LIMITS = getDynamicLimits ? getDynamicLimits(baseline) : SIM_CONFIG.LIMITS;
+  // DYN_LIMITS daha yukarıda hesaplandı (calculateUnitImpact'tan önce).
   const _mMin = (baseline.normMinRatio != null && baseline.normMinRatio > 0) ? baseline.normMinRatio : DYN_LIMITS.FORM_MORALE.MIN;
   const _mMax = (baseline.normMaxRatio != null && baseline.normMaxRatio > 0) ? baseline.normMaxRatio : DYN_LIMITS.FORM_MORALE.MAX;
   const _mScale = (baseline.leagueGoalVolatility != null && baseline.leagueAvgGoals > 0)
@@ -614,8 +621,11 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
 
     // GOL_IHTIYACI üst satürasyon: normLimits envelope'undan 1.0 etrafında simetrik uzantı.
     const _ihtMax = (baseline.normMaxRatio != null && baseline.normMinRatio != null)
-      ? baseline.normMaxRatio + (1.0 - baseline.normMinRatio) : 2.0;
-    const urgencyStart = Math.max(0, lateBase - (lateBase - earlyBase) * Math.max(0, clamp(u.GOL_IHTIYACI, 1.0, _ihtMax) - 1.0));
+      ? baseline.normMaxRatio + (1.0 - baseline.normMinRatio)
+      : (dynamicLimits?.POWER?.MAX != null ? dynamicLimits.POWER.MAX + (1.0 - (dynamicLimits?.POWER?.MIN ?? 1.0)) : null);
+    const urgencyStart = _ihtMax != null
+      ? Math.max(0, lateBase - (lateBase - earlyBase) * Math.max(0, clamp(u.GOL_IHTIYACI, 1.0, _ihtMax) - 1.0))
+      : lateBase; // veri yoksa urgency başlangıcı = lateBase (nötr)
     const urgency = (minute > urgencyStart) ? s.urgency : 1.0;
 
     // ── Dinamik Konfor Freni (comfortBrake) ──────────────────────────────────
