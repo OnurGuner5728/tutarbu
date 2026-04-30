@@ -1410,6 +1410,16 @@ app.get('/api/backtest', async (req, res) => {
         results.push(entry);
         send('match', entry);
 
+        // Log'da tahmin özeti göster
+        const _confTier = coverageCtrl.confidenceTier || '?';
+        const _maxP = Math.max(pHome, pDraw, pAway).toFixed(0);
+        if (isFinished) {
+          const hitIcon = hit1X2 ? '✅' : '❌';
+          progress(`  → ${hitIcon} Tahmin: ${predictedScore} (${predicted}) | Gerçek: ${realHS}-${realAS} (${realResult}) | ${_confTier} ${_maxP}%`);
+        } else {
+          progress(`  → 🔮 Tahmin: ${predictedScore} (${predicted}) | Sim: ${simTopScore || '—'} | İY: ${htPredScore || '—'} | ${_confTier} ${_maxP}%`);
+        }
+
       } catch (err) {
         send('error', { matchId: match.id, match: matchLabel, error: err.message });
       }
