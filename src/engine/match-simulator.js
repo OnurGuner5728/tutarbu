@@ -555,7 +555,10 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
     // ATK+MID bölgesi → gol dönüşümü (bitiricilik + yaratıcılık)
     const atkMidMod = _cbzm('YARATICILIK', zqr, lqr, dynW); // Dinamik: oyuncu profil bazlı
     if (atkMidMod !== 1.0) {
-      prob.goalConvRate *= Math.pow(atkMidMod, 0.6); // Daha hassas damping
+      // Damping: lgCV'den türetilen yuvarlanma. Düşük CV → damping sert (~0.5), yüksek CV → damping hafif (~0.8)
+      const _dampExp = (baseline?.leagueGoalVolatility != null && baseline?.leagueAvgGoals > 0)
+        ? 1 / (1 + baseline.leagueGoalVolatility / baseline.leagueAvgGoals) : (1 / 2);
+      prob.goalConvRate *= Math.pow(atkMidMod, _dampExp);
     }
     // GK bölgesi → kaleci kurtarış performansı
     const gkMod = _cbzm('GK_REFLEKS', zqr, lqr, dynW);     // G:1.00 (statik, tek bölge)
@@ -565,7 +568,10 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
     // DEF bölgesi → savunma müdahalesi
     const defMod = _cbzm('SAVUNMA_AKSIYONU', zqr, lqr, dynW); // Dinamik: oyuncu profil bazlı
     if (defMod !== 1.0) {
-      prob.blockRate *= Math.pow(defMod, 0.6);
+      // Savunma damping: aynı lgCV-bazlı exponent
+      const _defDampExp = (baseline?.leagueGoalVolatility != null && baseline?.leagueAvgGoals > 0)
+        ? 1 / (1 + baseline.leagueGoalVolatility / baseline.leagueAvgGoals) : (1 / 2);
+      prob.blockRate *= Math.pow(defMod, _defDampExp);
     }
   };
   _applyZoneSimParams(hProb, _hZQR, _hLQRForZQM, _hDynW);
@@ -651,7 +657,13 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
     const oppPb = oppSide === 'home' ? hProb : aProb;
     const teamExpGoalsRaw = pb_side.shotsPerMin * 90 * pb_side.onTargetRate * pb_side.goalConvRate;
     const _brakeLeagueRef = baseline.leagueAvgGoals ?? teamExpGoalsRaw;
-    const teamExpGoals = (teamExpGoalsRaw < _brakeLeagueRef * 0.60)
+    // Konfor freni referansı: lgCV'den türetilen minimum beklenen gol
+    // Düşük CV → %50 referans (istikrarlı lig = düşük gol beklentisi yeterli)
+    // Yüksek CV → %30 referans (kaotik lig = düşük beklenti normal)
+    const _brakeThreshRatio = (baseline?.leagueGoalVolatility != null && baseline?.leagueAvgGoals > 0)
+      ? 1 / (1 + baseline.leagueGoalVolatility / baseline.leagueAvgGoals)
+      : (1 / 2);
+    const teamExpGoals = (teamExpGoalsRaw < _brakeLeagueRef * _brakeThreshRatio)
       ? _brakeLeagueRef
       : teamExpGoalsRaw;
     const comfortThreshold = Math.max(1, Math.ceil(teamExpGoals));
@@ -878,7 +890,13 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
   // Dinamik zaman pencereleri: gerçek lig gol dağılımından (M005-M010) türetilir.
   // Veri yoksa makul statik fallback kullanılır.
   const _matchMins = baseline.matchMinutes ?? 90;
-  const earlyBase = dynamicTimeWindows?.EARLY_GAME_END ?? Math.round(_matchMins / 4.5); // ~20 for 90min
+  // Erken faz bölücü: lig gol dağılımından (0-15dk payından) türetilir
+  // M005 (0-15dk gol oranı) varsa: İlk %X gol 0-Ydk aralığında → earlyBase ≈ Y
+  const _earlyFraction = baseline?.dynamicAvgs?.M005 != null
+    ? baseline.dynamicAvgs.M005 / (baseline.leagueAvgGoals > 0 ? baseline.leagueAvgGoals : 1)
+    : null;
+  const earlyBase = dynamicTimeWindows?.EARLY_GAME_END
+    ?? (_earlyFraction != null && _earlyFraction > 0 ? Math.round(_matchMins * _earlyFraction) : Math.round(_matchMins / (100 / 22))); // ~20 için 90dk
   const lateBase = dynamicTimeWindows?.LATE_GAME_START ?? Math.round(_matchMins * 5 / 6); // ~75 for 90min
 
   // Urgency erken faz kısaltma: density saturation formu (0.6/0.08/0.5/0.95 sabitleri kaldırıldı).

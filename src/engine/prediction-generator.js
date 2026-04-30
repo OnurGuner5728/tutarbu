@@ -17,7 +17,7 @@ if (!SIM_CONFIG) {
 // Merkezi nötr sabitler referansı
 const ND = SIM_CONFIG?.NEUTRAL_DEFAULTS || {};
 const UI_CFG = SIM_CONFIG?.UI_THRESHOLDS || {};
-const PT = SIM_CONFIG?.POISSON_THRESHOLDS || {};
+// PT (POISSON_THRESHOLDS) kaldırıldı — tüm eşikler artık dinamik hesaplanıyor
 
 // Kalibrasyon parametreleri — başlangıçta yükle (null ise kalibrasyon devre dışı)
 let _calParams = null;
@@ -1401,7 +1401,9 @@ function calculateConfidence(prediction, shared, home, away, baseline) {
       ? (baseline.dynamicAvgs.M131 + baseline.dynamicAvgs.M133) / 200
       : ((baseline?.medianGoalRate != null && baseline?.leagueAvgGoals > 0)
           ? (baseline.medianGoalRate / (baseline.leagueAvgGoals * 2))
-          : 0.35);
+          : (baseline?.leagueDrawTendency != null
+              ? (1 - baseline.leagueDrawTendency) / 2 // drawRate'ten: kalanın yarısı = takım başı kazanma
+              : (1 / 3))); // matematik simetrisi: 3 sonuç eşit olasılık
     // Maksimum bonus lig gol averajından türeyen volatilite katsayısına bağlanır
     if (baseline.leagueAvgGoals == null) { /* veri yok → H2H bonusu skip */ }
     else {
@@ -1424,9 +1426,9 @@ function calculateConfidence(prediction, shared, home, away, baseline) {
 
   const _injThresh = (baseline.leagueGoalVolatility != null && baseline.leagueAvgGoals > 0)
     ? (baseline.leagueGoalVolatility / baseline.leagueAvgGoals)
-    : 0.5; // Volatil liglerde sakatlık eşiği yüksek (az etkiler)
+    : null; // Veri yoksa sakatlık bonusu/cezası uygulanmaz
 
-  if (maxInjuryImpact > _injThresh) {
+  if (_injThresh != null && maxInjuryImpact > _injThresh) {
     // Her 1.0 birim sakatlık etkisi → (leagueAvgGoals * volatilite) × derinlik çarpanı
     if (baseline.leagueAvgGoals != null) {
       const _injPenaltyScale = baseline.leagueAvgGoals * (1 + _injThresh);
