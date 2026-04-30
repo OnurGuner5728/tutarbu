@@ -439,7 +439,7 @@ function getDynamicBaseline(data) {
 
   const homeFatigue = computeFatigue(homeRestDays);
   const awayFatigue = computeFatigue(awayRestDays);
-  traces.push(`homeFatigue: ${homeFatigue.toFixed(3)} | awayFatigue: ${awayFatigue.toFixed(3)}`);
+  traces.push(`homeFatigue: ${homeFatigue?.toFixed(3) ?? 'null'} | awayFatigue: ${awayFatigue?.toFixed(3) ?? 'null'}`);
 
   // ── 14. possessionLimits — Saf veri: ligteki tüm takımların gerçek possession aralığı ──
   const possessionLimits = (() => {
