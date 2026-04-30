@@ -422,7 +422,8 @@ export default function BacktestPage({ onBack }) {
                     const isUp = r.matchStatus !== 'finished';
                     const statusColor = (MS[r.matchStatus]||MS.unknown).color;
                     return (
-                    <tr key={r.matchId||i} onClick={()=>setExpandedRow(expandedRow===r.matchId?null:r.matchId)} style={{borderBottom:'1px solid #141414',background:expandedRow===r.matchId?'#12121f':i%2===0?'#0b0b0b':'#090909',borderLeft:`3px solid ${isUp ? statusColor + '60' : expandedRow===r.matchId?'#6366f1':'transparent'}`,cursor:'pointer',transition:'background 0.15s'}}>
+                    <React.Fragment key={r.matchId||i}>
+                    <tr onClick={()=>setExpandedRow(expandedRow===r.matchId?null:r.matchId)} style={{borderBottom:'1px solid #141414',background:expandedRow===r.matchId?'#12121f':i%2===0?'#0b0b0b':'#090909',borderLeft:`3px solid ${isUp ? statusColor + '60' : expandedRow===r.matchId?'#6366f1':'transparent'}`,cursor:'pointer',transition:'background 0.15s'}}>
                       <td style={{...td,color:'#4b5563',fontSize:11}}>{r._order+1}</td>
                       <td style={{...td,maxWidth:220,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',color:isUp?'#a5b4fc':'#e5e7eb',fontWeight:500}} title={r.match}>
                         <span style={{marginRight:5,fontSize:13}} title={(MS[r.matchStatus]||MS.unknown).label}>{(MS[r.matchStatus]||MS.unknown).icon}</span>
@@ -500,7 +501,8 @@ export default function BacktestPage({ onBack }) {
                         </td>
                       </tr>
                     )}
-                  );
+                    </React.Fragment>
+                    );
                   })}
                 </tbody>
               </table>
