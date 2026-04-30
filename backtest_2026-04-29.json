@@ -1,0 +1,242 @@
+{
+  "date": "2026-04-29",
+  "endDate": "2026-04-29",
+  "total": 2,
+  "tournamentFilter": "top",
+  "accuracy1X2": 0,
+  "accuracyOU25": 50,
+  "accuracyBTTS": 100,
+  "accuracyScore": 0,
+  "avgBrierScore": 0.7182,
+  "avgLogLoss": 1.1479,
+  "htAccuracy1X2": 0,
+  "htAccuracyScore": 0,
+  "htTotal": 2,
+  "high": null,
+  "medium": {
+    "count": 1,
+    "accuracy1X2": 0,
+    "accuracyOU25": 100,
+    "accuracyBTTS": 100,
+    "accuracyScore": 0,
+    "avgBrier": 0.5891
+  },
+  "low": {
+    "count": 1,
+    "accuracy1X2": 0,
+    "accuracyOU25": 0,
+    "accuracyBTTS": 100,
+    "accuracyScore": 0,
+    "avgBrier": 0.8473
+  },
+  "poissonAccuracy1X2": 50,
+  "simulationAccuracy1X2": 50,
+  "drawDetection": {
+    "actual": 1,
+    "predicted": 0,
+    "recallRate": 0,
+    "precisionRate": null
+  },
+  "valueBets": {
+    "count": 2,
+    "accuracy1X2": 0
+  },
+  "byTournament": [
+    {
+      "tournamentId": 7,
+      "name": "UEFA Champions League, Knockout stage",
+      "total": 1,
+      "accuracy1X2": 0,
+      "accuracyOU25": 100,
+      "accuracyBTTS": 100,
+      "accuracyScore": 0,
+      "avgBrier": 0.5891
+    },
+    {
+      "tournamentId": 37,
+      "name": "VriendenLoterij Eredivisie, Relegation/Promotion Playoffs",
+      "total": 1,
+      "accuracy1X2": 0,
+      "accuracyOU25": 0,
+      "accuracyBTTS": 100,
+      "accuracyScore": 0,
+      "avgBrier": 0.8473
+    }
+  ],
+  "results": [
+    {
+      "matchId": 15632632,
+      "match": "Paris Saint-Germain vs FC Bayern München",
+      "homeTeam": "Paris Saint-Germain",
+      "awayTeam": "FC Bayern München",
+      "tournament": "UEFA Champions League, Knockout stage",
+      "tournamentId": 7,
+      "matchDate": "2026-04-28",
+      "actual": "5-4",
+      "actualResult": "1",
+      "actualOU25": "Over",
+      "actualBTTS": "Yes",
+      "predicted": "2-1",
+      "predictedResult": "2",
+      "predictedOU25": "Over",
+      "predictedBTTS": "Yes",
+      "simTopScore": "5-3",
+      "probHome": 39.27,
+      "probDraw": 16.95,
+      "probAway": 43.77,
+      "probOU25": 98.2,
+      "probBTTS": 94.2,
+      "actualHT": "3-2",
+      "actualHTResult": "1",
+      "predictedHT": "3-3",
+      "predictedHTResult": "X",
+      "simHTTopScore": "1-1",
+      "htHomeWinProb": 68.17,
+      "htDrawProb": 0,
+      "htAwayWinProb": 62.35,
+      "simHTHomeWin": 57.9,
+      "simHTDraw": 22.3,
+      "simHTAwayWin": 19.8,
+      "htft": {
+        "top1": "1/1",
+        "top3": [
+          {
+            "result": "1/1",
+            "prob": 45.85
+          },
+          {
+            "result": "X/1",
+            "prob": 13.49
+          },
+          {
+            "result": "2/1",
+            "prob": 10.13
+          }
+        ]
+      },
+      "hit1X2": false,
+      "hitOU25": true,
+      "hitBTTS": true,
+      "hitScore": false,
+      "hitHTResult": false,
+      "hitHTScore": false,
+      "brierScore": 0.5891,
+      "logLoss": 0.9347,
+      "confidenceTier": "MEDIUM",
+      "maxProbability": 60.5,
+      "isHighConfidence": false,
+      "poisson": {
+        "predicted": "1",
+        "homeWin": 45.05,
+        "draw": 10.42,
+        "awayWin": 44.53,
+        "topScore": "1-1",
+        "hit": true,
+        "lambdaHome": 2.25,
+        "lambdaAway": 2.15
+      },
+      "simulation": {
+        "predicted": "1",
+        "homeWin": 60.5,
+        "draw": 15.6,
+        "awayWin": 23.9,
+        "hit": true
+      },
+      "restDays": {
+        "home": 3,
+        "away": 3
+      },
+      "isValueBet": true,
+      "modelEdge": 8.5,
+      "marketHome": 41.83,
+      "marketAway": 35.24
+    },
+    {
+      "matchId": 16072779,
+      "match": "Roda JC Kerkrade vs RKC Waalwijk",
+      "homeTeam": "Roda JC Kerkrade",
+      "awayTeam": "RKC Waalwijk",
+      "tournament": "VriendenLoterij Eredivisie, Relegation/Promotion Playoffs",
+      "tournamentId": 37,
+      "matchDate": "2026-04-28",
+      "actual": "1-1",
+      "actualResult": "X",
+      "actualOU25": "Under",
+      "actualBTTS": "Yes",
+      "predicted": "1-2",
+      "predictedResult": "2",
+      "predictedOU25": "Over",
+      "predictedBTTS": "Yes",
+      "simTopScore": "1-1",
+      "probHome": 27.71,
+      "probDraw": 25.64,
+      "probAway": 46.65,
+      "probOU25": 69.1,
+      "probBTTS": 69.6,
+      "actualHT": "0-0",
+      "actualHTResult": "X",
+      "predictedHT": "1-2",
+      "predictedHTResult": "2",
+      "simHTTopScore": "0-0",
+      "htHomeWinProb": 33.39,
+      "htDrawProb": 13.51,
+      "htAwayWinProb": 53.11,
+      "simHTHomeWin": 26.8,
+      "simHTDraw": 34,
+      "simHTAwayWin": 39.2,
+      "htft": {
+        "top1": "2/2",
+        "top3": [
+          {
+            "result": "2/2",
+            "prob": 24.75
+          },
+          {
+            "result": "X/2",
+            "prob": 16.32
+          },
+          {
+            "result": "1/1",
+            "prob": 12.37
+          }
+        ]
+      },
+      "hit1X2": false,
+      "hitOU25": false,
+      "hitBTTS": true,
+      "hitScore": false,
+      "hitHTResult": false,
+      "hitHTScore": false,
+      "brierScore": 0.8473,
+      "logLoss": 1.361,
+      "confidenceTier": "LOW",
+      "maxProbability": 48,
+      "isHighConfidence": false,
+      "poisson": {
+        "predicted": "2",
+        "homeWin": 38.12,
+        "draw": 12.06,
+        "awayWin": 49.82,
+        "topScore": "1-1",
+        "hit": false,
+        "lambdaHome": 1.21,
+        "lambdaAway": 1.91
+      },
+      "simulation": {
+        "predicted": "2",
+        "homeWin": 31,
+        "draw": 21,
+        "awayWin": 48,
+        "hit": false
+      },
+      "restDays": {
+        "home": 4,
+        "away": 4
+      },
+      "isValueBet": true,
+      "modelEdge": 15.8,
+      "marketHome": 42.31,
+      "marketAway": 30.86
+    }
+  ]
+}

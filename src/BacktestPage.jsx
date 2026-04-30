@@ -168,7 +168,7 @@ export default function BacktestPage({ onBack }) {
   );
 
   return (
-    <div style={{background:'#090909',minHeight:'100vh',color:'#e5e7eb',fontFamily:'monospace',display:'flex',flexDirection:'column'}}>
+    <div style={{background:'#090909',height:'100vh',overflow:'hidden',color:'#e5e7eb',fontFamily:'monospace',display:'flex',flexDirection:'column'}}>
 
       {/* Header */}
       <div style={{display:'flex',alignItems:'center',gap:10,padding:'11px 16px',borderBottom:'1px solid #1a1a1a',background:'#0c0c0c',flexWrap:'wrap'}}>
