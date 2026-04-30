@@ -1229,9 +1229,9 @@ function generateCardPrediction(home, away, shared, baseline) {
 
   const expectedReds = (home.defense.M040 ?? ND.COUNTER_INIT) + (away.defense.M040 ?? ND.COUNTER_INIT);
 
-  // Aşama 7: Dinamik kart threshold'ları
+  // Aşama 7: Dinamik kart threshold'ları (PT kaldırıldı — tamamen dinamik)
   const lgYellowPerTeam = baseline?.dynamicAvgs?.M039 ?? null;
-  let cardL = PT.CARD_L, cardH = PT.CARD_H;
+  let cardL, cardH;
   if (lgYellowPerTeam != null && lgYellowPerTeam > 0) {
     const lgCardTotal = lgYellowPerTeam * 2;
     const _cv = (baseline?.leagueGoalVolatility != null && baseline?.leagueAvgGoals > 0)
@@ -1248,14 +1248,22 @@ function generateCardPrediction(home, away, shared, baseline) {
       const mid = Math.round(lgCardTotal * 2) / 2;
       cardL = mid; cardH = mid;
     }
+  } else {
+    // Lig kart verisi yoksa → expectedYellows'tan türet (varsa), yoksa null → poissonExceed skip
+    if (expectedYellows != null && expectedYellows > 0) {
+      cardL = Math.round((expectedYellows - 1) * 2) / 2;
+      cardH = Math.round((expectedYellows + 1) * 2) / 2;
+    } else {
+      cardL = null; cardH = null;
+    }
   }
 
   // Poisson-based over/under
   return {
     expectedYellowCards: expectedYellows != null ? round2(expectedYellows) : null,
     expectedRedCards: round2(expectedReds),
-    over35Cards: expectedYellows != null ? round2(Math.min(UI_CFG.MAX_UI_PROB, poissonExceed(expectedYellows, cardL) * 100)) : null,
-    over45Cards: expectedYellows != null ? round2(Math.min(UI_CFG.MAX_UI_PROB, poissonExceed(expectedYellows, cardH) * 100)) : null,
+    over35Cards: (expectedYellows != null && cardL != null) ? round2(Math.min(UI_CFG.MAX_UI_PROB, poissonExceed(expectedYellows, cardL) * 100)) : null,
+    over45Cards: (expectedYellows != null && cardH != null) ? round2(Math.min(UI_CFG.MAX_UI_PROB, poissonExceed(expectedYellows, cardH) * 100)) : null,
     refereeSeverity: shared.referee.M117 ?? null,
   };
 }
