@@ -1220,8 +1220,8 @@ app.get('/api/backtest', async (req, res) => {
         const pHome = report.result.homeWin || 0;
         const pDraw = report.result.draw || 0;
         const pAway = report.result.awayWin || 0;
-        const predicted = pHome >= pDraw && pHome >= pAway ? '1' : pAway >= pHome && pAway >= pDraw ? '2' : 'X';
-        if (predicted === 'X') totalDrawPredicted++;
+        const probBasedResult = pHome >= pDraw && pHome >= pAway ? '1' : pAway >= pHome && pAway >= pDraw ? '2' : 'X';
+        if (probBasedResult === 'X') totalDrawPredicted++;
 
         const simDist = report.simulationInsights?.distribution || {};
         const pOU25 = simDist.over25 || report.goals?.over25 || 0;
@@ -1231,6 +1231,17 @@ app.get('/api/backtest', async (req, res) => {
 
         const predictedScore = report.score?.predicted || 'N/A';
         const simTopScore = simDist.topScore || report.firstHalfSimulation?.topScore || null;
+
+        // Skor tahmininden 1X2 türet — tabloda skor ile uyumlu olsun
+        const predicted = (() => {
+          if (predictedScore && predictedScore !== 'N/A') {
+            const parts = predictedScore.split('-').map(Number);
+            if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+              return parts[0] > parts[1] ? '1' : parts[0] < parts[1] ? '2' : 'X';
+            }
+          }
+          return probBasedResult; // fallback: olasılık bazlı
+        })();
 
         // ── HT tahmin ──
         const htReport = report.firstHalf;

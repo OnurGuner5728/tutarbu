@@ -342,10 +342,12 @@ export default function App() {
               {selectedMatch.isLive && <span style={{ color: '#ff4444', marginLeft: 8, fontSize: '0.7rem' }}>● LIVE</span>}
             </div>
           )}
+          {/* REHBER DEVRE DIŞI — tekrar aktif etmek için display:'none' kaldır */}
           <button
             onClick={startTour}
             title="Rehberi Başlat"
             style={{
+              display: 'none',
               marginLeft: 'auto',
               background: 'rgba(0,242,255,0.07)',
               border: '1px solid rgba(0,242,255,0.2)',
@@ -353,7 +355,6 @@ export default function App() {
               color: 'rgba(0,242,255,0.7)',
               padding: '5px 12px',
               cursor: 'pointer',
-              display: 'flex',
               alignItems: 'center',
               gap: 5,
               fontSize: '0.72rem',
@@ -2101,7 +2102,8 @@ export default function App() {
         )}
       </main>
 
-      {/* ── GUIDED TOUR ── */}
+      {/* ── GUIDED TOUR (DEVRE DIŞI — tekrar aktif etmek için comment'i kaldır) ── */}
+      {/*
       <TourGuide
         steps={TOUR_STEPS}
         active={tourActive}
@@ -2118,6 +2120,7 @@ export default function App() {
         tourSingleSimDone={tourSingleSimDone}
         tourMultiSimDone={tourMultiSimDone}
       />
+      */}
     </div>
   );
 }
