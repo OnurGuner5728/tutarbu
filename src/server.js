@@ -1121,11 +1121,20 @@ app.get('/api/backtest', async (req, res) => {
   res.setHeader('X-Accel-Buffering', 'no');
   res.flushHeaders();
 
-  const send = (evt, data) => res.write(`event: ${evt}\ndata: ${JSON.stringify(data)}\n\n`);
+  // Client bağlantı kopmasını izle — EventSource auto-reconnect yeni backtest başlatır
+  // aborted flag ile pipeline loop'u durduruyoruz
+  let aborted = false;
+  req.on('close', () => { aborted = true; });
+
+  const send = (evt, data) => {
+    if (aborted) return; // Client ayrıldıysa yazmaya çalışma
+    try { res.write(`event: ${evt}\ndata: ${JSON.stringify(data)}\n\n`); } catch (_) {}
+  };
   const progress = (msg) => send('progress', { message: msg });
 
   try {
     progress(`Backtest: ${date}${endDate !== date ? ' → ' + endDate : ''} | limit: ${matchLimit} | turnuva: ${tournamentFilter}${includeUnplayed ? ' | +oynanmamış' : ''}`);
+
 
     // ── 1. Maç toplama (date range + dedup + unplayed support) ────────────
     const filterFn = buildTournamentFilter(tournamentFilter);
@@ -1199,8 +1208,11 @@ app.get('/api/backtest', async (req, res) => {
     let totalDrawActual = 0, totalDrawPredicted = 0;
 
     for (let mi = 0; mi < allMatches.length; mi++) {
+      if (aborted) break; // Client bağlantısı koptu, devam etme
       const match = allMatches[mi];
       if (mi > 0) await new Promise(r => setTimeout(r, BACKTEST_INTER_DELAY_MS));
+      if (aborted) break; // Bekleme süresinde de kopmuş olabilir
+
 
       const isFinished = match.status?.type === 'finished';
       const matchLabel = `${match.homeTeam.name} vs ${match.awayTeam.name}`;

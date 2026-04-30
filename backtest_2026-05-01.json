@@ -1,0 +1,347 @@
+{
+  "date": "2026-05-01",
+  "endDate": "2026-05-01",
+  "total": 3,
+  "finishedTotal": 0,
+  "upcomingTotal": 3,
+  "tournamentFilter": "all",
+  "accuracy1X2": null,
+  "accuracyOU25": null,
+  "accuracyBTTS": null,
+  "accuracyScore": null,
+  "avgBrierScore": null,
+  "avgLogLoss": null,
+  "htAccuracy1X2": null,
+  "htAccuracyScore": null,
+  "htTotal": 0,
+  "high": {
+    "count": 2,
+    "accuracy1X2": 0,
+    "accuracyOU25": 0,
+    "accuracyBTTS": 0,
+    "accuracyScore": 0,
+    "avgBrier": 0
+  },
+  "medium": null,
+  "low": {
+    "count": 1,
+    "accuracy1X2": 0,
+    "accuracyOU25": 0,
+    "accuracyBTTS": 0,
+    "accuracyScore": 0,
+    "avgBrier": 0
+  },
+  "poissonAccuracy1X2": 0,
+  "simulationAccuracy1X2": 0,
+  "drawDetection": {
+    "actual": 0,
+    "predicted": 0,
+    "recallRate": null,
+    "precisionRate": null
+  },
+  "valueBets": {
+    "count": 0,
+    "accuracy1X2": null
+  },
+  "byTournament": [
+    {
+      "tournamentId": 8,
+      "name": "LaLiga",
+      "total": 1,
+      "accuracy1X2": 0,
+      "accuracyOU25": 0,
+      "accuracyBTTS": 0,
+      "accuracyScore": 0,
+      "avgBrier": 0
+    },
+    {
+      "tournamentId": 17,
+      "name": "Premier League",
+      "total": 1,
+      "accuracy1X2": 0,
+      "accuracyOU25": 0,
+      "accuracyBTTS": 0,
+      "accuracyScore": 0,
+      "avgBrier": 0
+    },
+    {
+      "tournamentId": 23,
+      "name": "Serie A",
+      "total": 1,
+      "accuracy1X2": 0,
+      "accuracyOU25": 0,
+      "accuracyBTTS": 0,
+      "accuracyScore": 0,
+      "avgBrier": 0
+    }
+  ],
+  "results": [
+    {
+      "matchId": 14023940,
+      "matchStatus": "notstarted",
+      "match": "Leeds United vs Burnley",
+      "homeTeam": "Leeds United",
+      "awayTeam": "Burnley",
+      "tournament": "Premier League",
+      "tournamentId": 17,
+      "matchDate": "2026-05-01",
+      "matchTime": "19:00",
+      "actual": null,
+      "actualResult": null,
+      "actualOU25": null,
+      "actualBTTS": null,
+      "predicted": "2-0",
+      "predictedResult": "1",
+      "predictedOU25": "Over",
+      "predictedBTTS": "No",
+      "simTopScore": "2-0",
+      "probHome": 43.27,
+      "probDraw": 26.57,
+      "probAway": 30.16,
+      "probOU25": 52.7,
+      "probBTTS": 23.5,
+      "actualHT": null,
+      "actualHTResult": null,
+      "predictedHT": "2-0",
+      "predictedHTResult": "1",
+      "simHTTopScore": "1-0",
+      "htHomeWinProb": 84.83,
+      "htDrawProb": 13.06,
+      "htAwayWinProb": 2.11,
+      "simHTHomeWin": 62.1,
+      "simHTDraw": 32.6,
+      "simHTAwayWin": 5.3,
+      "htft": {
+        "top1": "1/1",
+        "top3": [
+          {
+            "result": "1/1",
+            "prob": 60.94
+          },
+          {
+            "result": "X/1",
+            "prob": 27.42
+          },
+          {
+            "result": "2/1",
+            "prob": 3.98
+          }
+        ]
+      },
+      "hit1X2": null,
+      "hitOU25": null,
+      "hitBTTS": null,
+      "hitScore": null,
+      "hitHTResult": null,
+      "hitHTScore": null,
+      "brierScore": null,
+      "logLoss": null,
+      "confidenceTier": "HIGH",
+      "maxProbability": 84.1,
+      "isHighConfidence": true,
+      "poisson": {
+        "predicted": "1",
+        "homeWin": 58.23,
+        "draw": 11.66,
+        "awayWin": 30.11,
+        "topScore": "2-0",
+        "hit": false,
+        "lambdaHome": 2.22,
+        "lambdaAway": 0.88
+      },
+      "simulation": {
+        "predicted": "1",
+        "homeWin": 84.1,
+        "draw": 11,
+        "awayWin": 4.9,
+        "hit": false
+      },
+      "restDays": {
+        "home": 5,
+        "away": 9
+      },
+      "isValueBet": false,
+      "modelEdge": -30.7,
+      "marketHome": 73.97,
+      "marketAway": 8.56
+    },
+    {
+      "matchId": 13980097,
+      "matchStatus": "notstarted",
+      "match": "Pisa vs Lecce",
+      "homeTeam": "Pisa",
+      "awayTeam": "Lecce",
+      "tournament": "Serie A",
+      "tournamentId": 23,
+      "matchDate": "2026-05-01",
+      "matchTime": "18:45",
+      "actual": null,
+      "actualResult": null,
+      "actualOU25": null,
+      "actualBTTS": null,
+      "predicted": "0-1",
+      "predictedResult": "2",
+      "predictedOU25": "Under",
+      "predictedBTTS": "No",
+      "simTopScore": "0-0",
+      "probHome": 26.69,
+      "probDraw": 33.59,
+      "probAway": 39.72,
+      "probOU25": 0.1,
+      "probBTTS": 1.4,
+      "actualHT": null,
+      "actualHTResult": null,
+      "predictedHT": "0-0",
+      "predictedHTResult": "1",
+      "simHTTopScore": "0-0",
+      "htHomeWinProb": 13.93,
+      "htDrawProb": 86.07,
+      "htAwayWinProb": 0,
+      "simHTHomeWin": 5.2,
+      "simHTDraw": 88.1,
+      "simHTAwayWin": 6.7,
+      "htft": {
+        "top1": "X/X",
+        "top3": [
+          {
+            "result": "X/X",
+            "prob": 69.16
+          },
+          {
+            "result": "X/2",
+            "prob": 11.54
+          },
+          {
+            "result": "X/1",
+            "prob": 7.4
+          }
+        ]
+      },
+      "hit1X2": null,
+      "hitOU25": null,
+      "hitBTTS": null,
+      "hitScore": null,
+      "hitHTResult": null,
+      "hitHTScore": null,
+      "brierScore": null,
+      "logLoss": null,
+      "confidenceTier": "HIGH",
+      "maxProbability": 78.5,
+      "isHighConfidence": true,
+      "poisson": {
+        "predicted": "2",
+        "homeWin": 39.51,
+        "draw": 15.94,
+        "awayWin": 44.55,
+        "topScore": "0-0",
+        "hit": false,
+        "lambdaHome": 0.75,
+        "lambdaAway": 1.02
+      },
+      "simulation": {
+        "predicted": "X",
+        "homeWin": 8.4,
+        "draw": 78.5,
+        "awayWin": 13.1,
+        "hit": false
+      },
+      "restDays": {
+        "home": 6,
+        "away": 6
+      },
+      "isValueBet": false,
+      "modelEdge": -1.2,
+      "marketHome": 27.52,
+      "marketAway": 40.96
+    },
+    {
+      "matchId": 14083457,
+      "matchStatus": "notstarted",
+      "match": "Girona FC vs Mallorca",
+      "homeTeam": "Girona FC",
+      "awayTeam": "Mallorca",
+      "tournament": "LaLiga",
+      "tournamentId": 8,
+      "matchDate": "2026-05-01",
+      "matchTime": "19:00",
+      "actual": null,
+      "actualResult": null,
+      "actualOU25": null,
+      "actualBTTS": null,
+      "predicted": "1-0",
+      "predictedResult": "1",
+      "predictedOU25": "Under",
+      "predictedBTTS": "No",
+      "simTopScore": "1-1",
+      "probHome": 38.77,
+      "probDraw": 25.11,
+      "probAway": 36.12,
+      "probOU25": 43.3,
+      "probBTTS": 49.5,
+      "actualHT": null,
+      "actualHTResult": null,
+      "predictedHT": "1-1",
+      "predictedHTResult": "2",
+      "simHTTopScore": "0-0",
+      "htHomeWinProb": 24.69,
+      "htDrawProb": 37.28,
+      "htAwayWinProb": 38.01,
+      "simHTHomeWin": 26.4,
+      "simHTDraw": 41.2,
+      "simHTAwayWin": 32.4,
+      "htft": {
+        "top1": "2/2",
+        "top3": [
+          {
+            "result": "2/2",
+            "prob": 20.45
+          },
+          {
+            "result": "X/2",
+            "prob": 16.11
+          },
+          {
+            "result": "1/1",
+            "prob": 15.24
+          }
+        ]
+      },
+      "hit1X2": null,
+      "hitOU25": null,
+      "hitBTTS": null,
+      "hitScore": null,
+      "hitHTResult": null,
+      "hitHTScore": null,
+      "brierScore": null,
+      "logLoss": null,
+      "confidenceTier": "LOW",
+      "maxProbability": 39.1,
+      "isHighConfidence": false,
+      "poisson": {
+        "predicted": "1",
+        "homeWin": 48.16,
+        "draw": 12.84,
+        "awayWin": 39,
+        "topScore": "1-1",
+        "hit": false,
+        "lambdaHome": 1.52,
+        "lambdaAway": 1.04
+      },
+      "simulation": {
+        "predicted": "2",
+        "homeWin": 33.7,
+        "draw": 27.2,
+        "awayWin": 39.1,
+        "hit": false
+      },
+      "restDays": {
+        "home": 6,
+        "away": 6
+      },
+      "isValueBet": false,
+      "modelEdge": -9.8,
+      "marketHome": 48.59,
+      "marketAway": 24.73
+    }
+  ]
+}

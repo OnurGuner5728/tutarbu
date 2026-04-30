@@ -133,11 +133,20 @@ export default function BacktestPage({ onBack }) {
       const d=JSON.parse(e.data);
       if (d.error) setError(d.error);
       else { setSummary(d); setProgress(p=>[...p,`✅ ${d.total} maç tamamlandı.`]); }
+      es.close(); // auto-reconnect önle
       stop();
     });
-    es.addEventListener('error', e => { try { const d=JSON.parse(e.data); setError(d.error||'Hata'); } catch(_){} stop(); });
-    es.onerror = () => { setError('Bağlantı hatası'); stop(); };
+    es.addEventListener('error', e => { try { const d=JSON.parse(e.data); setError(d.error||'Hata'); } catch(_){} es.close(); stop(); });
+    es.onerror = (e) => {
+      // EventSource readyState: 0=CONNECTING, 1=OPEN, 2=CLOSED
+      // CLOSED değilse gerçek bir hata — bağlantı hatası göster
+      if (es.readyState === EventSource.CLOSED) return; // Normal kapanma, hata sayma
+      setError('Bağlantı hatası — sunucu yanıt vermedi. Server çalışıyor mu?');
+      es.close(); // auto-reconnect kesinlikle önle
+      stop();
+    };
   }, [date, endDate, limitInput, tournamentFilter, customTournamentIds, includeUnplayed, minConfidence, stop]);
+
 
   useEffect(() => () => stop(), [stop]);
 

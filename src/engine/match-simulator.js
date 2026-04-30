@@ -684,7 +684,8 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
     // GOL_IHTIYACI üst satürasyon: normLimits envelope'undan 1.0 etrafında simetrik uzantı.
     const _ihtMax = (baseline.normMaxRatio != null && baseline.normMinRatio != null)
       ? baseline.normMaxRatio + (1.0 - baseline.normMinRatio)
-      : (dynamicLimits?.POWER?.MAX != null ? dynamicLimits.POWER.MAX + (1.0 - (dynamicLimits?.POWER?.MIN ?? 1.0)) : null);
+      : (DYN_LIMITS?.POWER?.MAX != null ? DYN_LIMITS.POWER.MAX + (1.0 - (DYN_LIMITS?.POWER?.MIN ?? 1.0)) : 2.0);
+
     const urgencyStart = _ihtMax != null
       ? Math.max(0, lateBase - (lateBase - earlyBase) * Math.max(0, clamp(u.GOL_IHTIYACI, 1.0, _ihtMax) - 1.0))
       : lateBase; // veri yoksa urgency başlangıcı = lateBase (nötr)
@@ -975,6 +976,9 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
   const _rcMaxPenalty = (_rcCV != null && _rcMedianCV != null)
     ? _rcPenMax * _rcCV / (_rcCV + _rcMedianCV) : null;
 
+  // lgPace: loop dışında hesapla — 95 tekrar gereksiz, scope sorununu da önler
+  const _lgPace = computeLeagueScale(baseline);
+
   for (let minute = 1; minute <= 95; minute++) {
     const minuteEvents = [];
     const pushEvent = (ev) => {
@@ -1003,7 +1007,6 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
       initialState.away.momentum, initialState.away.morale);
 
     // Yorgunluk artışı: pressing × lgScale / KADRO_DERINLIGI — tamamen dinamik
-    const _lgPace = computeLeagueScale(baseline);
     const _hKadroD = _s(homeUnits.KADRO_DERINLIGI);
     const _aKadroD = _s(awayUnits.KADRO_DERINLIGI);
     state.home.fatigue = Math.min(1, state.home.fatigue + state.home.pressing * _lgPace / (_hKadroD * 90));
@@ -1415,11 +1418,12 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
   }
 
   // Final possession — aynı 4 katmanlı model (maç sonu snapshot)
+  const _fpLgScale = computeLeagueScale(baseline); // _lgPace loop-scoped, burada yeniden hesapla
   const _fpLgAvg = (baseline.possessionBase ?? 0.5) * 100;
   const _fpH = hProb.possessionBase * 100;
   const _fpA = aProb.possessionBase * 100;
-  const _fpHSigma = _lgPace * 3 + Math.abs(_fpH - _fpLgAvg) * _lgPace * 2;
-  const _fpASigma = _lgPace * 3 + Math.abs(_fpA - _fpLgAvg) * _lgPace * 2;
+  const _fpHSigma = _fpLgScale * 3 + Math.abs(_fpH - _fpLgAvg) * _fpLgScale * 2;
+  const _fpASigma = _fpLgScale * 3 + Math.abs(_fpA - _fpLgAvg) * _fpLgScale * 2;
   // TOPLA_OYNAMA birimi: possession dominansını final skora yansıt
   const _fpHMatch = _fpH + _fpHSigma * (homeUnits.TOPLA_OYNAMA - 1.0) * 4;
   const _fpAMatch = _fpA + _fpASigma * (awayUnits.TOPLA_OYNAMA - 1.0) * 4;
