@@ -158,8 +158,8 @@ function getDynamicBaseline(data) {
     return count > 0 ? (corners / count) : null;
   };
 
-  const _rCornersH = data.homeRecentMatchDetails ? getCornersFromRecent(data.homeRecentMatchDetails, data.match?.homeTeam?.id) : null;
-  const _rCornersA = data.awayRecentMatchDetails ? getCornersFromRecent(data.awayRecentMatchDetails, data.match?.awayTeam?.id) : null;
+  const _rCornersH = data.homeRecentMatchDetails ? getCornersFromRecent(data.homeRecentMatchDetails, data.homeTeamId ?? data.event?.event?.homeTeam?.id) : null;
+  const _rCornersA = data.awayRecentMatchDetails ? getCornersFromRecent(data.awayRecentMatchDetails, data.awayTeamId ?? data.event?.event?.awayTeam?.id) : null;
 
   // SOT rate proxy already defined
   const _hCorners = (homeStats?.cornerKicks != null && homeStats?.matches > 0) ? homeStats.cornerKicks / homeStats.matches : _rCornersH;
