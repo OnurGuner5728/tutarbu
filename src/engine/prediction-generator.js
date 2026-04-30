@@ -546,55 +546,17 @@ function generatePrediction(metricsResult, data, baseline, audit, rng) {
     })(),
 
     // ── HT/FT 9-Sınıflı Market ────────────────────────────────────────────
-    // P(HT=i, FT=j) için 9 kombinasyon: 1/1, 1/X, 1/2, X/1, X/X, X/2, 2/1, 2/X, 2/2
-    // Yaklaşım: P(HT=i) × P(FT=j | HT=i)
-    //   P(FT=j | HT=home) ≈ daha güçlü home lehine dağılım (öne geçen takım korunma eğilimi)
-    //   P(FT=j | HT=draw) ≈ normal FT dağılımı
-    //   P(FT=j | HT=away) ≈ daha güçlü away lehine dağılım
+    // Doğrudan 1000 koşuluk simülasyonun frekans dağılımından türetilir.
+    // Her koşuda HT tarafı (1/X/2) ve FT tarafı (1/X/2) birlikte kaydedilir.
+    // Analitik P(HT)×P(FT|HT) formülü kaldırıldı — tutarsızlık kaynağıydı.
     htft: (() => {
-      const htDist = simulation.distribution.ht;
-      const ftDist = simulation.distribution;
-      if (!htDist) return null;
-
-      const pHT1 = (htDist.homeWin || 0) / 100;
-      const pHTX = (htDist.draw || 0) / 100;
-      const pHT2 = (htDist.awayWin || 0) / 100;
-      const pFT1 = (ftDist.homeWin || 0) / 100;
-      const pFTX = (ftDist.draw || 0) / 100;
-      const pFT2 = (ftDist.awayWin || 0) / 100;
-
-      // Conditional FT probs given HT outcome (simplified state-conditioned)
-      // Öndeki takım savunmaya çekilir: FT2|HT1 düşer, FT1|HT1 yükselir
-      // Ayar miktarı doğrudan CV'den: volatil ligde yarı zaman sonucu daha az belirleyici
-      const _dynAdj = (baseline?.leagueGoalVolatility != null && baseline?.leagueAvgGoals > 0)
-        ? baseline.leagueGoalVolatility / (baseline.leagueAvgGoals + baseline.leagueGoalVolatility)
-        : null;
-      const condFT = (htResult) => {
-        const adj = _dynAdj ?? 0; // veri yoksa ayar yok (HT→FT koşullu etki skip)
-        if (adj === 0) return { ft1: pFT1, ftX: pFTX, ft2: pFT2 };
-        if (htResult === 'home') return { ft1: pFT1 + adj, ftX: Math.max(0, pFTX - adj/2), ft2: Math.max(0, pFT2 - adj/2) };
-        if (htResult === 'away') return { ft1: Math.max(0, pFT1 - adj/2), ftX: Math.max(0, pFTX - adj/2), ft2: pFT2 + adj };
-        return { ft1: pFT1, ftX: pFTX, ft2: pFT2 };
+      const simHTFT = simulation.distribution?.htft;
+      if (!simHTFT) return null;
+      return {
+        probs: simHTFT.probs,
+        top1: simHTFT.top1,
+        top3: simHTFT.top3,
       };
-      const normalize = (o) => { const s = o.ft1+o.ftX+o.ft2; return { ft1: o.ft1/s, ftX: o.ftX/s, ft2: o.ft2/s }; };
-
-      const c1 = normalize(condFT('home'));
-      const cX = normalize(condFT('draw'));
-      const c2 = normalize(condFT('away'));
-
-      const probs = {
-        '1/1': round2(pHT1 * c1.ft1 * 100),
-        '1/X': round2(pHT1 * c1.ftX * 100),
-        '1/2': round2(pHT1 * c1.ft2 * 100),
-        'X/1': round2(pHTX * cX.ft1 * 100),
-        'X/X': round2(pHTX * cX.ftX * 100),
-        'X/2': round2(pHTX * cX.ft2 * 100),
-        '2/1': round2(pHT2 * c2.ft1 * 100),
-        '2/X': round2(pHT2 * c2.ftX * 100),
-        '2/2': round2(pHT2 * c2.ft2 * 100),
-      };
-      const sorted = Object.entries(probs).sort((a, b) => b[1] - a[1]);
-      return { probs, top1: sorted[0]?.[0], top3: sorted.slice(0, 3).map(([k, v]) => ({ result: k, prob: v })) };
     })(),
 
     // İlk gol tahmini — normalize so home+away sum to 100
@@ -1040,6 +1002,35 @@ function generatePrediction(metricsResult, data, baseline, audit, rng) {
     return obj;
   };
   sanitize(report);
+
+  // ── HT/FT ↔ firstHalf Tutarlılık Garantisi ──────────────────────────────
+  // firstHalf.htResult (Poisson'dan) ile htft.top1 (simülasyondan) çelişebilir.
+  // Örnek: Poisson htResult='X' (0-0 en olası) ama htft.top1='1/1' (home/home en sık combo).
+  // Kullanıcı her iki veriyi yan yana gördüğünde tutarsızlık algılar.
+  // Çözüm: htft.top1'deki HT tarafını authoritative kabul et ve firstHalf.htResult'ı buna uyumlu yap.
+  // Ayrıca firstHalf.topHTScore'u da htft'nin HT tarafıyla uyumlu en olası skor yap.
+  if (report.htft?.top1 && report.firstHalf) {
+    const htftHtSide = report.htft.top1.split('/')[0]; // "1/1" → "1", "X/2" → "X"
+    if (htftHtSide === '1' || htftHtSide === '2' || htftHtSide === 'X') {
+      report.firstHalf.htResult = htftHtSide;
+
+      // topHTScore'u da uyumlu yap: HT tarafına uyan en olası skor
+      const htScoreFreq = report.firstHalfSimulation?.scoreFrequency;
+      if (htScoreFreq && Object.keys(htScoreFreq).length > 0) {
+        const matchingSide = (score) => {
+          const [h, a] = score.split('-').map(Number);
+          if (htftHtSide === '1') return h > a;
+          if (htftHtSide === '2') return a > h;
+          return h === a;
+        };
+        const sorted = Object.entries(htScoreFreq).sort((a, b) => b[1] - a[1]);
+        const aligned = sorted.find(([score]) => matchingSide(score));
+        if (aligned) {
+          report.firstHalf.topHTScore = aligned[0];
+        }
+      }
+    }
+  }
 
   return report;
 }

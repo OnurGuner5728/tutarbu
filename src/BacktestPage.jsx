@@ -153,7 +153,7 @@ export default function BacktestPage({ onBack }) {
   // Export CSV
   const exportCSV = useCallback(() => {
     if (!results.length) return;
-    const cols = ['match','tournament','matchDate','actualResult','actual','actualHT','predictedResult','predicted','predictedHT','simTopScore','hit1X2','hitOU25','hitBTTS','hitScore','hitHTResult','brierScore','logLoss','confidenceTier','maxProbability','probHome','probDraw','probAway','probOU25','probBTTS','isValueBet','modelEdge'];
+    const cols = ['match','tournament','matchDate','actualResult','actual','actualHT','actualHTFT','predictedResult','predicted','predictedHT','simTopScore','hit1X2','hitOU25','hitBTTS','hitScore','hitHTResult','hitHTFT','brierScore','logLoss','confidenceTier','maxProbability','probHome','probDraw','probAway','probOU25','probBTTS','isValueBet','modelEdge'];
     const csv = [cols.join(','), ...results.map(r => cols.map(c => JSON.stringify(r[c]??'')).join(','))].join('\n');
     const b = URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
     const a = document.createElement('a'); a.href=b; a.download=`backtest_${date}.csv`; a.click(); URL.revokeObjectURL(b);
@@ -363,6 +363,7 @@ export default function BacktestPage({ onBack }) {
                 {upcomingCount>0&&<StatCard label="Oynanmamış" value={upcomingCount} sub="tahmin yapıldı" color="#6366f1"/>}
                 {showHTFT&&summary?.htTotal>0&&<StatCard label="HT 1X2" value={fmtPct(summary.htAccuracy1X2)} sub={`/${summary.htTotal}`} color="#34d399"/>}
                 {showHTFT&&summary?.htTotal>0&&<StatCard label="HT Exact" value={fmtPct(summary.htAccuracyScore)} sub={`/${summary.htTotal}`} color="#6ee7b7"/>}
+                {showHTFT&&summary?.htftTotal>0&&<StatCard label="HT/FT" value={fmtPct(summary.htftAccuracy)} sub={`/${summary.htftTotal}`} color="#8b5cf6"/>}
                 {live.avgBrier!=null&&<StatCard label="Avg Brier" value={live.avgBrier.toFixed(4)} sub="ref: 0.667" color={brierClr(live.avgBrier)}/>}
               </div>
               {/* Tier */}
@@ -447,7 +448,7 @@ export default function BacktestPage({ onBack }) {
                         <td style={{...td,color:r.actualHT?'#9ca3af':'#374151'}}>{r.actualHT||'—'} {r.actualHTResult&&<span style={{fontSize:9}}>{r.actualHTResult}</span>}</td>
                         <td style={{...td,color:r.hitHTResult===true?'#86efac':r.hitHTResult===false?'#fca5a5':'#6b7280',fontSize:10}}>{r.predictedHT||'—'} {r.predictedHTResult&&<span style={{fontSize:9}}>{r.predictedHTResult}</span>}</td>
                         <td style={{...td,color:'#6b7280',fontSize:10}}>{r.simHTTopScore||'—'}</td>
-                        <td style={{...td,color:'#6b7280',fontSize:10}}>{r.htft?.top1||'—'}</td>
+                        <td style={{...td,color:r.hitHTFT===true?'#86efac':r.hitHTFT===false?'#fca5a5':'#6b7280',fontSize:10,fontWeight:r.hitHTFT!=null?600:400}}>{r.htft?.top1||'—'}</td>
                       </>}
                       <td style={td}>{r.hit1X2!=null?<Ico ok={r.hit1X2}/>:<span style={{color:'#1f2937'}}>—</span>}</td>
                       <td style={td}>{r.hitOU25!=null?<Ico ok={r.hitOU25}/>:<span style={{color:'#1f2937'}}>—</span>}</td>
@@ -498,9 +499,10 @@ export default function BacktestPage({ onBack }) {
                               <Row l="FT Olasılıklar" v={`1: ${r.probHome?.toFixed(1)}% X: ${r.probDraw?.toFixed(1)}% 2: ${r.probAway?.toFixed(1)}%`} />
                               <Row l="O/U 2.5" v={`${r.probOU25?.toFixed(1)}%`} c={r.probOU25>55?'#4ade80':'#fbbf24'} />
                               <Row l="BTTS" v={`${r.probBTTS?.toFixed(1)}%`} />
-                              <Row l="HT Poisson" v={`${r.predictedHT||'—'} (${r.predictedHTResult||'—'})`} />
+                              <Row l="HT Tahmin" v={`${r.predictedHT||'—'} (${r.predictedHTResult||'—'})`} />
                               <Row l="HT 1X2" v={`${r.htHomeWinProb?.toFixed(1)}% / ${r.htDrawProb?.toFixed(1)}% / ${r.htAwayWinProb?.toFixed(1)}%`} />
-                              {r.htft && <Row l="HT/FT Top" v={`${r.htft.top1} (${r.htft.top3?.[0]?.prob?.toFixed(1)}%)`} c="#c4b5fd" />}
+                              {r.htft && <Row l="HT/FT Tahmin" v={`${r.htft.top1} (${r.htft.top3?.[0]?.prob?.toFixed(1)}%)`} c={r.hitHTFT===true?'#4ade80':r.hitHTFT===false?'#f87171':'#c4b5fd'} />}
+                              {r.actualHTFT && <Row l="HT/FT Gerçek" v={r.actualHTFT} c="#9ca3af" />}
                               <Row l="Dinlenme" v={`Ev: ${r.restDays?.home??'—'}g  Dep: ${r.restDays?.away??'—'}g`} />
                               <Row l="Market" v={`H: ${r.marketHome?.toFixed(1)}%  A: ${r.marketAway?.toFixed(1)}%`} />
                               <Row l="Value Bet" v={r.isValueBet ? `✅ +${r.modelEdge}%` : `❌ ${r.modelEdge}%`} c={r.isValueBet?'#22c55e':'#6b7280'} />

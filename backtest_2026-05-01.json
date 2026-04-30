@@ -1,9 +1,9 @@
 {
   "date": "2026-05-01",
   "endDate": "2026-05-01",
-  "total": 3,
+  "total": 10,
   "finishedTotal": 0,
-  "upcomingTotal": 3,
+  "upcomingTotal": 10,
   "tournamentFilter": "all",
   "accuracy1X2": null,
   "accuracyOU25": null,
@@ -14,7 +14,17 @@
   "htAccuracy1X2": null,
   "htAccuracyScore": null,
   "htTotal": 0,
+  "htftAccuracy": null,
+  "htftTotal": 0,
   "high": {
+    "count": 5,
+    "accuracy1X2": 0,
+    "accuracyOU25": 0,
+    "accuracyBTTS": 0,
+    "accuracyScore": 0,
+    "avgBrier": 0
+  },
+  "medium": {
     "count": 2,
     "accuracy1X2": 0,
     "accuracyOU25": 0,
@@ -22,9 +32,8 @@
     "accuracyScore": 0,
     "avgBrier": 0
   },
-  "medium": null,
   "low": {
-    "count": 1,
+    "count": 3,
     "accuracy1X2": 0,
     "accuracyOU25": 0,
     "accuracyBTTS": 0,
@@ -35,15 +44,35 @@
   "simulationAccuracy1X2": 0,
   "drawDetection": {
     "actual": 0,
-    "predicted": 0,
+    "predicted": 1,
     "recallRate": null,
-    "precisionRate": null
+    "precisionRate": 0
   },
   "valueBets": {
-    "count": 0,
-    "accuracy1X2": null
+    "count": 1,
+    "accuracy1X2": 0
   },
   "byTournament": [
+    {
+      "tournamentId": 384,
+      "name": "CONMEBOL Libertadores, Group A",
+      "total": 4,
+      "accuracy1X2": 0,
+      "accuracyOU25": 0,
+      "accuracyBTTS": 0,
+      "accuracyScore": 0,
+      "avgBrier": 0
+    },
+    {
+      "tournamentId": 480,
+      "name": "CONMEBOL Sudamericana, Group A",
+      "total": 3,
+      "accuracy1X2": 0,
+      "accuracyOU25": 0,
+      "accuracyBTTS": 0,
+      "accuracyScore": 0,
+      "avgBrier": 0
+    },
     {
       "tournamentId": 8,
       "name": "LaLiga",
@@ -102,7 +131,7 @@
       "probBTTS": 23.5,
       "actualHT": null,
       "actualHTResult": null,
-      "predictedHT": "2-0",
+      "predictedHT": "1-0",
       "predictedHTResult": "1",
       "simHTTopScore": "1-0",
       "htHomeWinProb": 84.83,
@@ -116,18 +145,31 @@
         "top3": [
           {
             "result": "1/1",
-            "prob": 60.94
+            "prob": 60
           },
           {
             "result": "X/1",
-            "prob": 27.42
+            "prob": 22
           },
           {
-            "result": "2/1",
-            "prob": 3.98
+            "result": "X/X",
+            "prob": 8
           }
-        ]
+        ],
+        "probs": {
+          "1/1": 60,
+          "1/X": 1.8,
+          "1/2": 0.3,
+          "X/1": 22,
+          "X/X": 8,
+          "X/2": 2.6,
+          "2/1": 2.1,
+          "2/X": 1.2,
+          "2/2": 2
+        }
       },
+      "actualHTFT": null,
+      "hitHTFT": null,
       "hit1X2": null,
       "hitOU25": null,
       "hitBTTS": null,
@@ -192,7 +234,7 @@
       "actualHT": null,
       "actualHTResult": null,
       "predictedHT": "0-0",
-      "predictedHTResult": "1",
+      "predictedHTResult": "X",
       "simHTTopScore": "0-0",
       "htHomeWinProb": 13.93,
       "htDrawProb": 86.07,
@@ -205,18 +247,31 @@
         "top3": [
           {
             "result": "X/X",
-            "prob": 69.16
+            "prob": 77.9
+          },
+          {
+            "result": "2/2",
+            "prob": 6.6
           },
           {
             "result": "X/2",
-            "prob": 11.54
-          },
-          {
-            "result": "X/1",
-            "prob": 7.4
+            "prob": 6.5
           }
-        ]
+        ],
+        "probs": {
+          "1/1": 4.7,
+          "1/X": 0.5,
+          "1/2": 0,
+          "X/1": 3.7,
+          "X/X": 77.9,
+          "X/2": 6.5,
+          "2/1": 0,
+          "2/X": 0.1,
+          "2/2": 6.6
+        }
       },
+      "actualHTFT": null,
+      "hitHTFT": null,
       "hit1X2": null,
       "hitOU25": null,
       "hitBTTS": null,
@@ -280,7 +335,7 @@
       "probBTTS": 49.5,
       "actualHT": null,
       "actualHTResult": null,
-      "predictedHT": "1-1",
+      "predictedHT": "0-1",
       "predictedHTResult": "2",
       "simHTTopScore": "0-0",
       "htHomeWinProb": 24.69,
@@ -294,18 +349,31 @@
         "top3": [
           {
             "result": "2/2",
-            "prob": 20.45
-          },
-          {
-            "result": "X/2",
-            "prob": 16.11
+            "prob": 25.3
           },
           {
             "result": "1/1",
-            "prob": 15.24
+            "prob": 20
+          },
+          {
+            "result": "X/X",
+            "prob": 16.8
           }
-        ]
+        ],
+        "probs": {
+          "1/1": 20,
+          "1/X": 4.9,
+          "1/2": 1.5,
+          "X/1": 12.1,
+          "X/X": 16.8,
+          "X/2": 12.3,
+          "2/1": 1.6,
+          "2/X": 5.5,
+          "2/2": 25.3
+        }
       },
+      "actualHTFT": null,
+      "hitHTFT": null,
       "hit1X2": null,
       "hitOU25": null,
       "hitBTTS": null,
@@ -342,6 +410,720 @@
       "modelEdge": -9.8,
       "marketHome": 48.59,
       "marketAway": 24.73
+    },
+    {
+      "matchId": 15832757,
+      "matchStatus": "notstarted",
+      "match": "Independiente Medellín vs Cusco FC",
+      "homeTeam": "Independiente Medellín",
+      "awayTeam": "Cusco FC",
+      "tournament": "CONMEBOL Libertadores, Group A",
+      "tournamentId": 384,
+      "matchDate": "2026-05-01",
+      "matchTime": "02:00",
+      "actual": null,
+      "actualResult": null,
+      "actualOU25": null,
+      "actualBTTS": null,
+      "predicted": "1-0",
+      "predictedResult": "1",
+      "predictedOU25": "Under",
+      "predictedBTTS": "No",
+      "simTopScore": "1-0",
+      "probHome": 40.86,
+      "probDraw": 40.31,
+      "probAway": 18.83,
+      "probOU25": 33,
+      "probBTTS": 36.7,
+      "actualHT": null,
+      "actualHTResult": null,
+      "predictedHT": "1-0",
+      "predictedHTResult": "1",
+      "simHTTopScore": "0-0",
+      "htHomeWinProb": 71.58,
+      "htDrawProb": 21.75,
+      "htAwayWinProb": 6.64,
+      "simHTHomeWin": 37.5,
+      "simHTDraw": 46,
+      "simHTAwayWin": 16.5,
+      "htft": {
+        "top1": "1/1",
+        "top3": [
+          {
+            "result": "1/1",
+            "prob": 34.1
+          },
+          {
+            "result": "X/1",
+            "prob": 21.3
+          },
+          {
+            "result": "X/X",
+            "prob": 19.4
+          }
+        ],
+        "probs": {
+          "1/1": 34.1,
+          "1/X": 3,
+          "1/2": 0.4,
+          "X/1": 21.3,
+          "X/X": 19.4,
+          "X/2": 5.3,
+          "2/1": 1.9,
+          "2/X": 5,
+          "2/2": 9.6
+        }
+      },
+      "actualHTFT": null,
+      "hitHTFT": null,
+      "hit1X2": null,
+      "hitOU25": null,
+      "hitBTTS": null,
+      "hitScore": null,
+      "hitHTResult": null,
+      "hitHTScore": null,
+      "brierScore": null,
+      "logLoss": null,
+      "confidenceTier": "LOW",
+      "maxProbability": 57.3,
+      "isHighConfidence": false,
+      "poisson": {
+        "predicted": "1",
+        "homeWin": 56.66,
+        "draw": 24.42,
+        "awayWin": 18.91,
+        "topScore": "1-0",
+        "hit": false,
+        "lambdaHome": 1.69,
+        "lambdaAway": 0.82
+      },
+      "simulation": {
+        "predicted": "1",
+        "homeWin": 57.3,
+        "draw": 27.4,
+        "awayWin": 15.3,
+        "hit": false
+      },
+      "restDays": {
+        "home": 5,
+        "away": 4
+      },
+      "isValueBet": false,
+      "modelEdge": -31.5,
+      "marketHome": 72.37,
+      "marketAway": 10.04
+    },
+    {
+      "matchId": 15832798,
+      "matchStatus": "inprogress",
+      "match": "Bolívar vs Fluminense",
+      "homeTeam": "Bolívar",
+      "awayTeam": "Fluminense",
+      "tournament": "CONMEBOL Libertadores, Group C",
+      "tournamentId": 384,
+      "matchDate": "2026-04-30",
+      "matchTime": "22:00",
+      "actual": null,
+      "actualResult": null,
+      "actualOU25": null,
+      "actualBTTS": null,
+      "predicted": "2-1",
+      "predictedResult": "1",
+      "predictedOU25": "Over",
+      "predictedBTTS": "No",
+      "simTopScore": "3-0",
+      "probHome": 53.34,
+      "probDraw": 31.04,
+      "probAway": 15.62,
+      "probOU25": 72.3,
+      "probBTTS": 33.3,
+      "actualHT": "1-0",
+      "actualHTResult": "1",
+      "predictedHT": "1-0",
+      "predictedHTResult": "1",
+      "simHTTopScore": "1-0",
+      "htHomeWinProb": 66.62,
+      "htDrawProb": 21.99,
+      "htAwayWinProb": 11.39,
+      "simHTHomeWin": 70.9,
+      "simHTDraw": 24.3,
+      "simHTAwayWin": 4.8,
+      "htft": {
+        "top1": "1/1",
+        "top3": [
+          {
+            "result": "1/1",
+            "prob": 68.5
+          },
+          {
+            "result": "X/1",
+            "prob": 17.9
+          },
+          {
+            "result": "X/X",
+            "prob": 4.8
+          }
+        ],
+        "probs": {
+          "1/1": 68.5,
+          "1/X": 2,
+          "1/2": 0.4,
+          "X/1": 17.9,
+          "X/X": 4.8,
+          "X/2": 1.6,
+          "2/1": 2.6,
+          "2/X": 1.2,
+          "2/2": 1
+        }
+      },
+      "actualHTFT": null,
+      "hitHTFT": null,
+      "hit1X2": null,
+      "hitOU25": null,
+      "hitBTTS": null,
+      "hitScore": null,
+      "hitHTResult": null,
+      "hitHTScore": null,
+      "brierScore": null,
+      "logLoss": null,
+      "confidenceTier": "MEDIUM",
+      "maxProbability": 89,
+      "isHighConfidence": false,
+      "poisson": {
+        "predicted": "1",
+        "homeWin": 53.82,
+        "draw": 22.74,
+        "awayWin": 23.44,
+        "topScore": "1-1",
+        "hit": false,
+        "lambdaHome": 2.23,
+        "lambdaAway": 1.44
+      },
+      "simulation": {
+        "predicted": "1",
+        "homeWin": 89,
+        "draw": 8,
+        "awayWin": 3,
+        "hit": false
+      },
+      "restDays": {
+        "home": 4,
+        "away": 4
+      },
+      "isValueBet": false,
+      "modelEdge": 2.4,
+      "marketHome": 50.98,
+      "marketAway": 22.38
+    },
+    {
+      "matchId": 15832799,
+      "matchStatus": "inprogress",
+      "match": "Independiente Rivadavia vs Deportivo La Guaira",
+      "homeTeam": "Independiente Rivadavia",
+      "awayTeam": "Deportivo La Guaira",
+      "tournament": "CONMEBOL Libertadores, Group C",
+      "tournamentId": 384,
+      "matchDate": "2026-04-30",
+      "matchTime": "22:00",
+      "actual": null,
+      "actualResult": null,
+      "actualOU25": null,
+      "actualBTTS": null,
+      "predicted": "1-0",
+      "predictedResult": "1",
+      "predictedOU25": "Under",
+      "predictedBTTS": "No",
+      "simTopScore": "0-1",
+      "probHome": 15.9,
+      "probDraw": 45.81,
+      "probAway": 38.29,
+      "probOU25": 12,
+      "probBTTS": 8.4,
+      "actualHT": "2-1",
+      "actualHTResult": "1",
+      "predictedHT": "0-1",
+      "predictedHTResult": "2",
+      "simHTTopScore": "0-0",
+      "htHomeWinProb": 58.72,
+      "htDrawProb": 33.3,
+      "htAwayWinProb": 7.97,
+      "simHTHomeWin": 2.3,
+      "simHTDraw": 56.2,
+      "simHTAwayWin": 41.5,
+      "htft": {
+        "top1": "2/2",
+        "top3": [
+          {
+            "result": "2/2",
+            "prob": 40
+          },
+          {
+            "result": "X/X",
+            "prob": 31.9
+          },
+          {
+            "result": "X/2",
+            "prob": 22
+          }
+        ],
+        "probs": {
+          "1/1": 1.4,
+          "1/X": 0.7,
+          "1/2": 0.2,
+          "X/1": 2.3,
+          "X/X": 31.9,
+          "X/2": 22,
+          "2/1": 0.1,
+          "2/X": 1.4,
+          "2/2": 40
+        }
+      },
+      "actualHTFT": null,
+      "hitHTFT": null,
+      "hit1X2": null,
+      "hitOU25": null,
+      "hitBTTS": null,
+      "hitScore": null,
+      "hitHTResult": null,
+      "hitHTScore": null,
+      "brierScore": null,
+      "logLoss": null,
+      "confidenceTier": "LOW",
+      "maxProbability": 62.2,
+      "isHighConfidence": false,
+      "poisson": {
+        "predicted": "1",
+        "homeWin": 45.7,
+        "draw": 34.94,
+        "awayWin": 19.36,
+        "topScore": "0-0",
+        "hit": false,
+        "lambdaHome": 1.11,
+        "lambdaAway": 0.6
+      },
+      "simulation": {
+        "predicted": "2",
+        "homeWin": 3.8,
+        "draw": 34,
+        "awayWin": 62.2,
+        "hit": false
+      },
+      "restDays": {
+        "home": 4,
+        "away": 5
+      },
+      "isValueBet": false,
+      "modelEdge": -56.6,
+      "marketHome": 72.54,
+      "marketAway": 9.58
+    },
+    {
+      "matchId": 15832777,
+      "matchStatus": "notstarted",
+      "match": "Corinthians vs Peñarol",
+      "homeTeam": "Corinthians",
+      "awayTeam": "Peñarol",
+      "tournament": "CONMEBOL Libertadores, Group E",
+      "tournamentId": 384,
+      "matchDate": "2026-05-01",
+      "matchTime": "00:00",
+      "actual": null,
+      "actualResult": null,
+      "actualOU25": null,
+      "actualBTTS": null,
+      "predicted": "1-0",
+      "predictedResult": "1",
+      "predictedOU25": "Under",
+      "predictedBTTS": "No",
+      "simTopScore": "1-0",
+      "probHome": 41.44,
+      "probDraw": 40.87,
+      "probAway": 17.7,
+      "probOU25": 25,
+      "probBTTS": 3.3,
+      "actualHT": null,
+      "actualHTResult": null,
+      "predictedHT": "1-0",
+      "predictedHTResult": "1",
+      "simHTTopScore": "0-0",
+      "htHomeWinProb": 32.16,
+      "htDrawProb": 67.84,
+      "htAwayWinProb": 0,
+      "simHTHomeWin": 54.4,
+      "simHTDraw": 45.5,
+      "simHTAwayWin": 0.1,
+      "htft": {
+        "top1": "1/1",
+        "top3": [
+          {
+            "result": "1/1",
+            "prob": 53.7
+          },
+          {
+            "result": "X/1",
+            "prob": 25.3
+          },
+          {
+            "result": "X/X",
+            "prob": 19.8
+          }
+        ],
+        "probs": {
+          "1/1": 53.7,
+          "1/X": 0.7,
+          "1/2": 0,
+          "X/1": 25.3,
+          "X/X": 19.8,
+          "X/2": 0.4,
+          "2/1": 0,
+          "2/X": 0.1,
+          "2/2": 0
+        }
+      },
+      "actualHTFT": null,
+      "hitHTFT": null,
+      "hit1X2": null,
+      "hitOU25": null,
+      "hitBTTS": null,
+      "hitScore": null,
+      "hitHTResult": null,
+      "hitHTScore": null,
+      "brierScore": null,
+      "logLoss": null,
+      "confidenceTier": "MEDIUM",
+      "maxProbability": 79,
+      "isHighConfidence": false,
+      "poisson": {
+        "predicted": "1",
+        "homeWin": 36.29,
+        "draw": 32.34,
+        "awayWin": 31.38,
+        "topScore": "0-0",
+        "hit": false,
+        "lambdaHome": 0.97,
+        "lambdaAway": 0.83
+      },
+      "simulation": {
+        "predicted": "1",
+        "homeWin": 79,
+        "draw": 20.6,
+        "awayWin": 0.4,
+        "hit": false
+      },
+      "restDays": {
+        "home": 4,
+        "away": 4
+      },
+      "isValueBet": false,
+      "modelEdge": -19.1,
+      "marketHome": 60.51,
+      "marketAway": 11.13
+    },
+    {
+      "matchId": 15832031,
+      "matchStatus": "notstarted",
+      "match": "Tigre vs América de Cali",
+      "homeTeam": "Tigre",
+      "awayTeam": "América de Cali",
+      "tournament": "CONMEBOL Sudamericana, Group A",
+      "tournamentId": 480,
+      "matchDate": "2026-05-01",
+      "matchTime": "00:00",
+      "actual": null,
+      "actualResult": null,
+      "actualOU25": null,
+      "actualBTTS": null,
+      "predicted": "1-0",
+      "predictedResult": "1",
+      "predictedOU25": "Over",
+      "predictedBTTS": "No",
+      "simTopScore": "0-1",
+      "probHome": 16.58,
+      "probDraw": 38.01,
+      "probAway": 45.4,
+      "probOU25": 33.4,
+      "probBTTS": 24.3,
+      "actualHT": null,
+      "actualHTResult": null,
+      "predictedHT": "0-1",
+      "predictedHTResult": "2",
+      "simHTTopScore": "0-0",
+      "htHomeWinProb": 8.77,
+      "htDrawProb": 33.29,
+      "htAwayWinProb": 57.94,
+      "simHTHomeWin": 8,
+      "simHTDraw": 41.4,
+      "simHTAwayWin": 50.6,
+      "htft": {
+        "top1": "2/2",
+        "top3": [
+          {
+            "result": "2/2",
+            "prob": 48.3
+          },
+          {
+            "result": "X/2",
+            "prob": 22.1
+          },
+          {
+            "result": "X/X",
+            "prob": 16.2
+          }
+        ],
+        "probs": {
+          "1/1": 3.8,
+          "1/X": 2.7,
+          "1/2": 1.5,
+          "X/1": 3.1,
+          "X/X": 16.2,
+          "X/2": 22.1,
+          "2/1": 0.2,
+          "2/X": 2.1,
+          "2/2": 48.3
+        }
+      },
+      "actualHTFT": null,
+      "hitHTFT": null,
+      "hit1X2": null,
+      "hitOU25": null,
+      "hitBTTS": null,
+      "hitScore": null,
+      "hitHTResult": null,
+      "hitHTScore": null,
+      "brierScore": null,
+      "logLoss": null,
+      "confidenceTier": "HIGH",
+      "maxProbability": 71.9,
+      "isHighConfidence": true,
+      "poisson": {
+        "predicted": "1",
+        "homeWin": 41.54,
+        "draw": 28.37,
+        "awayWin": 30.1,
+        "topScore": "1-1",
+        "hit": false,
+        "lambdaHome": 1.32,
+        "lambdaAway": 1.11
+      },
+      "simulation": {
+        "predicted": "2",
+        "homeWin": 7.1,
+        "draw": 21,
+        "awayWin": 71.9,
+        "hit": false
+      },
+      "restDays": {
+        "home": 5,
+        "away": 5
+      },
+      "isValueBet": false,
+      "modelEdge": -32,
+      "marketHome": 48.62,
+      "marketAway": 22.44
+    },
+    {
+      "matchId": 15832032,
+      "matchStatus": "notstarted",
+      "match": "Alianza Atlético de Sullana vs Macará",
+      "homeTeam": "Alianza Atlético de Sullana",
+      "awayTeam": "Macará",
+      "tournament": "CONMEBOL Sudamericana, Group A",
+      "tournamentId": 480,
+      "matchDate": "2026-05-01",
+      "matchTime": "02:00",
+      "actual": null,
+      "actualResult": null,
+      "actualOU25": null,
+      "actualBTTS": null,
+      "predicted": "1-0",
+      "predictedResult": "1",
+      "predictedOU25": "Over",
+      "predictedBTTS": "No",
+      "simTopScore": "0-3",
+      "probHome": 12.32,
+      "probDraw": 33.84,
+      "probAway": 53.85,
+      "probOU25": 55.7,
+      "probBTTS": 3.8,
+      "actualHT": null,
+      "actualHTResult": null,
+      "predictedHT": "0-1",
+      "predictedHTResult": "2",
+      "simHTTopScore": "0-1",
+      "htHomeWinProb": 10.42,
+      "htDrawProb": 52.48,
+      "htAwayWinProb": 37.09,
+      "simHTHomeWin": 0,
+      "simHTDraw": 21.9,
+      "simHTAwayWin": 78.1,
+      "htft": {
+        "top1": "2/2",
+        "top3": [
+          {
+            "result": "2/2",
+            "prob": 77.7
+          },
+          {
+            "result": "X/2",
+            "prob": 15
+          },
+          {
+            "result": "X/X",
+            "prob": 6.5
+          }
+        ],
+        "probs": {
+          "1/1": 0,
+          "1/X": 0,
+          "1/2": 0,
+          "X/1": 0.4,
+          "X/X": 6.5,
+          "X/2": 15,
+          "2/1": 0,
+          "2/X": 0.4,
+          "2/2": 77.7
+        }
+      },
+      "actualHTFT": null,
+      "hitHTFT": null,
+      "hit1X2": null,
+      "hitOU25": null,
+      "hitBTTS": null,
+      "hitScore": null,
+      "hitHTResult": null,
+      "hitHTScore": null,
+      "brierScore": null,
+      "logLoss": null,
+      "confidenceTier": "HIGH",
+      "maxProbability": 92.7,
+      "isHighConfidence": true,
+      "poisson": {
+        "predicted": "1",
+        "homeWin": 34.97,
+        "draw": 31.44,
+        "awayWin": 33.59,
+        "topScore": "0-0",
+        "hit": false,
+        "lambdaHome": 0.95,
+        "lambdaAway": 0.93
+      },
+      "simulation": {
+        "predicted": "2",
+        "homeWin": 0.4,
+        "draw": 6.9,
+        "awayWin": 92.7,
+        "hit": false
+      },
+      "restDays": {
+        "home": 4,
+        "away": 4
+      },
+      "isValueBet": false,
+      "modelEdge": -26.1,
+      "marketHome": 38.43,
+      "marketAway": 28.53
+    },
+    {
+      "matchId": 15832079,
+      "matchStatus": "inprogress",
+      "match": "Vasco da Gama vs Olimpia",
+      "homeTeam": "Vasco da Gama",
+      "awayTeam": "Olimpia",
+      "tournament": "CONMEBOL Sudamericana, Group G",
+      "tournamentId": 480,
+      "matchDate": "2026-04-30",
+      "matchTime": "22:00",
+      "actual": null,
+      "actualResult": null,
+      "actualOU25": null,
+      "actualBTTS": null,
+      "predicted": "0-1",
+      "predictedResult": "2",
+      "predictedOU25": "Over",
+      "predictedBTTS": "No",
+      "simTopScore": "0-4",
+      "probHome": 10.98,
+      "probDraw": 28.65,
+      "probAway": 60.37,
+      "probOU25": 94.1,
+      "probBTTS": 10,
+      "actualHT": "1-0",
+      "actualHTResult": "1",
+      "predictedHT": "0-4",
+      "predictedHTResult": "2",
+      "simHTTopScore": "0-4",
+      "htHomeWinProb": 9.76,
+      "htDrawProb": 39.24,
+      "htAwayWinProb": 50.98,
+      "simHTHomeWin": 0.2,
+      "simHTDraw": 4.6,
+      "simHTAwayWin": 95.2,
+      "htft": {
+        "top1": "2/2",
+        "top3": [
+          {
+            "result": "2/2",
+            "prob": 95.1
+          },
+          {
+            "result": "X/2",
+            "prob": 4.2
+          },
+          {
+            "result": "X/X",
+            "prob": 0.4
+          }
+        ],
+        "probs": {
+          "1/1": 0,
+          "1/X": 0,
+          "1/2": 0.2,
+          "X/1": 0,
+          "X/X": 0.4,
+          "X/2": 4.2,
+          "2/1": 0,
+          "2/X": 0.1,
+          "2/2": 95.1
+        }
+      },
+      "actualHTFT": null,
+      "hitHTFT": null,
+      "hit1X2": null,
+      "hitOU25": null,
+      "hitBTTS": null,
+      "hitScore": null,
+      "hitHTResult": null,
+      "hitHTScore": null,
+      "brierScore": null,
+      "logLoss": null,
+      "confidenceTier": "HIGH",
+      "maxProbability": 99.5,
+      "isHighConfidence": true,
+      "poisson": {
+        "predicted": "2",
+        "homeWin": 30.43,
+        "draw": 26.01,
+        "awayWin": 43.56,
+        "topScore": "1-1",
+        "hit": false,
+        "lambdaHome": 1.22,
+        "lambdaAway": 1.5
+      },
+      "simulation": {
+        "predicted": "2",
+        "homeWin": 0,
+        "draw": 0.5,
+        "awayWin": 99.5,
+        "hit": false
+      },
+      "restDays": {
+        "home": 4,
+        "away": 5
+      },
+      "isValueBet": true,
+      "modelEdge": 38,
+      "marketHome": 49.38,
+      "marketAway": 22.35
     }
   ]
 }

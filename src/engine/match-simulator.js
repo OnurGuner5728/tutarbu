@@ -1456,6 +1456,10 @@ function simulateMultipleRuns(params) {
   let htHomeWins = 0, htDraws = 0, htAwayWins = 0;
   let totalHTHomeGoals = 0, totalHTAwayGoals = 0;
   const htScoreMap = {};
+  // ── HT/FT 9-Sınıflı Kombine İzleme ──────────────────────────────────────
+  // Her koşuda HT sonucu (1/X/2) ve FT sonucu (1/X/2) birlikte kaydedilir.
+  // Bu sayede HT/FT marketi doğrudan simülasyon frekanslarından türetilir.
+  const htftMap = {};
 
   for (let i = 0; i < runs; i++) {
     const run = simulateSingleRun(params);
@@ -1491,6 +1495,12 @@ function simulateMultipleRuns(params) {
     totalHTAwayGoals += htA;
     const htKey = `${htH}-${htA}`;
     htScoreMap[htKey] = (htScoreMap[htKey] || 0) + 1;
+
+    // HT/FT kombine sonuç: HT tarafı (1/X/2) + FT tarafı (1/X/2)
+    const htSide = htH > htA ? '1' : htA > htH ? '2' : 'X';
+    const ftSide = hg > ag ? '1' : ag > hg ? '2' : 'X';
+    const htftKey = `${htSide}/${ftSide}`;
+    htftMap[htftKey] = (htftMap[htftKey] || 0) + 1;
 
     if (i === 0 || i % 50 === 0) candidateRuns.push(run);
   }
@@ -1532,6 +1542,14 @@ function simulateMultipleRuns(params) {
   const avgHTHome = totalHTHomeGoals / runs;
   const avgHTAway = totalHTAwayGoals / runs;
 
+  // HT/FT 9-sınıflı dağılım — doğrudan simülasyon frekanslarından
+  const ALL_HTFT_COMBOS = ['1/1','1/X','1/2','X/1','X/X','X/2','2/1','2/X','2/2'];
+  const htftProbs = {};
+  for (const combo of ALL_HTFT_COMBOS) {
+    htftProbs[combo] = pct(htftMap[combo] || 0);
+  }
+  const sortedHTFT = Object.entries(htftProbs).sort((a, b) => b[1] - a[1]);
+
   return {
     runs,
     distribution: {
@@ -1550,6 +1568,12 @@ function simulateMultipleRuns(params) {
         avgAwayGoals: +avgHTAway.toFixed(2),
         topScore: sortedHTScores[0]?.[0] ?? null,
         scoreFrequency: sortedHTScores.slice(0, 6).reduce((acc, [s, c]) => { acc[s] = pct(c); return acc; }, {}),
+      },
+      // HT/FT 9-sınıflı market — 1000 koşudan doğrudan frekans
+      htft: {
+        probs: htftProbs,
+        top1: sortedHTFT[0]?.[0] ?? null,
+        top3: sortedHTFT.slice(0, 3).map(([k, v]) => ({ result: k, prob: v })),
       },
     },
     sampleRun: bestSampleRun

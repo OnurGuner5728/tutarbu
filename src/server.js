@@ -1202,6 +1202,7 @@ app.get('/api/backtest', async (req, res) => {
     const results = [];
     let hits1X2 = 0, hitsOU25 = 0, hitsBTTS = 0, hitsScore = 0;
     let hitsHT1X2 = 0, hitsHTScore = 0, htTotal = 0;
+    let hitsHTFT = 0, htftTotal = 0;
     let totalBrier = 0, totalLogLoss = 0;
     let poissonHits = 0, simHits = 0, poissonTotal = 0, simTotal = 0;
     const tournamentStats = {}; // { [tournamentId]: { name, total, hits1X2, hitsOU25, hitsBTTS } }
@@ -1296,17 +1297,47 @@ app.get('/api/backtest', async (req, res) => {
         // ── HT tahmin ──
         const htReport = report.firstHalf;
         const simHTDist = report.firstHalfSimulation;
-        const htPredResult = htReport?.htResult ?? null;
-        const htPredScore = (() => {
-          if (htReport?.htLambdaHome != null && htReport?.htLambdaAway != null) {
-            return `${Math.round(htReport.htLambdaHome)}-${Math.round(htReport.htLambdaAway)}`;
-          }
-          if (htReport?.expectedHomeGoals != null) {
-            return `${Math.round(htReport.expectedHomeGoals)}-${Math.round(htReport.expectedAwayGoals)}`;
-          }
-          return null;
-        })();
         const simHTTopScore = simHTDist?.topScore ?? null;
+
+        // HT 1X2 tahmini: HT/FT market ile tutarlı olması için HT/FT top1'deki
+        // HT tarafını referans al. Böylece Tah HT sütunu ile HT/FT sütunu
+        // asla çelişmez. Örnek: HT/FT=1/1 ise htPredResult='1' olur.
+        const htftTop1 = report.htft?.top1 ?? null;
+        const htPredResult = (() => {
+          // Öncelik: HT/FT top1'deki HT tarafı (tutarlılık garantisi)
+          if (htftTop1) {
+            const htSide = htftTop1.split('/')[0]; // "1/1" → "1"
+            if (htSide === '1' || htSide === '2' || htSide === 'X') return htSide;
+          }
+          // Fallback: simülasyonun HT 1X2 dağılımından en yüksek
+          const sh = parseFloat(simHTDist?.homeWin) || 0;
+          const sd = parseFloat(simHTDist?.draw) || 0;
+          const sa = parseFloat(simHTDist?.awayWin) || 0;
+          if (sh > sd && sh > sa) return '1';
+          if (sa > sd && sa > sh) return '2';
+          return 'X';
+        })();
+
+        // HT skor tahmini: htPredResult ile UYUMLU en olası HT skoru seçilir.
+        // Böylece Tah HT "0-0 x" gösterirken HT/FT "1/1" göstermez.
+        const htPredScore = (() => {
+          const scoreFreq = simHTDist?.scoreFrequency;
+          if (!scoreFreq || !Object.keys(scoreFreq).length) {
+            return htReport?.topHTScore || null;
+          }
+          // HT/FT'nin HT tarafı ile uyumlu skorları filtrele
+          const matchingSide = (score) => {
+            const [h, a] = score.split('-').map(Number);
+            if (htPredResult === '1') return h > a;
+            if (htPredResult === '2') return a > h;
+            return h === a; // X
+          };
+          const sorted = Object.entries(scoreFreq).sort((a, b) => b[1] - a[1]);
+          const aligned = sorted.find(([score]) => matchingSide(score));
+          if (aligned) return aligned[0];
+          // Hiç uyumlu skor yoksa (çok nadir) en olası skoru al
+          return sorted[0]?.[0] || null;
+        })();
 
         // ── Hit hesapları (sadece oynanmış maçlar) ──
         const hit1X2 = isFinished ? (predicted === realResult) : null;
@@ -1316,12 +1347,18 @@ app.get('/api/backtest', async (req, res) => {
         const hitHTResult = (isFinished && htPredResult && realHTResult) ? htPredResult === realHTResult : null;
         const hitHTScore = (isFinished && htPredScore && realHTScore) ? htPredScore === realHTScore : null;
 
+        // ── HT/FT kombine hit (gerçek HT taraf + gerçek FT taraf vs tahmin) ──
+        const realHTFT = (realHTResult && realResult) ? `${realHTResult}/${realResult}` : null;
+        const predHTFT = report.htft?.top1 ?? null;
+        const hitHTFT = (isFinished && realHTFT && predHTFT) ? realHTFT === predHTFT : null;
+
         if (hit1X2 === true) hits1X2++;
         if (hitOU25 === true) hitsOU25++;
         if (hitBTTS === true) hitsBTTS++;
         if (hitScore === true) hitsScore++;
         if (hitHTResult !== null) { htTotal++; if (hitHTResult) hitsHT1X2++; }
         if (hitHTScore === true) hitsHTScore++;
+        if (hitHTFT !== null) { htftTotal++; if (hitHTFT) hitsHTFT++; }
 
         // ── Brier + LogLoss (sadece oynanmış maçlar) ──
         let brierScore = null, logLoss = null;
@@ -1400,8 +1437,11 @@ app.get('/api/backtest', async (req, res) => {
           simHTHomeWin: simHTDist?.homeWin ?? null,
           simHTDraw: simHTDist?.draw ?? null,
           simHTAwayWin: simHTDist?.awayWin ?? null,
-          // HT/FT 9-class
-          htft: report.htft ? { top1: report.htft.top1, top3: report.htft.top3 } : null,
+          // HT/FT 9-class (simülasyon frekanslarından)
+          htft: report.htft ? { top1: report.htft.top1, top3: report.htft.top3, probs: report.htft.probs } : null,
+          // HT/FT gerçek + hit
+          actualHTFT: realHTFT,
+          hitHTFT,
           // Hit'ler
           hit1X2, hitOU25, hitBTTS, hitScore, hitHTResult, hitHTScore,
           // Kalibrasyon
@@ -1483,6 +1523,9 @@ app.get('/api/backtest', async (req, res) => {
       htAccuracy1X2: htTotal > 0 ? +((hitsHT1X2 / htTotal) * 100).toFixed(1) : null,
       htAccuracyScore: htTotal > 0 ? +((hitsHTScore / htTotal) * 100).toFixed(1) : null,
       htTotal,
+      // HT/FT kombine market doğruluğu
+      htftAccuracy: htftTotal > 0 ? +((hitsHTFT / htftTotal) * 100).toFixed(1) : null,
+      htftTotal,
       // Tier breakdown
       high: tierStats('HIGH'), medium: tierStats('MEDIUM'), low: tierStats('LOW'),
       // Motor karşılaştırması
