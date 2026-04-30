@@ -209,19 +209,21 @@ function generatePrediction(metricsResult, data, baseline, audit, rng) {
       // ── Dinamik Overconfidence Ezici (Temperature Scaling) ───────────────
       // Kitapçının Brier skorunu yakalamak ve aşırı özgüveni (Overconfidence) kırmak için
       // Ligin gol volatilitesine göre dinamik olarak olasılıkları merkeze büzüştürür.
-      const cvVal = (avg != null && avg > 0) ? (vol / avg) : 0.5;
+      const cvVal = (avg != null && avg > 0) ? (vol / avg) : 0;
 
-      // Lig dinamik metrikleri — baseline'dan, yoksa metricsResult'tan, son çare nötr
-      const compIndex = baseline?.leagueCompetitiveness ?? metricsResult.meta?.leagueCompetitiveness ?? 1.0;
-      const drawTendency = baseline?.leagueDrawTendency ?? metricsResult.meta?.leagueDrawTendency ?? 1.0;
+      // Lig dinamik metrikleri — baseline'dan saf veri
+      // compIndex: 1/CV formatında (yüksek = rekabetçi lig), drawTendency: saf beraberlik oranı
+      const compIndex = baseline?.leagueCompetitiveness ?? metricsResult.meta?.leagueCompetitiveness ?? null;
+      const drawTendency = baseline?.leagueDrawTendency ?? metricsResult.meta?.leagueDrawTendency ?? null;
 
       // CV ne kadar yüksekse (sürpriz ihtimali çoksa) temperature o kadar artar.
-      // Rekabetçilik ve Beraberlik eğilimi de T'yi artırır (olasılıkları düzleştirir)
-      // T > 1.0 oldukça olasılıklar üniforma (1/3) doğru yaklaşır.
-      // compIndex > 1.0 (çekişmeli) ise T artar.
-      const temperature = 1.0 + (cvVal * 0.6) + ((compIndex - 1.0) * 0.3) + ((drawTendency - 1.0) * 0.2);
-      // Temperature için güvenlik sınırları (örn: minimum 1.0, maksimum 2.0)
-      const safeTemp = Math.max(1.0, Math.min(2.0, temperature));
+      // Rekabetçilik yüksekse (compIndex büyük = 1/cv büyük = CV küçük = lig çekişmeli) → T artar
+      // Beraberlik oranı yüksekse → T artar (olasılıklar düzleşir)
+      // Tüm katkılar doğrudan veriden: cvVal zaten dinamik, compIndex 1/cv, drawTendency saf oran
+      let temperature = 1.0 + cvVal;
+      if (compIndex != null) temperature += cvVal / compIndex; // rekabetçi ligde CV etkisi artar
+      if (drawTendency != null) temperature += drawTendency;  // beraberlik oranı doğrudan katkı
+      // Temperature doğal aralığında kalır — veri yoksa sadece 1+cvVal kullanılır
 
       let s_homeWin = homeWin / 100;
       let s_draw = draw / 100;
@@ -231,7 +233,7 @@ function generatePrediction(metricsResult, data, baseline, audit, rng) {
       if (s_sum > 0) {
         let T_probs = [s_homeWin / s_sum, s_draw / s_sum, s_awayWin / s_sum].map(p => {
           const clampedP = Math.max(1e-9, Math.min(1 - 1e-9, p));
-          return Math.exp(Math.log(clampedP) / safeTemp);
+          return Math.exp(Math.log(clampedP) / temperature);
         });
 
         const tSum = T_probs.reduce((a, b) => a + b, 0);

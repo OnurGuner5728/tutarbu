@@ -422,59 +422,57 @@ function getDynamicBaseline(data) {
   const awayFatigue = computeFatigue(awayRestDays);
   traces.push(`homeFatigue: ${homeFatigue.toFixed(3)} | awayFatigue: ${awayFatigue.toFixed(3)}`);
 
-  // ── 14. possessionLimits — Takım possession istatistiklerinden dinamik min/max ──
+  // ── 14. possessionLimits — Saf veri: ligteki tüm takımların gerçek possession aralığı ──
   const possessionLimits = (() => {
     const allPoss = [];
     const rows = data.standingsTotal?.standings?.[0]?.rows;
     if (Array.isArray(rows)) {
       rows.forEach(r => { if (r.averageBallPossession != null) allPoss.push(r.averageBallPossession); });
     }
-    // Fallback: iki takımın sezon verisi
-    if (allPoss.length < 4 && hPoss != null) allPoss.push(hPoss);
-    if (allPoss.length < 4 && aPoss != null) allPoss.push(aPoss);
+    if (allPoss.length < 2 && hPoss != null) allPoss.push(hPoss);
+    if (allPoss.length < 2 && aPoss != null) allPoss.push(aPoss);
     if (allPoss.length >= 2) {
-      const min = Math.max(20, Math.min(...allPoss) * 0.85);
-      const max = Math.min(80, Math.max(...allPoss) * 1.15);
-      traces.push(`possessionLimits: [${min.toFixed(1)}, ${max.toFixed(1)}] (${rows ? 'STANDINGS' : 'TEAM_PROXY'})`);
+      // Doğrudan veriden: ligteki en düşük ve en yüksek possession değeri
+      const min = Math.min(...allPoss);
+      const max = Math.max(...allPoss);
+      traces.push(`possessionLimits: [${min.toFixed(1)}, ${max.toFixed(1)}] (${Array.isArray(rows) && rows.length >= 4 ? 'STANDINGS' : 'TEAM_PROXY'}, n=${allPoss.length})`);
       return { min, max };
     }
     traces.push('possessionLimits: null (NO_DATA)');
     return null;
   })();
 
-  // ── 15. lambdaLimits — Standings'ten tüm takımların gol/maç dağılımı ──
+  // ── 15. lambdaLimits — Saf veri: ligteki tüm takımların gol/maç dağılımının gerçek aralığı ──
   const lambdaLimits = (() => {
     const rows = data.standingsTotal?.standings?.[0]?.rows;
-    if (!Array.isArray(rows) || rows.length < 4) {
-      // Fallback: iki takımın sezon gol ortalaması
-      const hGPM = (homeStats?.goalsScored != null && homeStats?.matches > 0) ? homeStats.goalsScored / homeStats.matches : null;
-      const aGPM = (awayStats?.goalsScored != null && awayStats?.matches > 0) ? awayStats.goalsScored / awayStats.matches : null;
-      if (hGPM != null && aGPM != null) {
-        const min = Math.max(0.1, Math.min(hGPM, aGPM) * 0.5);
-        const max = Math.max(hGPM, aGPM) * 1.8;
-        traces.push(`lambdaLimits: [${min.toFixed(2)}, ${max.toFixed(2)}] (TEAM_PROXY)`);
-        return { min, max };
-      }
-      traces.push('lambdaLimits: null (NO_DATA)');
-      return null;
-    }
-    const gpms = rows
-      .map(r => {
+    const gpms = [];
+    if (Array.isArray(rows) && rows.length >= 4) {
+      rows.forEach(r => {
         const g = r.scoresFor ?? r.goalsFor ?? 0;
         const m = r.matches ?? r.played ?? 0;
-        return m > 0 ? g / m : null;
-      })
-      .filter(v => v != null && v > 0);
-    if (gpms.length < 4) { traces.push('lambdaLimits: null (INSUFFICIENT_DATA)'); return null; }
-    const min = Math.max(0.1, Math.min(...gpms) * 0.6);
-    const max = Math.max(...gpms) * 1.5;
-    traces.push(`lambdaLimits: [${min.toFixed(2)}, ${max.toFixed(2)}] (STANDINGS_DISTRIBUTION)`);
-    return { min, max };
+        if (m > 0 && g >= 0) gpms.push(g / m);
+      });
+    }
+    // Standings yoksa iki takımın verisi
+    if (gpms.length < 2) {
+      const hGPM = (homeStats?.goalsScored != null && homeStats?.matches > 0) ? homeStats.goalsScored / homeStats.matches : null;
+      const aGPM = (awayStats?.goalsScored != null && awayStats?.matches > 0) ? awayStats.goalsScored / awayStats.matches : null;
+      if (hGPM != null) gpms.push(hGPM);
+      if (aGPM != null) gpms.push(aGPM);
+    }
+    if (gpms.length >= 2) {
+      // Doğrudan veriden: ligteki en az gol atan ve en çok gol atan takımın ortalamaları
+      const min = Math.min(...gpms);
+      const max = Math.max(...gpms);
+      traces.push(`lambdaLimits: [${min.toFixed(3)}, ${max.toFixed(3)}] (${gpms.length >= 4 ? 'STANDINGS_DISTRIBUTION' : 'TEAM_PROXY'}, n=${gpms.length})`);
+      return { min, max };
+    }
+    traces.push('lambdaLimits: null (NO_DATA)');
+    return null;
   })();
 
-  // ── 16. cornerGoalRate — Son maçlardan korner→gol oranı ──
+  // ── 16. cornerGoalRate — Saf veri: son maçlardan korner→gol oranı ──
   const cornerGoalRate = (() => {
-    // Son maç detaylarından kornerden gol oranı hesapla
     const allDetails = [
       ...(data.homeRecentMatchDetails || []),
       ...(data.awayRecentMatchDetails || []),
@@ -488,7 +486,6 @@ function getDynamicBaseline(data) {
       for (const g of period.groups) {
         const cornerItem = g.statisticsItems?.find(s => s.name === 'Corner kicks');
         if (cornerItem) corners = (Number(cornerItem.home) || 0) + (Number(cornerItem.away) || 0);
-        // Goals from set pieces / corners (SofaScore'da "Goals from set pieces" veya "Goals from corner" olarak gelir)
         const cornerGoalItem = g.statisticsItems?.find(s =>
           s.name === 'Goals from corners' || s.name === 'Corner goals' ||
           s.name === 'Goals scored from set pieces' || s.name === 'Set piece goals'
@@ -501,55 +498,53 @@ function getDynamicBaseline(data) {
         matchCount++;
       }
     }
-    // Eğer set piece/corner gol verisi bulunamadıysa, lig ortalaması yaklaşımı
-    // Genel futbol istatistiklerinde kornerden gol oranı ~%3-4 arası
-    if (matchCount >= 3 && totalCorners > 0) {
+    if (totalCorners > 0) {
+      // Saf oran: toplam korner golleri / toplam kornerler
       const rate = totalCornerGoals / totalCorners;
       traces.push(`cornerGoalRate: ${rate.toFixed(4)} (RECENT_MATCHES, ${matchCount} matches, ${totalCorners} corners, ${totalCornerGoals} goals)`);
-      return Math.max(0.01, Math.min(0.20, rate));
+      return rate;
     }
-    // Standings'ten lig geneli gol/korner oranı
+    // Standings verisi: lig gol ortalaması / korner ortalaması ile türet
     if (_standingsGoals != null && _standingsCorner != null && _standingsCorner > 0) {
-      // Lig geneli: toplam goller / toplam kornerler × yaklaşık korner→gol oranı
-      // Genellikle bir maçtaki kornerlerin ~%3-5'i gol ile sonuçlanır
-      const lgCornerGoalRate = (_standingsGoals * 0.04) / _standingsCorner;
-      traces.push(`cornerGoalRate: ${lgCornerGoalRate.toFixed(4)} (LEAGUE_DERIVED)`);
-      return Math.max(0.01, Math.min(0.20, lgCornerGoalRate));
+      // Lig geneli: goller korner sayısından ne kadar sıklıkla çıkıyor
+      // goalsPerMatch / cornersPerMatch = her korner başına düşen gol eşdeğeri
+      const lgRate = _standingsGoals / _standingsCorner;
+      traces.push(`cornerGoalRate: ${lgRate.toFixed(4)} (LEAGUE_RATIO: goals/corners)`);
+      return lgRate;
     }
     traces.push('cornerGoalRate: null (NO_DATA)');
     return null;
   })();
 
-  // ── 17. leagueCompetitiveness — Standings puanlarından CV (Varyans Katsayısı) ──
+  // ── 17. leagueCompetitiveness — Saf veri: standings puan CV'sinden ──
   const leagueCompetitiveness = (() => {
     const rows = data.standingsTotal?.standings?.[0]?.rows;
     if (!Array.isArray(rows) || rows.length < 4) { traces.push('leagueCompetitiveness: null (NO_DATA)'); return null; }
     const points = rows.map(r => r.points ?? 0).filter(p => p > 0);
     if (points.length < 4) { traces.push('leagueCompetitiveness: null (INSUFFICIENT)'); return null; }
     const mean = points.reduce((s, p) => s + p, 0) / points.length;
-    const variance = points.reduce((s, p) => s + (p - mean) ** 2, 0) / points.length;
-    const cv = mean > 0 ? Math.sqrt(variance) / mean : 0;
-    // CV düşükse lig rekabetçi (takımlar birbirine yakın), yüksekse dominant takım var
-    // 0.3 = çok rekabetçi, 0.6+ = dominant
-    const competitiveness = Math.max(0.5, Math.min(2.0, 1.0 + (0.4 - cv) * 2));
-    traces.push(`leagueCompetitiveness: ${competitiveness.toFixed(3)} (CV=${cv.toFixed(3)}, STANDINGS)`);
+    const stdDev = Math.sqrt(points.reduce((s, p) => s + (p - mean) ** 2, 0) / points.length);
+    const cv = mean > 0 ? stdDev / mean : 0;
+    // Saf CV: düşük CV = rekabetçi lig, yüksek CV = dominant takımlar var
+    // CV'nin tersi doğrudan rekabetçilik indexi olarak kullanılır
+    // cv=0 → sonsuz rekabet (tüm takımlar eşit puan), cv→∞ → sıfır rekabet
+    const competitiveness = cv > 0 ? (1 / cv) : null;
+    traces.push(`leagueCompetitiveness: ${competitiveness?.toFixed(3) ?? 'null'} (CV=${cv.toFixed(3)}, STANDINGS)`);
     return competitiveness;
   })();
 
-  // ── 18. leagueDrawTendency — Standings'ten beraberlik eğilimi ──
+  // ── 18. leagueDrawTendency — Saf veri: standings'ten beraberlik oranı ──
   const leagueDrawTendency = (() => {
     const rows = data.standingsTotal?.standings?.[0]?.rows;
     if (!Array.isArray(rows) || rows.length < 4) { traces.push('leagueDrawTendency: null (NO_DATA)'); return null; }
     const totalDraws = rows.reduce((s, r) => s + (r.draws ?? 0), 0);
     const totalMatches = rows.reduce((s, r) => s + (r.matches ?? r.played ?? 0), 0);
-    if (totalMatches < 10) { traces.push('leagueDrawTendency: null (INSUFFICIENT)'); return null; }
-    // Beraberlik oranı: her maç 2 takım oynuyor, draws × 2 / totalMatches (düzeltme)
-    // Ama standings'te her takımın draws'u kendi maçları içindir, yani totalDraws = toplam beraberlik (her biri 2 takım sayılıyor)
-    const drawRate = totalDraws / totalMatches; // ~0.25 = normal
-    // 1.0 = nötr, >1.0 = beraberlik eğilimli lig, <1.0 = düşük beraberlik
-    const tendency = Math.max(0.5, Math.min(2.0, drawRate / 0.25));
-    traces.push(`leagueDrawTendency: ${tendency.toFixed(3)} (drawRate=${drawRate.toFixed(3)}, STANDINGS)`);
-    return tendency;
+    if (totalMatches === 0) { traces.push('leagueDrawTendency: null (NO_MATCHES)'); return null; }
+    // Saf oran: beraberlik sayısı / toplam maç sayısı
+    // Bu doğrudan ligin beraberlik eğilimini verir (0.15 = düşük, 0.30 = yüksek)
+    const drawRate = totalDraws / totalMatches;
+    traces.push(`leagueDrawTendency: ${drawRate.toFixed(4)} (drawRate, STANDINGS)`);
+    return drawRate;
   })();
 
   return {
