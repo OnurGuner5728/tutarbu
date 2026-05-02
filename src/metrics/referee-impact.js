@@ -229,6 +229,12 @@ function calculateRefereeMetrics(data) {
   }
 
   // ── M115: Ev Sahibi Kırmızı Kart / Maç (×100) ──
+  // Kariyer verileri — M115/M116/M117/M120/M122 için gerekli (TDZ önlemek için erken tanım)
+  const careerGames = refereeStats?.eventReferee?.games ?? null;
+  const careerYellow = refereeStats?.eventReferee?.yellowCards ?? null;
+  const careerRed = refereeStats?.eventReferee?.redCards ?? null;
+  const careerYR = refereeStats?.eventReferee?.yellowRedCards ?? null;
+
   let M115 = hasRedData
     ? (refHomeRed / refRedDataCount) * 100
     : null;
@@ -253,17 +259,6 @@ function calculateRefereeMetrics(data) {
   }
 
   // ── M117: Hakem Şiddet Skoru — ÇOK BOYUTLU ──
-  // Eski: sadece (yellowCards + redCards×3) / matchesCount
-  // Yeni: kartlar + penaltılar + faul eğilimi ağırlıklı bileşik
-  // severity = (sarıPerMaç × 1.0 + kırmızıPerMaç × 3.0 + penPerMaç × 2.0) / 6
-  // normalize: 0–100 (lig ortalaması ≈ 50)
-  // Kaynak: refereeLastEvents (öncelikli), sonra stats.
-  // Kariyer verileri — M117, M120 gibi metrikler için gerekli (erken tanım)
-  const careerGames = refereeStats?.eventReferee?.games ?? null;
-  const careerYellow = refereeStats?.eventReferee?.yellowCards ?? null;
-  const careerRed = refereeStats?.eventReferee?.redCards ?? null;
-  const careerYR = refereeStats?.eventReferee?.yellowRedCards ?? null;
-
   // M117: Birleşik sertlik skoru.
   // Hiyerarşi: lastEvents card data → kariyer stats → null
   let M117 = null;

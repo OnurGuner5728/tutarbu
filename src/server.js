@@ -333,6 +333,10 @@ app.post('/api/predict/:eventId', async (req, res) => {
     baseline.ptsCV = metrics.meta?.ptsCV ?? null;
     baseline.normMinRatio = metrics.meta?.normMinRatio ?? null;
     baseline.normMaxRatio = metrics.meta?.normMaxRatio ?? null;
+    // HT/FT reversal oranları — morale cascade kalibrasyonu için
+    baseline._htLeadContinuation = metrics.dynamicLeagueAvgs?._htLeadContinuation ?? null;
+    baseline._htDrawToWinRate = metrics.dynamicLeagueAvgs?._htDrawToWinRate ?? null;
+    baseline._htReversalRate = metrics.dynamicLeagueAvgs?._htReversalRate ?? null;
 
     // Mevki Bazlı Piyasa Değeri Kalite Düzeltmesi (PVKD) — MC simülasyonu için
     // Workshop lineup varsa, assignedPosition'ları içeren lineup oyuncuları kullanılır.
@@ -553,6 +557,10 @@ app.post('/api/workshop/:eventId', async (req, res) => {
     baseline.ptsCV = metrics.meta?.ptsCV ?? null;
     baseline.normMinRatio = metrics.meta?.normMinRatio ?? null;
     baseline.normMaxRatio = metrics.meta?.normMaxRatio ?? null;
+    // HT/FT reversal oranları — morale cascade kalibrasyonu için
+    baseline._htLeadContinuation = metrics.dynamicLeagueAvgs?._htLeadContinuation ?? null;
+    baseline._htDrawToWinRate = metrics.dynamicLeagueAvgs?._htDrawToWinRate ?? null;
+    baseline._htReversalRate = metrics.dynamicLeagueAvgs?._htReversalRate ?? null;
 
     // Inject Position-based Market Value Breakdown (PVKD)
     // Workshop lineup'ında assignedPosition değiştirilmiş olabilir — lineup oyuncuları kullan
@@ -814,6 +822,10 @@ app.post('/api/simulate/:eventId', async (req, res) => {
     baseline.ptsCV = metrics.meta?.ptsCV ?? null;
     baseline.normMinRatio = metrics.meta?.normMinRatio ?? null;
     baseline.normMaxRatio = metrics.meta?.normMaxRatio ?? null;
+    // HT/FT reversal oranları — morale cascade kalibrasyonu için
+    baseline._htLeadContinuation = metrics.dynamicLeagueAvgs?._htLeadContinuation ?? null;
+    baseline._htDrawToWinRate = metrics.dynamicLeagueAvgs?._htDrawToWinRate ?? null;
+    baseline._htReversalRate = metrics.dynamicLeagueAvgs?._htReversalRate ?? null;
 
     // Inject Position-based Market Value Breakdown (PVKD) for Monte Carlo simulation
     // Workshop lineup varsa, assignedPosition'ları içeren lineup oyuncuları kullanılır.
@@ -1238,6 +1250,10 @@ app.get('/api/backtest', async (req, res) => {
         baseline.ptsCV = metrics.meta?.ptsCV ?? null;
         baseline.normMinRatio = metrics.meta?.normMinRatio ?? null;
         baseline.normMaxRatio = metrics.meta?.normMaxRatio ?? null;
+    // HT/FT reversal oranları — morale cascade kalibrasyonu için
+    baseline._htLeadContinuation = metrics.dynamicLeagueAvgs?._htLeadContinuation ?? null;
+    baseline._htDrawToWinRate = metrics.dynamicLeagueAvgs?._htDrawToWinRate ?? null;
+    baseline._htReversalRate = metrics.dynamicLeagueAvgs?._htReversalRate ?? null;
         baseline.homeMVBreakdown = computePositionMVBreakdown(data.homePlayers || []);
         baseline.awayMVBreakdown = computePositionMVBreakdown(data.awayPlayers || []);
 

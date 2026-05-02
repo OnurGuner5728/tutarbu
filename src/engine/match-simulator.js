@@ -395,16 +395,26 @@ function calculateUnitImpact(blockId, metrics, selected, audit, dynamicAvgs, bas
       continue;
     }
     // normalized = 1.0 at league average; clamp sınırları liğin kendi min/max takım dağılımı.
-    // DİNAMİK VARYANS BÜYÜTECİ: lig volatilitesine göre farklılıkları matematiksel olarak belirginleştir
-    const amplify = baseline.leagueGoalVolatility ?? null;
+    // DİNAMİK VARYANS BÜYÜTECİ: global CV kullanarak boyut-bağımsız amplification.
+    // HATA DÜZELTMESİ: Önceki formül leagueGoalVolatility / perMetricAvg kullanıyordu →
+    // boyut karışması (goals/match ÷ form_score gibi incompatible birimler).
+    // Yeni: global CV = leagueGoalVolatility / leagueAvgGoals (her ikisi de goals/match) → boyutsuz.
+    // Hedef: lig CV'sinin 0.5 katı kadar sapma gösteren takım nMax'a ulaşır.
+    // EPL: CV=0.221 → amplify=4.18. %10 üstündeki takım → normalized=1.418
+    const _globalCV = (baseline?.leagueGoalVolatility != null && baseline?.leagueAvgGoals > 0)
+      ? baseline.leagueGoalVolatility / baseline.leagueAvgGoals : null;
+    const amplify = (_globalCV != null && nMax > 1.0 && _globalCV > 0)
+      ? (nMax - 1.0) / (_globalCV * 0.5)
+      : (baseline?.leagueGoalVolatility ?? 1.0);
     const rawRatio = val / leagueAvg;
     let normalized;
     if (amplify != null) {
       const variance = rawRatio - 1.0;
       normalized = clamp(1.0 + (variance * amplify), nMin, nMax);
     } else {
-      normalized = rawRatio; // volatilite yoksa ham oran
+      normalized = rawRatio;
     }
+
 
     if (sign === -1) normalized = 2.0 - normalized;
     weightedFactor += normalized * weight;
@@ -535,7 +545,29 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
 
 
 
+
+  // ── Değişiklik 8: Orphaned computeProbBases alanları → Simülasyon ─────────
+  const _lgCV_sim = (baseline?.leagueGoalVolatility != null && baseline?.leagueAvgGoals > 0)
+    ? baseline.leagueGoalVolatility / baseline.leagueAvgGoals : null;
+  if (_lgCV_sim != null) {
+    const _xs = _lgCV_sim * 0.5;
+    if (hProb.xGOverPerformance != null && hProb.goalConvRate != null)
+      hProb.goalConvRate *= clamp(1.0 + (hProb.xGOverPerformance - 1.0) * _xs, 1.0 - _xs, 1.0 + _xs);
+    if (aProb.xGOverPerformance != null && aProb.goalConvRate != null)
+      aProb.goalConvRate *= clamp(1.0 + (aProb.xGOverPerformance - 1.0) * _xs, 1.0 - _xs, 1.0 + _xs);
+    const _refCSR = baseline?.leagueCleanSheetRate ?? 0.28;
+    if (hProb.cleanSheetRate != null && aProb.gkSaveRate != null)
+      aProb.gkSaveRate = Math.min(0.95, aProb.gkSaveRate * clamp(hProb.cleanSheetRate / Math.max(_refCSR, 0.01), 0.85, 1.15));
+    if (aProb.cleanSheetRate != null && hProb.gkSaveRate != null)
+      hProb.gkSaveRate = Math.min(0.95, hProb.gkSaveRate * clamp(aProb.cleanSheetRate / Math.max(_refCSR, 0.01), 0.85, 1.15));
+    if (hProb.savePctAboveExpected != null && hProb.gkSaveRate != null)
+      hProb.gkSaveRate = clamp(hProb.gkSaveRate + hProb.savePctAboveExpected * _lgCV_sim * 0.3, 0.40, 0.95);
+    if (aProb.savePctAboveExpected != null && aProb.gkSaveRate != null)
+      aProb.gkSaveRate = clamp(aProb.gkSaveRate + aProb.savePctAboveExpected * _lgCV_sim * 0.3, 0.40, 0.95);
+  }
+
   // ── Bölge-Bazlı Sim Param Ölçeklemesi ────────────────────────────────
+
   // ZQM behavioral unit'leri zaten modifiye etti. Burada sim parametrelerini
   // (shotsPerMin, goalConvRate, gkSaveRate, blockRate) de bölge oranlarıyla
   // ölçekliyoruz. Her parametre ilgili bölgenin kalitesinden etkilenir:
@@ -1115,9 +1147,28 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
       const dampCoeff = defProb.blockRate;
       const dampedFlow = Math.pow(Math.max(rawFlow, EPS), dampCoeff);
       // Goal velocity cap: tek taraflı 5+ gol sonrası şut olasılığı %50 düşer
-      // Gerçek futbolda 5-0'dan sonra tempo ve motivasyon belirgin biçimde düşer.
       const goalVelocityCap = goals[side] >= 5 ? 0.50 : 1.0;
-      const shotProb = clamp(attkProb.shotsPerMin * dampedFlow * goalVelocityCap, DYN_LIMITS.PROBABILITY.MIN, DYN_LIMITS.PROBABILITY.MAX);
+
+      // ── firstHalfGoalRate + lateGoalRate → zaman penceresi şut multiplier ────
+      // Bu metrikler computeProbBases'de hesaplanıyor ama sim loop kullanmıyordu.
+      // firstHalfGoalRate > 0.5 → erken gol baskısı yüksek → 1-45'te şut artar
+      // lateGoalRate > 0.33 (30dk'nın 1/3'ü) → geç baskı → 76-90'da şut artar
+      // Hassasiyet = _lgCV_sim * 0.4 — standings'ten türetilmiş
+      const _fhR = isHome ? hProb.firstHalfGoalRate : aProb.firstHalfGoalRate;
+      const _ltR = isHome ? hProb.lateGoalRate       : aProb.lateGoalRate;
+      const _lgCV_loop = (baseline?.leagueGoalVolatility != null && baseline?.leagueAvgGoals > 0)
+        ? baseline.leagueGoalVolatility / baseline.leagueAvgGoals : null;
+      let timeWindowMult = 1.0;
+      if (_lgCV_loop != null) {
+        const _twSens = _lgCV_loop * 0.4;
+        if (minute <= 45 && _fhR != null) {
+          timeWindowMult = clamp(1.0 + (_fhR - 0.5) * _twSens, 1.0 - _twSens * 0.5, 1.0 + _twSens);
+        } else if (minute >= 76 && _ltR != null) {
+          timeWindowMult = clamp(1.0 + (_ltR - 0.33) * _twSens, 1.0 - _twSens * 0.5, 1.0 + _twSens);
+        }
+      }
+      const shotProb = clamp(attkProb.shotsPerMin * dampedFlow * goalVelocityCap * timeWindowMult, DYN_LIMITS.PROBABILITY.MIN, DYN_LIMITS.PROBABILITY.MAX);
+
 
       if (r() < shotProb) {
         stats[side].shots++;
@@ -1155,8 +1206,12 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
             const normalizedConv = attkProb.goalConvRate / expectedShots;
             const oppExpShots = Math.max(defProb.shotsPerMin * 90, 1);
             const negNormalizedConv = defProb.goalConvRate / oppExpShots;
-            const posBoost = normalizedConv * scorerKillerInst * goalDampening;
-            const negDrop = negNormalizedConv * cFragil * goalDampening;
+            // HT/FT cascade dampening: gerçek dünya devam oranıyla orantılı
+            const htCascadeDamp = baseline._htLeadContinuation != null
+              ? baseline._htLeadContinuation
+              : 1.0;
+            const posBoost = normalizedConv * scorerKillerInst * goalDampening * htCascadeDamp;
+            const negDrop = negNormalizedConv * cFragil * goalDampening * htCascadeDamp;
             if (isHome) {
               state.home.morale = clamp(state.home.morale + posBoost, DYN_LIMITS.MORALE.MIN, DYN_LIMITS.MORALE.MAX);
               state.home.momentum = clamp(state.home.momentum + posBoost * attkProb.onTargetRate, DYN_LIMITS.MOMENTUM.MIN, DYN_LIMITS.MOMENTUM.MAX);

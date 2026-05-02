@@ -81,6 +81,10 @@ function computeAllLeagueAverages(data) {
   let penGoalCount = 0;    // Penaltıdan gelen goller (M019 dinamik katsayı için)
   let cornerGoalCount = 0; // Kornerden gelen goller (M023 dinamik katsayı için)
 
+  // HT/FT reversal rate sayaçları
+  let htLeadTotal = 0, htLeadWin = 0, htReversalTotal = 0;
+  let htDrawTotal = 0, htDrawWin = 0;
+
   // Dakika bazlı gol dağılımı hesaplama
   for (const match of allRecentMatches) {
     const incidents = match.incidents?.incidents || [];
@@ -164,6 +168,23 @@ function computeAllLeagueAverages(data) {
       }
       if (leadChanges > 0) comebacks++;
     }
+
+    // HT/FT reversal rate: period1 skorlarından HT sonucu belirlenir
+    const htHS = match.homeScore?.period1;
+    const htAS = match.awayScore?.period1;
+    if (htHS != null && htAS != null) {
+      const htResult = htHS > htAS ? '1' : htAS > htHS ? '2' : 'X';
+      const ftResult = hs > as ? '1' : as > hs ? '2' : 'X';
+      if (htResult !== 'X') {
+        htLeadTotal++;
+        if (htResult === ftResult) htLeadWin++;
+        if (htResult !== ftResult && ftResult !== 'X') htReversalTotal++;
+      }
+      if (htResult === 'X' && ftResult !== 'X') {
+        htDrawTotal++;
+        htDrawWin++;
+      }
+    }
   }
 
   // Shotmap bazlı analiz
@@ -240,6 +261,15 @@ function computeAllLeagueAverages(data) {
     set('M008', (goalsByPeriod[3] / totalGoalIncidents) * 100, 'incidents 46-60dk');
     set('M009', (goalsByPeriod[4] / totalGoalIncidents) * 100, 'incidents 61-75dk');
     set('M010', (goalsByPeriod[5] / totalGoalIncidents) * 100, 'incidents 76-90dk');
+  }
+
+  // HT/FT reversal oranları — ligdeki geri dönüş eğilimi
+  if (htLeadTotal >= 5) {
+    set('_htLeadContinuation', htLeadWin / htLeadTotal, `incidents HT lead→FT win (${htLeadWin}/${htLeadTotal})`);
+    set('_htReversalRate', htReversalTotal / htLeadTotal, `incidents HT lead→FT loss (${htReversalTotal}/${htLeadTotal})`);
+  }
+  if (htDrawTotal >= 5) {
+    set('_htDrawToWinRate', htDrawWin / htDrawTotal, `incidents HT draw→FT win (${htDrawWin}/${htDrawTotal})`);
   }
 
   // M011: Şut → Gol %

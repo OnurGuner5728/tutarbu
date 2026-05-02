@@ -18,7 +18,7 @@ const cache = new Map();
 const CACHE_TTL = {
   standings: 3600,
   teamPlayers: 0, // Set to 0 to always fetch fresh squad data from user-specified API
-  playerStats: 1800,
+  playerStats: 3600, // 1 saat cache — aynı oyuncu farklı maçlarda yeniden çekilmez
   teamLastEvents: 600,
   eventDetail: 300,
   liveEvents: 30,
@@ -89,8 +89,8 @@ async function initBrowser() {
       console.log('[Playwright] Navigating to sofascore.com to establish trust...');
       await page.goto('https://www.sofascore.com/', { waitUntil: 'domcontentloaded', timeout: 60000 });
 
-      // Wait a bit to ensure cookies/cloudflare challenge is cleared if any
-      await page.waitForTimeout(3000);
+      // Cloudflare challenge için yeterli bekleme süresi
+      await page.waitForTimeout(5000);
       isReady = true;
       console.log('[Playwright] Browser ready.');
     } catch (err) {
@@ -106,6 +106,22 @@ async function initBrowser() {
   })();
 
   return initPromise;
+}
+
+/**
+ * Challenge geldiğinde sofascore.com'u yeniden ziyaret ederek trust kurar.
+ * Cloudflare bot tespiti sıfırlanır, cookieler yenilenir.
+ */
+async function reEstablishTrust() {
+  if (!page) return;
+  try {
+    console.warn('[Playwright] Re-establishing trust with sofascore.com...');
+    await page.goto('https://www.sofascore.com/', { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await page.waitForTimeout(5000);
+    console.log('[Playwright] Trust re-established.');
+  } catch (e) {
+    console.error('[Playwright] Trust re-establishment failed:', e.message);
+  }
 }
 
 async function closeBrowser() {
@@ -141,7 +157,8 @@ process.on('exit', () => {
 // ─── RATE LIMITER (Sequential Queue) ──────────────────────────
 // Paralel Promise.allSettled çağrılarında bile tüm istekler sıraya girer
 let rateLimitQueue = Promise.resolve();
-const RATE_LIMIT_MS = 350; // Her istek arası minimum bekleme
+const RATE_LIMIT_MS = 1500; // Her istek arası minimum bekleme — garantili, block yok
+
 
 function waitForRateLimit() {
   return new Promise(resolve => {
@@ -207,7 +224,7 @@ async function fetchAPI(path, ttlCategory = 'default', skipCache = false) {
 
   await waitForRateLimit();
 
-  const MAX_RETRIES = 3;
+  const MAX_RETRIES = 4;
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
       const data = await executeBrowserFetch(path);
@@ -216,12 +233,15 @@ async function fetchAPI(path, ttlCategory = 'default', skipCache = false) {
       }
       return data;
     } catch (error) {
-      if (error.message.includes('403') || error.message.includes('429') || error.message.includes('503') || error.message.includes('Failed to fetch')) {
-        // Exponential backoff: 3s, 8s, 18s
-        const backoff = Math.min(3000 * Math.pow(2, attempt) + Math.random() * 2000, 30000);
+      if (error.message.includes('403') || error.message.includes('429') || error.message.includes('503') || error.message.includes('Failed to fetch') || error.message.includes('challenge')) {
+        // İlk block'ta hemen trust yeniden kur (Cloudflare challenge cookie'si yenilenir)
+        if (attempt === 0) await reEstablishTrust();
+        // Exponential backoff: 5s, 10s, 20s, 30s
+        const backoff = Math.min(5000 * Math.pow(2, attempt) + Math.random() * 2000, 30000);
         console.warn(`[Playwright] Rate limited / Blocked on ${path} (attempt ${attempt + 1}/${MAX_RETRIES + 1}), waiting ${(backoff/1000).toFixed(1)}s...`);
         await new Promise(r => setTimeout(r, backoff));
         continue;
+
       }
       console.error(`[Playwright] Error fetching ${path}: ${error.message}`);
       return null;

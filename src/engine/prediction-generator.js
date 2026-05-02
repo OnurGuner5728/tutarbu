@@ -164,16 +164,18 @@ function generatePrediction(metricsResult, data, baseline, audit, rng) {
       const simDist = simulation.distribution;
       const conf = prediction.confidenceScore != null ? prediction.confidenceScore / 100 : null;
 
-      // ── Dinamik Blend Ağırlığı (MC-Poisson Agreement) ──────────────────────
-      // Sabit pW=conf yerine: iki modelin anlaşma derecesi (agreement) ile ağırlıklandır.
-      // TVD (Total Variation Distance) = ½ × Σ|p_poisson - p_mc|. Değer 0-1 arası.
-      // Poisson ve MC arasındaki ağırlık merkezi (basePoissonW) ligin volatilitesine bağlanır:
-      // vol/avg (CV) yüksekse lig kaotiktir, analitik Poisson'ın baz güveni düşer.
+      // ── Dinamik Blend Ağırlığı (Poisson-Ağırlıklı) ───────────────────────────
+      // Backtest bulgusu: Poisson-Only %64 doğruyla piyasanın üstünde.
+      // MC karması bu fırsatı örtüyor. basePoissonW için min taban yükseltildi.
+      // Formul: 1 - CV/(CV+avg) → tipik UCL'de ~0.73, Championship'te ~0.67
+      // Bunun üstüne conf+agreement katkısı ekleniyor (0.75-0.90 bandına ulaşmak için).
       const vol = baseline?.leagueGoalVolatility;
       const avg = baseline?.leagueAvgGoals;
+      // basePoissonW: CV düşük (istikrarlı lig) → Poisson daha güvenilir → yüksek ağırlık
+      // Taban: 0.65 minimum garantisi — MC hiçbir zaman Poisson'u tam ezip geçmeyecek
       const basePoissonW = (vol != null && avg != null && avg > 0)
-        ? 1.0 - (vol / (vol + avg))
-        : null; // Veri yoksa blend ağırlığı belirlenemez
+        ? Math.max(0.65, 1.0 - (vol / (vol + avg)))
+        : 0.70; // Veri yoksa Poisson'a %70 taban ağırlığı
 
       const pH_poiss = prediction.homeWinProbability / 100;
       const pD_poiss = prediction.drawProbability / 100;
@@ -182,26 +184,46 @@ function generatePrediction(metricsResult, data, baseline, audit, rng) {
       const pD_mc = simDist.draw / 100;
       const pA_mc = simDist.awayWin / 100;
 
+      // TVD: iki modelin anlaşma derecesi — düşük TVD → güvenli blend
       const tvd = (Math.abs(pH_poiss - pH_mc) + Math.abs(pD_poiss - pD_mc) + Math.abs(pA_poiss - pA_mc)) / 2;
       let pW;
-      if (basePoissonW != null && conf != null) {
+      if (conf != null) {
+        // Conf yüksekse ve TVD düşükse (modeller anlaşıyor) → Poisson bantı genisler
         pW = basePoissonW + (1.0 - basePoissonW) * conf * (1 - tvd);
-      } else if (basePoissonW != null) {
-        pW = basePoissonW; // güven yoksa sadece lig CV baz ağırlığı
       } else {
-        pW = 1 / 2; // hiçbir lig verisi yoksa → iki modelin aritmetik ortalaması
+        pW = basePoissonW; // Conf yoksa taban ağırlık
       }
       const sW = 1.0 - pW;
 
-      let homeWin = (prediction.homeWinProbability * pW) + (simDist.homeWin * sW);
-      let draw = (prediction.drawProbability * pW) + (simDist.draw * sW);
-      let awayWin = (prediction.awayWinProbability * pW) + (simDist.awayWin * sW);
+      // cvVal burada tanımlanıyor: market blend (gamma) ve temperature scaling ikisi de kullanır
+      const cvVal = (vol != null && avg != null && avg > 0) ? (vol / avg) : 0;
 
-      // ── Kalibrasyon Post-Processing ──────────────────────────────────────
-      // Platt scaling + lig bazlı düzeltme (backtest verisinden öğrenilmiş)
-      // Sistem overconfidence sorunu: %60 dediğinde gerçekleşme ~%45
+      // ── Değişiklik 9: Piyasa Odds Prior (M131-M133) → 3. Blend Kaynağı ────
+      const closingH = metricsResult.shared?.contextual?.M131;
+      const closingD = metricsResult.shared?.contextual?.M132;
+      const closingA = metricsResult.shared?.contextual?.M133;
+      let gamma = 0;
+      if (closingH != null && closingD != null && closingA != null) {
+        // mktTVD: piyasa ile Poisson arasındaki fark (0-100 scale, /200 → 0-1 normalize)
+        const mktTVD = (Math.abs(closingH - (prediction.homeWinProbability ?? 50))
+          + Math.abs(closingD - (prediction.drawProbability ?? 25))
+          + Math.abs(closingA - (prediction.awayWinProbability ?? 25))) / 200;
+        gamma = Math.max(0, Math.min(cvVal * 0.6, cvVal * (1 - mktTVD)));
+      }
+
+      const blendTotal = pW + sW + gamma;
+      let homeWin = ((prediction.homeWinProbability * pW) + (simDist.homeWin * sW) + ((closingH ?? 0) * gamma)) / blendTotal;
+      let draw    = ((prediction.drawProbability    * pW) + (simDist.draw    * sW) + ((closingD ?? 0) * gamma)) / blendTotal;
+      let awayWin = ((prediction.awayWinProbability * pW) + (simDist.awayWin * sW) + ((closingA ?? 0) * gamma)) / blendTotal;
+
+      // ── Kalibrasyon Post-Processing ────────────────────────────────────
+      // Platt scaling + lig bazı düzeltme (backtest verisinden öğrenilmiş)
+      // KORUMA: competition.global.draw > 1.20 ise devre dışı bırak.
+      // Mevcut params (301 maç eski veri) draw’u 1.355x şişirip ev sahibi avantajını siliyor.
       const leagueId = metricsResult.meta?.tournamentId ?? null;
-      if (_calParams) {
+      const _globalDrawMult = _calParams?.competition?.global?.draw ?? null;
+      const _calSafe = _calParams && (_globalDrawMult == null || _globalDrawMult <= 1.20);
+      if (_calSafe) {
         const calSum = homeWin + draw + awayWin;
         const rawProbs = calSum > 0
           ? [homeWin / calSum, draw / calSum, awayWin / calSum]
@@ -213,31 +235,26 @@ function generatePrediction(metricsResult, data, baseline, audit, rng) {
         awayWin = calProbs[2] * 100;
       }
 
-      // ── Dinamik Overconfidence Ezici (Temperature Scaling) ───────────────
-      // Kitapçının Brier skorunu yakalamak ve aşırı özgüveni (Overconfidence) kırmak için
-      // Ligin gol volatilitesine göre dinamik olarak olasılıkları merkeze büzüştürür.
-      const cvVal = (avg != null && avg > 0) ? (vol / avg) : 0;
-
-      // Lig dinamik metrikleri — baseline'dan saf veri
-      // compIndex: 1/CV formatında (yüksek = rekabetçi lig), drawTendency: saf beraberlik oranı
+      // ── Hafif Temperature Scaling (Sıkıştırma Değil, Düzeltme) ─────────────────
+      // Backtest bulgusu: Eski formül T=1.8-2.5 üretiyordu — %60’u %38’e düşürüyor.
+      // Poisson-Only %64 doğru iken Blend %48.7’de: sebebin üc’te biri temperature.
+      // Yeni hedef: T = 1.0 (kaotik lig) → 1.15 (maksimum). drawTendency katkısı kaldırıldı.
+      // compIndex katkısı: 4x azaltıldı, üst sınır: MAX_T = 1.15
       const compIndex = baseline?.leagueCompetitiveness ?? metricsResult.meta?.leagueCompetitiveness ?? null;
-      const drawTendency = baseline?.leagueDrawTendency ?? metricsResult.meta?.leagueDrawTendency ?? null;
-
-      // CV ne kadar yüksekse (sürpriz ihtimali çoksa) temperature o kadar artar.
-      // Rekabetçilik yüksekse (compIndex büyük = 1/cv büyük = CV küçük = lig çekişmeli) → T artar
-      // Beraberlik oranı yüksekse → T artar (olasılıklar düzleşir)
-      // Tüm katkılar doğrudan veriden: cvVal zaten dinamik, compIndex 1/cv, drawTendency saf oran
-      let temperature = 1.0 + cvVal;
-      if (compIndex != null) temperature += cvVal / compIndex; // rekabetçi ligde CV etkisi artar
-      if (drawTendency != null) temperature += drawTendency;  // beraberlik oranı doğrudan katkı
-      // Temperature doğal aralığında kalır — veri yoksa sadece 1+cvVal kullanılır
+      // drawTendency artık eklenmez — draw bias’ını daha da kötüleştiriyordu
+      const MAX_T = 1.15; // Mutlak tavan: %55'i %50'ye çekebilir ama %60'a dokunmaz
+      let temperature = 1.0 + cvVal * 0.25; // cvVal etkisi 4x azaltıldı
+      if (compIndex != null && compIndex > 0) {
+        temperature += (cvVal / compIndex) * 0.10; // Rekabet katkısı 8x azaltıldı
+      }
+      temperature = Math.min(temperature, MAX_T); // Tavan garantisi
 
       let s_homeWin = homeWin / 100;
       let s_draw = draw / 100;
       let s_awayWin = awayWin / 100;
       const s_sum = s_homeWin + s_draw + s_awayWin;
 
-      if (s_sum > 0) {
+      if (s_sum > 0 && temperature > 1.001) { // T≈1.0 ise atlat—gereksiz hesap yapma
         let T_probs = [s_homeWin / s_sum, s_draw / s_sum, s_awayWin / s_sum].map(p => {
           const clampedP = Math.max(1e-9, Math.min(1 - 1e-9, p));
           return Math.exp(Math.log(clampedP) / temperature);

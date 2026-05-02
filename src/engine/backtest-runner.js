@@ -110,6 +110,10 @@ async function runBacktest(date, matchLimit = 10) {
         baseline.ptsCV                = metrics.meta?.ptsCV                ?? null;
         baseline.normMinRatio         = metrics.meta?.normMinRatio         ?? null;
         baseline.normMaxRatio         = metrics.meta?.normMaxRatio         ?? null;
+        // HT/FT reversal oranları — morale cascade kalibrasyonu için
+        baseline._htLeadContinuation = metrics.dynamicLeagueAvgs?._htLeadContinuation ?? null;
+        baseline._htDrawToWinRate = metrics.dynamicLeagueAvgs?._htDrawToWinRate ?? null;
+        baseline._htReversalRate = metrics.dynamicLeagueAvgs?._htReversalRate ?? null;
 
         // Inject Position-based Market Value Breakdown (PVKD)
         baseline.homeMVBreakdown = computePositionMVBreakdown(fullData.homePlayers || []);

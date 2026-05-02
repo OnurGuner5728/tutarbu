@@ -329,18 +329,24 @@ function applyHalftimeRegression(sideState, units, baseline, initialMomentum, in
   const lgScale = computeLeagueScale(baseline);
   const menajerEffect = (units.MENAJER_STRATEJISI ?? 1.0) * lgScale;
 
+  // HT/FT reversal boost: geri dönüş oranı yüksek liglerde regresyon güçlenir
+  const htRegBoost = (baseline._htReversalRate != null && lgScale > 0)
+    ? 1 + baseline._htReversalRate / lgScale
+    : 1.0;
+  const boostedEffect = menajerEffect * htRegBoost;
+
   // Momentum kısmen başlangıca döner — menajer etkisi oranında
-  sideState.momentum += (initialMomentum - sideState.momentum) * menajerEffect;
+  sideState.momentum += (initialMomentum - sideState.momentum) * boostedEffect;
 
   // Morale: menajer etkisi × FORM_UZUN (uzun vadeli form stabilitesi)
   const formStability = units.FORM_UZUN ?? 1.0;
-  sideState.morale += (initialMorale - sideState.morale) * menajerEffect * formStability / _s(formStability + menajerEffect);
+  sideState.morale += (initialMorale - sideState.morale) * boostedEffect * formStability / _s(formStability + boostedEffect);
 
   // Territory sıfırlanır (restart — her iki takım kendi yarısında başlar)
   sideState.territory = sideState._initialTerritory ?? 0.5;
 
   // Pressing: menajer stratejisi oranında yeniden ayarlanır
-  sideState.pressing += (initialPressing - sideState.pressing) * menajerEffect * formStability / _s(formStability + menajerEffect);
+  sideState.pressing += (initialPressing - sideState.pressing) * boostedEffect * formStability / _s(formStability + boostedEffect);
 
   // Recent actions temizlenir
   sideState.recentActions = [];
