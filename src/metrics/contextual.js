@@ -37,7 +37,7 @@ function calculateContextualMetrics(data) {
 
   // ── M131-M134: Bahis Oranı İma Edilen Olasılıklar ──
   let M131 = null, M132 = null, M133 = null, M134 = null;
-  let M134b = null, M134c = null, ahLine = null;
+  let M134b = null, M134c = null, M134d = null, ahLine = null;
   // Ham decimal oranlar (UI'da göstermek için)
   let rawOdds1 = null, rawOddsX = null, rawOdds2 = null;
 
@@ -101,10 +101,29 @@ function calculateContextualMetrics(data) {
         if (isHome) M134c = (1 / decimal) * 100;
       }
     }
+
+    // Both Teams To Score (KG Var) — marketId=29 veya mName içerir
+    // "Yes"/"GG" = KG Var oldu — Shin transform uygulanır
+    const isBTTS = mId === 29 || mId === 28 ||
+      mName.includes('both teams') || mName.includes('btts') ||
+      mName.includes('gg/ng') || mName.includes('goal/no goal') ||
+      mName.includes('her iki taraf');
+    if (isBTTS) {
+      for (const choice of (market.choices || [])) {
+        const decimal = parseOddsDecimal(choice);
+        if (decimal == null) continue;
+        const cName = (choice.name || '').toLowerCase();
+        if (cName === 'yes' || cName === 'gg' || cName === 'goal' || cName === 'var') {
+          M134d = (1 / decimal) * 100;
+        }
+      }
+    }
   }
 
   // ── M135-M137: Kullanıcı Oyları ──
-  let M135 = null, M136 = null, M137 = null;
+  // Veri yoksa: 50 (nötr) — MOMENTUM_AKIŞI'nda sinyalsiz geçmek yerine
+  // kalabalığın belirsiz olduğunu temsil eder (ekstra bilgi yok)
+  let M135 = 50, M136 = null, M137 = 50;
   if (votes) {
     const voteData = votes.vote || votes;
     const vote1Raw = voteData.vote1 ?? voteData.home ?? null;
@@ -786,7 +805,7 @@ function calculateContextualMetrics(data) {
     M180, M181, M182, M183, M184, M185,
     // ResistanceIndex + ΔMarketMove
     M186, M187, M188, M189,
-    M131, M132, M133, M134, M134b, M134c, M135, M136, M137, M138, M139, M140,
+    M131, M132, M133, M134, M134b, M134c, M134d, M135, M136, M137, M138, M139, M140,
     M141, M142, M143, M144, M145, M170, M171, M172, M173, M174, M175, M176,
     _meta: {
       isCup,

@@ -222,6 +222,9 @@ function calculateAllMetrics(data) {
     // Dynamic Block Weights — Oyuncu profil bazlı bölge ağırlıkları (Bayesian Hibrit)
     homeDynamicBlockWeights: data._homeDynamicBlockWeights ?? null,
     awayDynamicBlockWeights: data._awayDynamicBlockWeights ?? null,
+    // TopPlayers × MissingPlayers — yıldız golcü yoksa beklenen gol atma oranı düşer
+    homeTopPlayerGoalDrop: data.homeTopPlayerGoalDrop ?? 0,
+    awayTopPlayerGoalDrop: data.awayTopPlayerGoalDrop ?? 0,
   });
 
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);

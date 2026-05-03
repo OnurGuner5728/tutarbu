@@ -287,13 +287,22 @@ function calculateAdvancedMetrics(allMetrics) {
     homeScoreProfile?.avgConceded, homeScoreProfile?.n);
 
 
+  // ── TopPlayers × MissingPlayers: Beklenen Gol Düşüşü ──────────────────────
+  // Eğer takımın en çok gol atan oyuncuları sakatsa/askıdaysa,
+  // beklenen gol atma oranı doğrudan düşürülür.
+  // Kaynak: data._homeTopPlayerGoalDrop / data._awayTopPlayerGoalDrop
+  // (data-fetcher.js'te topPlayers × missingPlayers çapraz hesabı ile üretilir)
+  // Saf veri: goals/appearances — sıfır statik katsayı, sıfır clamp.
+  const _homeGoalDrop = allMetrics.homeTopPlayerGoalDrop ?? 0;
+  const _awayGoalDrop = allMetrics.awayTopPlayerGoalDrop ?? 0;
+
   // QF (Kalite Faktörleri) lambda rate'lerine UYGULANMAZ.
   // Neden: QF zaten unit'lere uygulanıyor (satır 81-86), oradan getPower → behavDiff →
   // behavMod yoluyla lambda'yı etkiliyor. Doğrudan rate'lere de uygulamak ÇİFT SAYIM olur
   // ve Leverkusen gibi güçlü takımlara absurd lambda'lar verir (3.47 gibi).
-  const homeAttackRate_source = homeAtkRaw;
+  const homeAttackRate_source = homeAtkRaw != null ? Math.max(0, homeAtkRaw - _homeGoalDrop) : null;
   const awayDefenseRate_source = awayDefRaw;
-  const awayAttackRate_source = awayAtkRaw;
+  const awayAttackRate_source = awayAtkRaw != null ? Math.max(0, awayAtkRaw - _awayGoalDrop) : null;
   const homeDefenseRate_source = homeDefRaw;
 
   // Dixon-Coles baz lambda (home advantage dahil değil)
@@ -807,6 +816,18 @@ function calculateAdvancedMetrics(allMetrics) {
         }
         if (leagueFingerprint?.leagueBTTSRate != null && leagueFingerprint.reliability > 0) {
           bttsRateSources.push({ rate: leagueFingerprint.leagueBTTSRate, rel: leagueFingerprint.reliability });
+        }
+        // M134d: Bookmaker BTTS Yes implied probability (Shin-transformed %)
+        // Güvenilirlik: Poisson ile arası ne kadar yakınsa o kadar yüksek
+        // (piyasanın bağımsız bir prior olduğunu varsayıyoruz — veri kaynağı farklı)
+        const _bttsOddsRaw = contextual?.M134d ?? null;
+        if (_bttsOddsRaw != null) {
+          const bttsOddsProb = _bttsOddsRaw / 100; // 0-1'e normalize
+          // Piyasa ve Poisson arasındaki mesafeye ters orantılı güven
+          // Yakınsa piyasaya güven yüksek, uzaksa düşük (piyasa hata yapmış olabilir)
+          const _bttsDiv = Math.abs(P_btts_raw - bttsOddsProb) / Math.max(P_btts_raw, bttsOddsProb, 0.01);
+          const _bttsOddsRel = Math.max(0.1, 1 - _bttsDiv); // min 0.1 güven korunur
+          bttsRateSources.push({ rate: bttsOddsProb, rel: _bttsOddsRel });
         }
         if (bttsRateSources.length > 0) {
           const tRel = bttsRateSources.reduce((s, x) => s + x.rel, 0);

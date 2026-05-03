@@ -9,6 +9,7 @@ const { simulateMatch } = require('./match-simulator');
 const simConfigModule = require('./sim-config');
 const SIM_CONFIG = simConfigModule.SIM_CONFIG;
 const { loadCalibration, calibrateProbs } = require('./calibration');
+const { computeBlockZoneModifier } = require('./lineup-impact');
 
 if (!SIM_CONFIG) {
   console.error('[PredictionGenerator] CRITICAL: SIM_CONFIG is undefined. Check sim-config.js exports.');
@@ -172,17 +173,22 @@ function generatePrediction(metricsResult, data, baseline, audit, rng) {
       const vol = baseline?.leagueGoalVolatility;
       const avg = baseline?.leagueAvgGoals;
       // basePoissonW: CV düşük (istikrarlı lig) → Poisson daha güvenilir → yüksek ağırlık
-      // Taban: 0.65 minimum garantisi — MC hiçbir zaman Poisson'u tam ezip geçmeyecek
+      // minPoissonW: ligin predictability'sine bağlı dinamik alt sınır
+      const _teamCount = baseline?.leagueTeamCount ?? metricsResult.meta?.leagueTeamCount ?? null;
+      const _lgCVForW = (vol != null && avg != null && avg > 0) ? vol / avg : null;
+      const minPoissonW = (_lgCVForW != null && _teamCount != null)
+        ? 0.5 + 0.3 / (1 + _lgCVForW * _teamCount / 20)  // Düşük CV + çok takım → yüksek Poisson güveni
+        : 0.65;
       const basePoissonW = (vol != null && avg != null && avg > 0)
-        ? Math.max(0.65, 1.0 - (vol / (vol + avg)))
-        : 0.70; // Veri yoksa Poisson'a %70 taban ağırlığı
+        ? Math.max(minPoissonW, 1.0 - (vol / (vol + avg)))
+        : minPoissonW + 0.05; // Veri yoksa minPoissonW + küçük güvenlik marjı
 
-      const pH_poiss = prediction.homeWinProbability / 100;
-      const pD_poiss = prediction.drawProbability / 100;
-      const pA_poiss = prediction.awayWinProbability / 100;
-      const pH_mc = simDist.homeWin / 100;
-      const pD_mc = simDist.draw / 100;
-      const pA_mc = simDist.awayWin / 100;
+      const pH_poiss = (prediction.homeWinProbability ?? 0) / 100;
+      const pD_poiss = (prediction.drawProbability ?? 0) / 100;
+      const pA_poiss = (prediction.awayWinProbability ?? 0) / 100;
+      const pH_mc = (simDist.homeWin ?? 0) / 100;
+      const pD_mc = (simDist.draw ?? 0) / 100;
+      const pA_mc = (simDist.awayWin ?? 0) / 100;
 
       // TVD: iki modelin anlaşma derecesi — düşük TVD → güvenli blend
       const tvd = (Math.abs(pH_poiss - pH_mc) + Math.abs(pD_poiss - pD_mc) + Math.abs(pA_poiss - pA_mc)) / 2;
@@ -202,19 +208,22 @@ function generatePrediction(metricsResult, data, baseline, audit, rng) {
       const closingH = metricsResult.shared?.contextual?.M131;
       const closingD = metricsResult.shared?.contextual?.M132;
       const closingA = metricsResult.shared?.contextual?.M133;
-      let gamma = 0;
-      if (closingH != null && closingD != null && closingA != null) {
-        // mktTVD: piyasa ile Poisson arasındaki fark (0-100 scale, /200 → 0-1 normalize)
-        const mktTVD = (Math.abs(closingH - (prediction.homeWinProbability ?? 50))
-          + Math.abs(closingD - (prediction.drawProbability ?? 25))
-          + Math.abs(closingA - (prediction.awayWinProbability ?? 25))) / 200;
-        gamma = Math.max(0, Math.min(cvVal * 0.6, cvVal * (1 - mktTVD)));
-      }
+      // ── Market Odds: Blend'den çıkarıldı, ayrı karşılaştırma olarak raporlanır ──
+      // Model bağımsızlığı: piyasa oranları modelin kendi tahminini ezmemeli.
+      // Value opportunity'ler kullanıcıya ayrı gösterilir.
+      const gamma = 0; // Market odds artık blend'e katılmıyor
 
       const blendTotal = pW + sW + gamma;
-      let homeWin = ((prediction.homeWinProbability * pW) + (simDist.homeWin * sW) + ((closingH ?? 0) * gamma)) / blendTotal;
-      let draw    = ((prediction.drawProbability    * pW) + (simDist.draw    * sW) + ((closingD ?? 0) * gamma)) / blendTotal;
-      let awayWin = ((prediction.awayWinProbability * pW) + (simDist.awayWin * sW) + ((closingA ?? 0) * gamma)) / blendTotal;
+      // NaN koruması: null olasılıklar 0 olarak değil, karşı kaynağa devredilir
+      const _pHW = prediction.homeWinProbability ?? simDist.homeWin ?? 33.3;
+      const _pDW = prediction.drawProbability ?? simDist.draw ?? 33.3;
+      const _pAW = prediction.awayWinProbability ?? simDist.awayWin ?? 33.3;
+      const _sHW = simDist.homeWin ?? prediction.homeWinProbability ?? 33.3;
+      const _sDW = simDist.draw ?? prediction.drawProbability ?? 33.3;
+      const _sAW = simDist.awayWin ?? prediction.awayWinProbability ?? 33.3;
+      let homeWin = ((_pHW * pW) + (_sHW * sW) + ((closingH ?? 0) * gamma)) / blendTotal;
+      let draw    = ((_pDW * pW) + (_sDW * sW) + ((closingD ?? 0) * gamma)) / blendTotal;
+      let awayWin = ((_pAW * pW) + (_sAW * sW) + ((closingA ?? 0) * gamma)) / blendTotal;
 
       // ── Kalibrasyon Post-Processing ────────────────────────────────────
       // Platt scaling + lig bazı düzeltme (backtest verisinden öğrenilmiş)
@@ -222,7 +231,8 @@ function generatePrediction(metricsResult, data, baseline, audit, rng) {
       // Mevcut params (301 maç eski veri) draw’u 1.355x şişirip ev sahibi avantajını siliyor.
       const leagueId = metricsResult.meta?.tournamentId ?? null;
       const _globalDrawMult = _calParams?.competition?.global?.draw ?? null;
-      const _calSafe = _calParams && (_globalDrawMult == null || _globalDrawMult <= 1.20);
+      const _calStale = _calParams?._stale === true;
+      const _calSafe = _calParams && !_calStale && (_globalDrawMult == null || _globalDrawMult <= 1.20);
       if (_calSafe) {
         const calSum = homeWin + draw + awayWin;
         const rawProbs = calSum > 0
@@ -241,13 +251,22 @@ function generatePrediction(metricsResult, data, baseline, audit, rng) {
       // Yeni hedef: T = 1.0 (kaotik lig) → 1.15 (maksimum). drawTendency katkısı kaldırıldı.
       // compIndex katkısı: 4x azaltıldı, üst sınır: MAX_T = 1.15
       const compIndex = baseline?.leagueCompetitiveness ?? metricsResult.meta?.leagueCompetitiveness ?? null;
-      // drawTendency artık eklenmez — draw bias’ını daha da kötüleştiriyordu
-      const MAX_T = 1.15; // Mutlak tavan: %55'i %50'ye çekebilir ama %60'a dokunmaz
-      let temperature = 1.0 + cvVal * 0.25; // cvVal etkisi 4x azaltıldı
+      const lgCV = (vol != null && avg != null && avg > 0) ? vol / avg : null;
+      // MAX_T: ligin rekabetçilik indeksinden türetilir (dinamik)
+      // Rekabetçi lig (yüksek compIndex) → daha yüksek T (daha çok smooth)
+      // Dominant lig (düşük compIndex) → düşük T (favorilere güven)
+      const MAX_T = compIndex != null
+        ? 1.0 + 1.0 / (compIndex + 4)  // compIndex=3→1.14, compIndex=5→1.11, compIndex=10→1.07
+        : (lgCV != null ? 1.0 + lgCV * 0.3 : 1.10);
+      // cvSensitivity: rekabetçi ligde düşük hassasiyet (varyans zaten yüksek)
+      const cvSensitivity = compIndex != null
+        ? 1.0 / (compIndex + 3)
+        : 0.25;
+      let temperature = 1.0 + cvVal * cvSensitivity;
       if (compIndex != null && compIndex > 0) {
-        temperature += (cvVal / compIndex) * 0.10; // Rekabet katkısı 8x azaltıldı
+        temperature += (cvVal / compIndex) * 0.10;
       }
-      temperature = Math.min(temperature, MAX_T); // Tavan garantisi
+      temperature = Math.min(temperature, MAX_T);
 
       let s_homeWin = homeWin / 100;
       let s_draw = draw / 100;
@@ -285,8 +304,42 @@ function generatePrediction(metricsResult, data, baseline, audit, rng) {
         stats: simulation.sampleRun?.stats || null
       };
 
-      res.calibrated = _calParams != null;
+      res.calibrated = _calSafe;
+      if (_calStale) res.calibrationWarning = 'stale';
       res.mostLikelyResult = getMostLikelyResult(res);
+
+      // ── MC Belirsizlik Bilgisi ────────────────────────────────────────────
+      const simUncertainty = simulation.distribution?.uncertainty;
+      if (simUncertainty) {
+        res.uncertainty = {
+          homeWinCI: simUncertainty.ci95HomeWin,
+          drawCI: simUncertainty.ci95Draw,
+          awayWinCI: simUncertainty.ci95AwayWin,
+          goalVariance: {
+            home: simUncertainty.stdHomeGoals,
+            away: simUncertainty.stdAwayGoals,
+          },
+        };
+      }
+
+      // ── Market Comparison (Blend'den bağımsız raporlama) ──────────────────
+      if (closingH != null && closingD != null && closingA != null) {
+        const deltaH = round2(res.homeWin - closingH);
+        const deltaD = round2(res.draw - closingD);
+        const deltaA = round2(res.awayWin - closingA);
+        const mktTVD = (Math.abs(deltaH) + Math.abs(deltaD) + Math.abs(deltaA)) / 200;
+        const valueOpportunities = [];
+        if (deltaH > 3) valueOpportunities.push({ market: '1', modelEdge: deltaH });
+        if (deltaD > 3) valueOpportunities.push({ market: 'X', modelEdge: deltaD });
+        if (deltaA > 3) valueOpportunities.push({ market: '2', modelEdge: deltaA });
+        res.marketComparison = {
+          modelVsMarket: { home: deltaH, draw: deltaD, away: deltaA },
+          valueOpportunities,
+          consensus: mktTVD < 0.05, // Model ve piyasa aynı favoriye mi işaret ediyor
+          marketImplied: { home: round2(closingH), draw: round2(closingD), away: round2(closingA) },
+        };
+      }
+
       return res;
     })(),
 
@@ -603,7 +656,7 @@ function generatePrediction(metricsResult, data, baseline, audit, rng) {
       const aLQR = baseline?.awayLineupQualityRatio ?? 1.0;
 
       // Bölgesel Kadro Etkisi (ZQM): Her güç metriğini ilgili bölge oranıyla modifiye et
-      const { computeBlockZoneModifier } = require('./lineup-impact');
+      // computeBlockZoneModifier dosya başında import edildi
       const hZQR = baseline?.homeZoneQualityRatios ?? { G: 1.0, D: 1.0, M: 1.0, F: 1.0 };
       const aZQR = baseline?.awayZoneQualityRatios ?? { G: 1.0, D: 1.0, M: 1.0, F: 1.0 };
       const hDynW = baseline?.homeDynamicBlockWeights ?? null;
@@ -1003,22 +1056,31 @@ function generatePrediction(metricsResult, data, baseline, audit, rng) {
     console.error("[PredictionGenerator] Edge DB application failed:", e.message);
   }
 
-  // ── NaN/Infinity Sanitizer ─────────────────────────────────────────────────
-  // API verisi eksik veya sıfıra bölme durumunda NaN/Infinity sızabilir.
-  // Tüm sayısal çıktıları tarayıp null'a çeviriyoruz — sessiz hata yerine açık yokluk.
-  const sanitize = (obj) => {
+  // ── NaN/Infinity Diagnostic Sanitizer ──────────────────────────────────────
+  // NaN/Infinity'nin nereden geldiğini loglayarak kök neden analizi yapar.
+  // Sessiz null çevirme yerine uyarı verir — upstream düzeltme hedeflenir.
+  const _nanWarnings = [];
+  const sanitize = (obj, path = '') => {
     if (obj == null || typeof obj !== 'object') return obj;
     for (const key of Object.keys(obj)) {
       const v = obj[key];
       if (typeof v === 'number' && (!isFinite(v) || isNaN(v))) {
+        const loc = `${path}.${key}`;
+        _nanWarnings.push(loc);
+        console.warn(`[SANITIZER] NaN/Inf detected at ${loc} — replacing with null`);
         obj[key] = null;
       } else if (typeof v === 'object' && v !== null) {
-        sanitize(v);
+        sanitize(v, `${path}.${key}`);
       }
     }
     return obj;
   };
-  sanitize(report);
+  sanitize(report, 'report');
+  if (_nanWarnings.length > 0) {
+    report._diagnostics = report._diagnostics || {};
+    report._diagnostics.nanLocations = _nanWarnings;
+    report._diagnostics.nanCount = _nanWarnings.length;
+  }
 
   // ── HT/FT ↔ firstHalf Tutarlılık Garantisi ──────────────────────────────
   // firstHalf.htResult (Poisson'dan) ile htft.top1 (simülasyondan) çelişebilir.

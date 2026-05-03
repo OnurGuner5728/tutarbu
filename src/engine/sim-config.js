@@ -77,13 +77,10 @@ const SIM_CONFIG = {
     SURPRISE_HIGH: 60,            // Yüksek sürpriz endeksi eşiği
   },
 
-  // ─── Poisson Thresholds (bahis endüstrisi standart çizgileri) ─────────────
+  // ─── Poisson Thresholds ──────────────────────────────────────────────────────
+  // CORNER_L/M/H ve CARD_L/H kaldırıldı — prediction-generator'da lig ortalamasından
+  // dinamik olarak hesaplanıyor. Sadece matematiksel üst sınır korunur.
   POISSON_THRESHOLDS: {
-    CORNER_L: 8.5,
-    CORNER_M: 9.5,
-    CORNER_H: 10.5,
-    CARD_L: 3.5,
-    CARD_H: 4.5,
     MAX_GOALS: 15,
   },
 };

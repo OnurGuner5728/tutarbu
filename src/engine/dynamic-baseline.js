@@ -650,6 +650,19 @@ function getDynamicBaseline(data) {
   })();
   traces.push(`leaguePointDensity: ${leaguePointDensity?.toFixed(3) ?? 'null'}`);
 
+  // ── 26. seasonProgress — Sezon ilerleme faktörü ──
+  // Sezon başında (ilk 5-6 hafta) baseline güvenilirliği çok düşük.
+  // seasonProgress < 0.15 → tüm baseline'lara dampening uygulanmalı.
+  const expectedTotalMatches = leagueTeamCount != null ? (leagueTeamCount - 1) * 2 : null;
+  const seasonProgress = (expectedTotalMatches != null && expectedTotalMatches > 0 && _lgMatchesPerTeam != null)
+    ? Math.min(1.0, _lgMatchesPerTeam / expectedTotalMatches)
+    : null;
+  // baselineReliability: %30 sezon ilerleme noktasında tam güven
+  const baselineReliability = seasonProgress != null
+    ? Math.min(1.0, seasonProgress / 0.3)
+    : null;
+  traces.push(`seasonProgress: ${seasonProgress?.toFixed(3) ?? 'null'}, baselineReliability: ${baselineReliability?.toFixed(3) ?? 'null'}`);
+
   return {
     leagueAvgGoals, shotsPerMin, onTargetRate, goalConvRate,
     gkSaveRate, blockRate, cornerPerMin, yellowPerMin,
@@ -659,6 +672,7 @@ function getDynamicBaseline(data) {
     leagueCompetitiveness, leagueDrawTendency,
     leagueTeamCount, leagueGoalVolatility, normMinRatio, normMaxRatio,
     foulRate, offsideRate, throwInRate, leaguePointDensity,
+    seasonProgress, baselineReliability,
     dataQuality, dataQualityDetail: { filled: _filledCount, total: _totalCritical },
     traces,
   };

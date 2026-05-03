@@ -30,3 +30,6 @@ Thumbs.db
 # Agent directories
 .claude/
 .gemini/
+
+# SQLite match cache — 1GB+ olabilir, commit etme
+data/

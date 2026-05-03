@@ -230,5 +230,5 @@ function calculateDynamicRating(playerData, overridePosition) {
   return Math.min(99, Math.max(40, Math.round(finalScore)));
 }
 
-module.exports = { calculateDynamicRating, computePositionStatScore, getPositionDistance, getResidualPenalty };
+module.exports = { calculateDynamicRating };
 

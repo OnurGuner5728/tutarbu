@@ -10,7 +10,7 @@ const { SIM_CONFIG, getDynamicLimits } = require('./sim-config');
 const { recordBaselineTrace, recordSimWarning } = require('./audit-helper');
 const { computeWeatherMultipliers } = require('../services/weather-service');
 const { BLOCK_QF_MAP, computeAlpha, computeQualityFactors } = require('./quality-factors');
-const { applyZoneModifiers } = require('./lineup-impact');
+const { applyZoneModifiers, computeBlockZoneModifier } = require('./lineup-impact');
 const { applyEventImpact, applyNaturalRegression, applyHalftimeRegression, updateTacticalStance, computeLeagueScale, computePressingImpactScale } = require('./event-impact');
 // METRIC_METADATA artık kullanılmıyor — tüm lig ortalamaları dinamik.
 
@@ -70,7 +70,8 @@ const SIM_BLOCKS = {
   // III. PSYCHOLOGY
   ZİHİNSEL_DAYANIKLILIK: [
     { id: 'M064', weight: 4, sign: 1 }, { id: 'M165', weight: 3, sign: 1 },
-    { id: 'M186', weight: 2, sign: 1 }  // ResistanceIndex: beklentinin üzerinde performans gösteren takım daha sağlam
+    { id: 'M186', weight: 2, sign: 1 }, // ResistanceIndex (home)
+    { id: 'M187', weight: 2, sign: 1 }  // ResistanceIndex (away) — simetri
   ],
   FİŞİ_ÇEKME: [
     { id: 'M065', weight: 4, sign: 1 }, { id: 'M043', weight: 2, sign: 1 },
@@ -86,7 +87,8 @@ const SIM_BLOCKS = {
   ],
   MOMENTUM_AKIŞI: [
     { id: 'M146', weight: 3, sign: 1 }, { id: 'M149', weight: 2, sign: 1 },
-    { id: 'M174', weight: 2, sign: 1 }, { id: 'M175', weight: 2, sign: 1 }
+    { id: 'M174', weight: 2, sign: 1 }, { id: 'M175', weight: 2, sign: 1 },
+    { id: 'M135', weight: 1, sign: 1 }  // Kamu oylaması: ev sahibi desteği (veri yoksa 50=nötr)
   ],
 
   // IV. CONTEXT & STRATEGY
@@ -103,10 +105,8 @@ const SIM_BLOCKS = {
     { id: 'M005', weight: 1, sign: 1 }
   ],
   MAC_SONU: [
-    // Ablation: dirAcc=%34.8 (ters sinyal), 1X2 tahmininde zararlı.
-    // Bu metrikler zamanlama için MC motorunda kullanılır ama getPower/lambda'ya katkı vermiyor.
-    // Ağırlıklar düşürüldü — behavMod etkisi minimumd tutuluyor.
-    { id: 'M010', weight: 1, sign: 1 }  // Sadece geç gol eğilimi (OU/BTTS için değerli)
+    { id: 'M010', weight: 2, sign: 1 }, // Geç gol eğilimi (76-90dk)
+    { id: 'M004', weight: 1, sign: 1 }  // 2. yarı gol/maç oranı
   ],
   MENAJER_STRATEJISI: [
     { id: 'M139', weight: 2, sign: 1 }, { id: 'M140', weight: 3, sign: 1 }
@@ -115,9 +115,10 @@ const SIM_BLOCKS = {
     { id: 'M141', weight: 3, sign: 1 }, { id: 'M170', weight: 3, sign: 1 }
   ],
   GOL_IHTIYACI: [
-    { id: 'M141', weight: 2, sign: 1 }, { id: 'M171', weight: 4, sign: 1 },
+    { id: 'M171', weight: 4, sign: 1 },
     { id: 'M172', weight: 3, sign: 1 },
-    { id: 'M188', weight: 2, sign: 1 }  // ΔMarketMove: piyasa bu yönde hareket ettiyse motivasyon sinyali
+    { id: 'M188', weight: 2, sign: 1 }, // ΔMarketMove home
+    { id: 'M189', weight: 2, sign: 1 }  // ΔMarketMove away — simetri
   ],
 
   // V. OPERATIONAL
@@ -139,22 +140,42 @@ const SIM_BLOCKS = {
   ],
   HAKEM_DINAMIKLERI: [
     { id: 'M111', weight: 2, sign: 1 }, { id: 'M118b', weight: 3, sign: 1 },
-    { id: 'M117', weight: 1, sign: 1 }, { id: 'M122', weight: 2, sign: 1 }  // Blend sertlik skoru
+    { id: 'M117', weight: 1, sign: 1 }
+    // M122 kaldırıldı — H2H_DOMINASYON'da zaten var, çift sayma bias'ı yaratıyordu
   ],
   TAKTIKSEL_UYUM: [
-    // M068 (formasyon string parsing) ve M075 (formasyon adaptasyon) kaldırıldı:
-    // Ablation: dirAcc=%43 (rastgele altı), corr=0.031 (sinyalsiz)
-    // Kağıt üstü formasyon gerçek taktik şekli yansıtmıyor — değerleme.md §2
-    // M177/178/179 (sonuç bazlı pressing/territory) çok daha güçlü sinyal
-    { id: 'M179', weight: 2, sign: 1 },  // Savunma hat yüksekliği (finalThirdEntries bazlı)
-    { id: 'M177', weight: 1, sign: 1 }   // Pressing yoğunluğu (TOPLA_OYNAMA ile örtüşmemesi için weight düşük)
+    { id: 'M179', weight: 2, sign: 1 }  // Savunma hat yüksekliği (finalThirdEntries bazlı)
+    // M177 kaldırıldı — TOPLA_OYNAMA'da zaten var, çift sayma bias'ı yaratıyordu
   ]
 };
 
+/**
+ * Metrik değerini çıkarır — MetricValue wrapper ve düz sayı destekler.
+ * @returns {number|null} Metrik değeri (confidence bilgisi getMC ile alınır)
+ */
 function getM(metrics, selected, id) {
   if (!selected.has(id)) return null;
-  const v = metrics?.[id];
-  return (v != null && isFinite(v)) ? v : null;
+  const raw = metrics?.[id];
+  if (raw == null) return null;
+  // MetricValue wrapper: { value, confidence, ... }
+  if (typeof raw === 'object' && 'value' in raw) {
+    const v = raw.value;
+    return (v != null && isFinite(v)) ? v : null;
+  }
+  // Düz sayı (legacy)
+  return (typeof raw === 'number' && isFinite(raw)) ? raw : null;
+}
+
+/**
+ * Metriğin confidence değerini döndürür (0-1).
+ * Düz sayı → 1.0 (geriye uyumluluk).
+ */
+function getMC(metrics, id) {
+  const raw = metrics?.[id];
+  if (raw == null) return 0;
+  if (typeof raw === 'object' && 'confidence' in raw) return raw.confidence ?? 0;
+  if (typeof raw === 'number') return 1.0;
+  return 0;
 }
 
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
@@ -417,8 +438,11 @@ function calculateUnitImpact(blockId, metrics, selected, audit, dynamicAvgs, bas
 
 
     if (sign === -1) normalized = 2.0 - normalized;
-    weightedFactor += normalized * weight;
-    totalWeight += weight;
+    // Confidence weighting: düşük güvenilirlikli metrikler azaltılmış ağırlıkla katkıda bulunur
+    const conf = getMC(metrics, id);
+    const effectiveWeight = weight * conf;
+    weightedFactor += normalized * effectiveWeight;
+    totalWeight += effectiveWeight;
   }
 
   if (missingAny) {
@@ -576,7 +600,7 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
   //   goalConvRate → ATK+MID zone (bitiricilik + yaratıcılık)
   //   gkSaveRate → GK zone (kaleci refleksi)
   //   blockRate → DEF zone (savunma müdahalesi)
-  const { computeBlockZoneModifier: _cbzm } = require('./lineup-impact');
+  const _cbzm = computeBlockZoneModifier; // Dosya başında import edildi
   const _applyZoneSimParams = (prob, zqr, lqr, dynW) => {
     if (!zqr) return;
     const allIdentity = Object.values(zqr).every(r => r === 1.0);
@@ -897,9 +921,11 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
     const matchProgress = minute / (lateBase || _matchMins);
 
     // Yorgunluk Çarpanı: Takımın yorgunluk eşiği kadro derinliği ve zihinsel dirence göre esner
-    const fatigueRate = (leaguePace * fragility) / (squadDepth * mentalToughness);
+    const _sqMenDenom = Math.max(squadDepth * mentalToughness, EPS); // sıfıra bölme koruması
+    const fatigueRate = (leaguePace * fragility) / _sqMenDenom;
     // Yorgunluk maç ilerledikçe artar, minimum sınır kırılganlıkla orantılıdır, ölçek için lig takım sayısı kullanılır
-    const fatigueFactor = Math.max(fragility / (squadDepth + mentalToughness), 1.0 - ((matchProgress * fatigueRate) / leagueTeamCount));
+    const _fatTeamN = leagueTeamCount ?? 20; // null koruması — bölücüde kullanılıyor
+    const fatigueFactor = Math.max(fragility / Math.max(squadDepth + mentalToughness, EPS), 1.0 - ((matchProgress * fatigueRate) / _fatTeamN));
 
     // ── HÜCUM GRUBU ──
     effective.BITIRICILIK = u.BITIRICILIK * s.morale * rcMult * fatigueFactor;
@@ -1605,6 +1631,14 @@ function simulateMultipleRuns(params) {
   }
   const sortedHTFT = Object.entries(htftProbs).sort((a, b) => b[1] - a[1]);
 
+  // ── Varyans ve CI95 Hesaplama ──────────────────────────────────────────────
+  // 1X2 oranları için binomial CI: p ± 1.96 * sqrt(p*(1-p)/n)
+  const _pHW = homeWins / runs, _pD = draws / runs, _pAW = awayWins / runs;
+  const _ci = (p) => {
+    const se = Math.sqrt(Math.max(0, p * (1 - p) / runs));
+    return [+((p - 1.96 * se) * 100).toFixed(1), +((p + 1.96 * se) * 100).toFixed(1)];
+  };
+
   return {
     runs,
     distribution: {
@@ -1616,6 +1650,14 @@ function simulateMultipleRuns(params) {
       topScore: topScoreCandidates[0]?.[0] ?? null,
       scoreFrequency: sortedScores.slice(0, 10).reduce((acc, [score, cnt]) => { acc[score] = pct(cnt); return acc; }, {}),
       lambdaAnchored: false,
+      // Varyans ve CI95 — MC belirsizlik ölçümü
+      uncertainty: {
+        ci95HomeWin: _ci(_pHW),
+        ci95Draw: _ci(_pD),
+        ci95AwayWin: _ci(_pAW),
+        stdHomeGoals: +(stdHome).toFixed(2),
+        stdAwayGoals: +(stdAway).toFixed(2),
+      },
       // İlk yarı simülasyon dağılımı
       ht: {
         homeWin: pct(htHomeWins), draw: pct(htDraws), awayWin: pct(htAwayWins),

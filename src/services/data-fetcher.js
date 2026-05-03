@@ -1,11 +1,102 @@
 /**
  * Data Fetcher — Orchestrator
  * Bir maç için gereken TÜM verileri SofaScore API'den toplar.
- * Hiçbir fallback/statik değer yoktur.
+ * SQLite cache (match-db.js) ile desteklenir — aynı veri tekrar çekilmez.
  */
 
 const api = require('./playwright-client');
 const { fetchWeatherData, computeWeatherMetrics } = require('./weather-service');
+const matchDB = require('./match-db');
+matchDB.initDB();
+
+// ─── CACHED WRAPPER FONKSİYONLARI ────────────────────────────────────────────
+// Her wrapper: DB kontrol → hit ise dön, miss ise API çek → DB'ye yaz → dön
+
+async function cachedTeam(teamId) {
+  const c = matchDB.getTeam(teamId);
+  if (c) return c;
+  const d = await api.getTeam(teamId).catch(() => null);
+  if (d) matchDB.saveTeam(teamId, d);
+  return d;
+}
+
+async function cachedTeamPlayers(teamId) {
+  // team_cache içinde players kolonu yok — doğrudan API (TTL: playwright cache 0)
+  return api.getTeamPlayers(teamId).catch(() => null);
+}
+
+async function cachedStandings(tId, sId, type) {
+  const c = matchDB.getStandings(tId, sId, type);
+  if (c) return c;
+  const d = await api.getStandings(tId, sId, type).catch(() => null);
+  if (d) matchDB.saveStandings(tId, sId, type, d);
+  return d;
+}
+
+async function cachedTeamSeasonStats(teamId, tId, sId) {
+  const c = matchDB.getTeamSeasonStats(teamId, tId, sId);
+  if (c?.stats) return c.stats;
+  const d = await api.getTeamSeasonStats(teamId, tId, sId).catch(() => null);
+  if (d) {
+    const ex = matchDB.getTeamSeasonStats(teamId, tId, sId);
+    matchDB.saveTeamSeasonStats(teamId, tId, sId, d, ex?.topPlayers ?? null);
+  }
+  return d;
+}
+
+async function cachedTeamTopPlayers(teamId, tId, sId) {
+  const c = matchDB.getTeamSeasonStats(teamId, tId, sId);
+  if (c?.topPlayers) return c.topPlayers;
+  const d = await api.getTeamTopPlayers(teamId, tId, sId).catch(() => null);
+  if (d) {
+    const ex = matchDB.getTeamSeasonStats(teamId, tId, sId);
+    matchDB.saveTeamSeasonStats(teamId, tId, sId, ex?.stats ?? null, d);
+  }
+  return d;
+}
+
+async function cachedRefereeStats(refereeId) {
+  const c = matchDB.getReferee(refereeId);
+  if (c?.stats) return c.stats;
+  const d = await api.getRefereeStats(refereeId).catch(() => null);
+  if (d) {
+    const ex = matchDB.getReferee(refereeId);
+    matchDB.saveReferee(refereeId, d, ex?.lastEvents ?? null);
+  }
+  return d;
+}
+
+async function cachedRefereeLastEvents(refereeId) {
+  const c = matchDB.getReferee(refereeId);
+  if (c?.lastEvents) return c.lastEvents;
+  const d = await api.getRefereeLastEvents(refereeId, 0).catch(() => null);
+  if (d) {
+    const ex = matchDB.getReferee(refereeId);
+    matchDB.saveReferee(refereeId, ex?.stats ?? null, d);
+  }
+  return d;
+}
+
+async function cachedManagerLastEvents(managerId) {
+  const c = matchDB.getManager(managerId);
+  if (c) return c;
+  const d = await api.getManagerLastEvents(managerId, 0).catch(() => null);
+  if (d) matchDB.saveManager(managerId, d);
+  return d;
+}
+
+async function cachedPlayerStats(playerId, tId, sId) {
+  const c = matchDB.getPlayer(playerId, tId, sId);
+  if (c) return c; // { seasonStats, attributes, characteristics }
+  const [seasonStats, attributes, characteristics] = await Promise.all([
+    api.getPlayerSeasonStats(playerId, tId, sId).catch(() => null),
+    api.getPlayerAttributes(playerId).catch(() => null),
+    api.getPlayerCharacteristics(playerId).catch(() => null),
+  ]);
+  matchDB.savePlayer(playerId, tId, sId, { seasonStats, attributes, characteristics });
+  return { seasonStats, attributes, characteristics };
+}
+
 
 /**
  * Verilen event ID için tahmin motorunun ihtiyaç duyduğu tüm ham verileri toplar.
@@ -93,16 +184,28 @@ async function fetchAllMatchData(eventId) {
 
   const teamH2H = null;
 
-  // 3 + 4. Takım verileri — Ev sahibi ve deplasman (paralel)
+  // 3 + 4. Takım verileri — DB önce, sonra API
+  // team_last_events: merged halde saklanıyor — sayfa 0+1 birleşik
+  const homeLastEventsCached = matchDB.getTeamLastEvents(homeTeamId);
+  const awayLastEventsCached = matchDB.getTeamLastEvents(awayTeamId);
+
   const teamLevelResults = await Promise.allSettled([
-    track('homeTeam', api.getTeam(homeTeamId)),
-    track('homePlayers', api.getTeamPlayers(homeTeamId)),
-    track('homeLastEvents0', api.getTeamLastEvents(homeTeamId, 0)),
-    track('homeLastEvents1', api.getTeamLastEvents(homeTeamId, 1)),
-    track('awayTeam', api.getTeam(awayTeamId)),
-    track('awayPlayers', api.getTeamPlayers(awayTeamId)),
-    track('awayLastEvents0', api.getTeamLastEvents(awayTeamId, 0)),
-    track('awayLastEvents1', api.getTeamLastEvents(awayTeamId, 1)),
+    track('homeTeam',        cachedTeam(homeTeamId)),
+    track('homePlayers',     cachedTeamPlayers(homeTeamId)),
+    track('homeLastEvents0', homeLastEventsCached
+      ? Promise.resolve({ events: homeLastEventsCached })
+      : api.getTeamLastEvents(homeTeamId, 0)),
+    track('homeLastEvents1', homeLastEventsCached
+      ? Promise.resolve(null)
+      : api.getTeamLastEvents(homeTeamId, 1)),
+    track('awayTeam',        cachedTeam(awayTeamId)),
+    track('awayPlayers',     cachedTeamPlayers(awayTeamId)),
+    track('awayLastEvents0', awayLastEventsCached
+      ? Promise.resolve({ events: awayLastEventsCached })
+      : api.getTeamLastEvents(awayTeamId, 0)),
+    track('awayLastEvents1', awayLastEventsCached
+      ? Promise.resolve(null)
+      : api.getTeamLastEvents(awayTeamId, 1)),
   ]);
 
   teamLevelResults.forEach((r) => {
@@ -126,6 +229,16 @@ async function fetchAllMatchData(eventId) {
   const awayLastEvents0 = awayLastEvents0Res.status === 'fulfilled' ? awayLastEvents0Res.value.value : null;
   const awayLastEvents1 = awayLastEvents1Res.status === 'fulfilled' ? awayLastEvents1Res.value.value : null;
 
+  // API'den geldiyse DB'ye kaydet (bir sonraki maç için hazır)
+  if (!homeLastEventsCached) {
+    const merged = mergeAndSortEvents(homeLastEvents0, homeLastEvents1);
+    if (merged.length > 0) matchDB.saveTeamLastEvents(homeTeamId, merged);
+  }
+  if (!awayLastEventsCached) {
+    const merged = mergeAndSortEvents(awayLastEvents0, awayLastEvents1);
+    if (merged.length > 0) matchDB.saveTeamLastEvents(awayTeamId, merged);
+  }
+
   // 5. Lig/Turnuva verileri
   let standingsTotal = null, standingsHome = null, standingsAway = null;
   let homeTeamSeasonStats = null, awayTeamSeasonStats = null;
@@ -134,13 +247,13 @@ async function fetchAllMatchData(eventId) {
 
   if (tournamentId && seasonId) {
     leagueResults = await Promise.allSettled([
-      track('standingsTotal', api.getStandings(tournamentId, seasonId, 'total')),
-      track('standingsHome', api.getStandings(tournamentId, seasonId, 'home')),
-      track('standingsAway', api.getStandings(tournamentId, seasonId, 'away')),
-      track('homeTeamSeasonStats', api.getTeamSeasonStats(homeTeamId, tournamentId, seasonId)),
-      track('awayTeamSeasonStats', api.getTeamSeasonStats(awayTeamId, tournamentId, seasonId)),
-      track('homeTopPlayers', api.getTeamTopPlayers(homeTeamId, tournamentId, seasonId)),
-      track('awayTopPlayers', api.getTeamTopPlayers(awayTeamId, tournamentId, seasonId)),
+      track('standingsTotal',       cachedStandings(tournamentId, seasonId, 'total')),
+      track('standingsHome',        cachedStandings(tournamentId, seasonId, 'home')),
+      track('standingsAway',        cachedStandings(tournamentId, seasonId, 'away')),
+      track('homeTeamSeasonStats',  cachedTeamSeasonStats(homeTeamId, tournamentId, seasonId)),
+      track('awayTeamSeasonStats',  cachedTeamSeasonStats(awayTeamId, tournamentId, seasonId)),
+      track('homeTopPlayers',       cachedTeamTopPlayers(homeTeamId, tournamentId, seasonId)),
+      track('awayTopPlayers',       cachedTeamTopPlayers(awayTeamId, tournamentId, seasonId)),
     ]);
 
     leagueResults.forEach((r) => {
@@ -161,19 +274,16 @@ async function fetchAllMatchData(eventId) {
   }
 
   // 6. Hakem verileri (Paralel)
-  const refereeTrackResults = await Promise.allSettled([
-    track('refereeStats', refereeId ? api.getRefereeStats(refereeId) : Promise.resolve(null)),
-    track('refereeLastEvents', refereeId ? api.getRefereeLastEvents(refereeId, 0) : Promise.resolve(null)),
-  ]);
-  let refereeStats = refereeTrackResults[0].status === 'fulfilled' ? refereeTrackResults[0].value.value : null;
-  const refereeLastEvents = refereeTrackResults[1].status === 'fulfilled' ? refereeTrackResults[1].value.value : null;
+  // 6. Hakem verileri — DB önce (TTL: 48h)
+  let refereeStats = refereeId ? await cachedRefereeStats(refereeId) : null;
+  const refereeLastEvents = refereeId ? await cachedRefereeLastEvents(refereeId) : null;
 
   if (event.referee && refereeId) {
     if (!refereeStats) refereeStats = { statistics: {} };
     refereeStats.eventReferee = event.referee;
   }
 
-  // 7. Menajer verileri
+  // 7. Menajer verileri — DB önce (TTL: 48h)
   let actualHomeManagerId = homeManagerId;
   let actualAwayManagerId = awayManagerId;
   if (managers) {
@@ -183,13 +293,10 @@ async function fetchAllMatchData(eventId) {
   if (!actualHomeManagerId && homeTeam?.team?.manager?.id) actualHomeManagerId = homeTeam.team.manager.id;
   if (!actualAwayManagerId && awayTeam?.team?.manager?.id) actualAwayManagerId = awayTeam.team.manager.id;
 
-  const managerTrackResults = await Promise.allSettled([
-    track('homeManagerLastEvents', actualHomeManagerId ? api.getManagerLastEvents(actualHomeManagerId, 0) : Promise.resolve(null)),
-    track('awayManagerLastEvents', actualAwayManagerId ? api.getManagerLastEvents(actualAwayManagerId, 0) : Promise.resolve(null)),
+  const [homeManagerCareer, awayManagerCareer] = await Promise.all([
+    actualHomeManagerId ? cachedManagerLastEvents(actualHomeManagerId) : Promise.resolve(null),
+    actualAwayManagerId ? cachedManagerLastEvents(actualAwayManagerId) : Promise.resolve(null),
   ]);
-
-  const homeManagerCareer = managerTrackResults[0].status === 'fulfilled' ? managerTrackResults[0].value.value : null;
-  const awayManagerCareer = managerTrackResults[1].status === 'fulfilled' ? managerTrackResults[1].value.value : null;
 
   // 8. Derinlemesine Detaylar (H2H & Son Maçlar - Paralel)
   const [h2hMatchDetails, homeRecentMatchDetails, awayRecentMatchDetails] = await Promise.all([
@@ -424,21 +531,32 @@ async function fetchAllMatchData(eventId) {
       elapsedMs: r.status === 'fulfilled' ? r.value.elapsedMs : (r.reason?.elapsedMs || 0),
       data: r.status === 'fulfilled' ? r.value.value : null
     })),
-    // Hakem & Menajer
-    ...refereeTrackResults.map(r => ({
-      endpoint: r.status === 'fulfilled' ? r.value.name : (r.reason?.trackName || 'unknown'),
-      status: r.status,
-      success: r.status === 'fulfilled',
-      elapsedMs: r.status === 'fulfilled' ? r.value.elapsedMs : (r.reason?.elapsedMs || 0),
-      data: r.status === 'fulfilled' ? r.value.value : null
-    })),
-    ...managerTrackResults.map(r => ({
-      endpoint: r.status === 'fulfilled' ? r.value.name : (r.reason?.trackName || 'unknown'),
-      status: r.status,
-      success: r.status === 'fulfilled',
-      elapsedMs: r.status === 'fulfilled' ? r.value.elapsedMs : (r.reason?.elapsedMs || 0),
-      data: r.status === 'fulfilled' ? r.value.value : null
-    })),
+    // Hakem & Menajer (DB cache üzerinden — array değil)
+    {
+      endpoint: 'refereeStats',
+      url: refereeId ? `/referee/${refereeId}/statistics/seasons` : null,
+      success: !!refereeStats,
+      data: refereeStats,
+    },
+    {
+      endpoint: 'refereeLastEvents',
+      url: refereeId ? `/referee/${refereeId}/events/last/0` : null,
+      success: !!refereeLastEvents,
+      data: refereeLastEvents,
+    },
+    {
+      endpoint: 'homeManagerLastEvents',
+      url: actualHomeManagerId ? `/manager/${actualHomeManagerId}/events/last/0` : null,
+      success: !!homeManagerCareer,
+      data: homeManagerCareer,
+    },
+    {
+      endpoint: 'awayManagerLastEvents',
+      url: actualAwayManagerId ? `/manager/${actualAwayManagerId}/events/last/0` : null,
+      success: !!awayManagerCareer,
+      data: awayManagerCareer,
+    },
+
     // H2H maç detayları (M129/M130)
     {
       endpoint: 'h2hMatchDetails',
@@ -524,6 +642,41 @@ async function fetchAllMatchData(eventId) {
     _apiLog,
   };
 
+  // ── TopPlayers × MissingPlayers: Beklenen Gol Düşüşü Hesabı ─────────────
+  // Sakatlanmış/askıya alınmış yıldız gol atacak mıydı? — saf veri analizi.
+  // Kaynak: topPlayers.topPlayers.goalscorer (API) × missingPlayers (API)
+  // Çıktı: goals/appearances oranı — gol atma beklenebilirdi ama artık yok.
+  // Minimum 5 maç katılım şartı: küçük örneklemden hatalı büyük oran çıkmasın.
+  //
+  // SofaScore missingPlayers yapısı: { home: { players: [...] }, away: { players: [...] } }
+  // veya bazı response'larda düz: { players: [...] } — her ikisini de destekliyoruz.
+  const _calcGoalDrop = (topPlayersData, missingPlayersData, side) => {
+    if (!topPlayersData || !missingPlayersData) return 0;
+    // Tarafı doğru listeden al
+    const sidePlayers =
+      missingPlayersData[side]?.players ||   // { home: { players: [...] }, away: { players: [...] } }
+      missingPlayersData.players ||           // flat { players: [...] }
+      [];
+    const missingIds = new Set(sidePlayers.map(p => p.player?.id).filter(Boolean));
+    if (missingIds.size === 0) return 0;
+    const topScorers = (topPlayersData.topPlayers?.goalscorer?.players || []).slice(0, 5);
+    let goalRateLost = 0;
+    for (const tp of topScorers) {
+      const pid = tp.player?.id;
+      if (!pid || !missingIds.has(pid)) continue;
+      const goals = tp.statistics?.goals ?? 0;
+      const apps  = tp.statistics?.appearances ?? 0;
+      // Minimum 5 maç katılım şartı — küçük örneklem güvensiz
+      if (apps >= 5 && goals > 0) {
+        goalRateLost += goals / apps;
+      }
+    }
+    return goalRateLost;
+  };
+
+  result.homeTopPlayerGoalDrop = _calcGoalDrop(homeTopPlayers, result.missingPlayers, 'home');
+  result.awayTopPlayerGoalDrop = _calcGoalDrop(awayTopPlayers, result.missingPlayers, 'away');
+
   // Hava durumu (stadyum koordinatları ve tarih var ise)
   let weatherPromise = Promise.resolve(null);
   if (eventData.event && eventData.event.startTimestamp) {
@@ -555,6 +708,15 @@ async function fetchAllMatchData(eventId) {
     result.weatherMetrics = computeWeatherMetrics(weatherRaw);
   }
 
+  // ── Schema Validation — API response kontrol ──
+  try {
+    const { validateMatchData } = require('./schema-validator');
+    const schemaWarnings = validateMatchData(result);
+    if (schemaWarnings.length > 0) {
+      result._schemaWarnings = schemaWarnings;
+    }
+  } catch (e) { /* schema-validator opsiyonel */ }
+
   return result;
 }
 
@@ -572,6 +734,10 @@ async function fetchRecentMatchDetails(eventsArray, count = 5) {
     .slice(0, count);
 
   const details = await Promise.all(recentFinished.map(async (ev) => {
+    // Kalıcı cache — bitmiş maç verisi değişmez
+    const cached = matchDB.getRecentDetail(ev.id);
+    if (cached) return cached;
+
     const [incidents, stats, shotmap, graph, lineups] = await Promise.all([
       api.getEventIncidents(ev.id).catch(() => null),
       api.getEventStats(ev.id).catch(() => null),
@@ -580,7 +746,7 @@ async function fetchRecentMatchDetails(eventsArray, count = 5) {
       api.getEventLineups(ev.id).catch(() => null),
     ]);
 
-    return {
+    const detail = {
       eventId: ev.id,
       homeTeam: ev.homeTeam,
       awayTeam: ev.awayTeam,
@@ -594,6 +760,8 @@ async function fetchRecentMatchDetails(eventsArray, count = 5) {
       graph,
       lineups,
     };
+    matchDB.saveRecentDetail(ev.id, detail);
+    return detail;
   }));
   return details;
 }
@@ -612,18 +780,26 @@ async function fetchPlayerStats(players, tournamentId, seasonId) {
   const stats = [];
   const log = [];
 
-  // Artık batching'i playwright-client'ın içindeki 200ms rate-limiter'a bırakıyoruz.
-  // Tüm oyuncuları aynı anda Promise.all ile başlatmak, toplam süreyi minimize eder.
   await Promise.all(targetPlayers.map(async (p) => {
     const playerId = p.player?.id;
     if (!playerId) return;
 
     const t0 = Date.now();
-    const [seasonStats, attributes, characteristics] = await Promise.all([
-      api.getPlayerSeasonStats(playerId, tournamentId, seasonId).catch(() => null),
-      api.getPlayerAttributes(playerId).catch(() => null),
-      api.getPlayerCharacteristics(playerId).catch(() => null),
-    ]);
+    // DB'den kontrol — TTL: 24h
+    const cached = matchDB.getPlayer(playerId, tournamentId, seasonId);
+    let seasonStats, attributes, characteristics, fromCache = false;
+
+    if (cached) {
+      ({ seasonStats, attributes, characteristics } = cached);
+      fromCache = true;
+    } else {
+      [seasonStats, attributes, characteristics] = await Promise.all([
+        api.getPlayerSeasonStats(playerId, tournamentId, seasonId).catch(() => null),
+        api.getPlayerAttributes(playerId).catch(() => null),
+        api.getPlayerCharacteristics(playerId).catch(() => null),
+      ]);
+      matchDB.savePlayer(playerId, tournamentId, seasonId, { seasonStats, attributes, characteristics });
+    }
     const duration = Date.now() - t0;
 
     stats.push({
@@ -641,6 +817,7 @@ async function fetchPlayerStats(players, tournamentId, seasonId) {
       playerId,
       name: p.player.name,
       substitute: p.substitute || false,
+      fromCache,
       durationMs: duration,
       hasSeasonStats: !!seasonStats,
       hasAttributes: !!attributes,
@@ -664,24 +841,38 @@ async function fetchH2HMatchDetails(h2hEventsData) {
     .slice(0, 5);
 
   const details = await Promise.all(finished.map(async (ev) => {
+    // Kalıcı cache — H2H maç istatistikleri değişmez
+    const cached = matchDB.getRecentDetail(ev.id);
+    if (cached) {
+      // Formatı H2H beklentisine dönüştür
+      return {
+        eventId: ev.id,
+        homeTeamId: ev.homeTeam?.id,
+        awayTeamId: ev.awayTeam?.id,
+        homeScore: ev.homeScore,
+        awayScore: ev.awayScore,
+        incidents: cached.incidents?.incidents || cached.incidents || [],
+        statistics: cached.stats ? flattenStats(cached.stats) : [],
+      };
+    }
+
     const [incidentsData, statsData] = await Promise.all([
       api.getEventIncidents(ev.id).catch(() => null),
       api.getEventStats(ev.id).catch(() => null),
     ]);
 
-    // İstatistikleri düzleştir
-    const statsArr = statsData?.statistics || [];
-    const allPeriod = statsArr.find(p => p.period === 'ALL') || statsArr[0] || null;
-    const flatStats = [];
-    for (const group of (allPeriod?.groups || [])) {
-      for (const item of (group.statisticsItems || [])) {
-        flatStats.push({
-          name: item.name,
-          homeValue: item.homeValue ?? item.home ?? null,
-          awayValue: item.awayValue ?? item.away ?? null,
-        });
-      }
-    }
+    const flatStats = flattenStats(statsData);
+
+    const detail = {
+      eventId: ev.id,
+      homeTeam: ev.homeTeam,
+      awayTeam: ev.awayTeam,
+      homeScore: ev.homeScore,
+      awayScore: ev.awayScore,
+      incidents: incidentsData,
+      stats: statsData,
+    };
+    matchDB.saveRecentDetail(ev.id, detail);
 
     return {
       eventId: ev.id,
@@ -695,6 +886,22 @@ async function fetchH2HMatchDetails(h2hEventsData) {
   }));
 
   return details;
+}
+
+function flattenStats(statsData) {
+  const statsArr = statsData?.statistics || [];
+  const allPeriod = statsArr.find(p => p.period === 'ALL') || statsArr[0] || null;
+  const flat = [];
+  for (const group of (allPeriod?.groups || [])) {
+    for (const item of (group.statisticsItems || [])) {
+      flat.push({
+        name: item.name,
+        homeValue: item.homeValue ?? item.home ?? null,
+        awayValue: item.awayValue ?? item.away ?? null,
+      });
+    }
+  }
+  return flat;
 }
 
 
@@ -747,4 +954,29 @@ async function fetchPlayerStatsForPlayers(players, tournamentId, seasonId) {
   return stats;
 }
 
-module.exports = { fetchAllMatchData, fetchPlayerStatsForPlayers };
+/**
+ * Lineup oyuncularını playerStats dizisiyle zenginleştirir.
+ * seasonStats, statistics, attributes, characteristics enjekte eder.
+ */
+function enrichPlayers(playersArr, statsArr) {
+  if (!playersArr || !statsArr) return playersArr;
+  return playersArr.map(p => {
+    if (!p.player) return p;
+    const st = statsArr.find(s => s.playerId === p.player.id || s.playerId === p.player.playerId);
+    if (st) {
+      return {
+        ...p,
+        player: {
+          ...p.player,
+          seasonStats: st.seasonStats || null,
+          statistics: st.seasonStats?.statistics || null,
+          attributes: st.attributes || null,
+          characteristics: st.characteristics || null,
+        }
+      };
+    }
+    return p;
+  });
+}
+
+module.exports = { fetchAllMatchData, fetchPlayerStatsForPlayers, enrichPlayers };

@@ -324,7 +324,27 @@ function loadCalibration(paramsPath) {
   const filePath = paramsPath ?? PARAMS_FILE;
   if (!fs.existsSync(filePath)) return null;
   try {
-    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    const params = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    // Kalibrasyon yaşı kontrolü: 30 günden eskiyse devre dışı bırak
+    const MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 gün
+    if (params?.lastUpdated) {
+      const age = Date.now() - new Date(params.lastUpdated).getTime();
+      if (age > MAX_AGE_MS) {
+        console.warn(`[calibration] Params are ${Math.round(age / (24*60*60*1000))} days old (>30d) — disabled`);
+        params._stale = true;
+        return params;
+      }
+    } else {
+      // lastUpdated yoksa file mtime'dan kontrol et
+      const stat = fs.statSync(filePath);
+      const age = Date.now() - stat.mtimeMs;
+      if (age > MAX_AGE_MS) {
+        console.warn(`[calibration] Params file is ${Math.round(age / (24*60*60*1000))} days old (>30d) — disabled`);
+        params._stale = true;
+        return params;
+      }
+    }
+    return params;
   } catch (err) {
     console.error('[calibration] loadCalibration failed:', err.message);
     return null;

@@ -10,7 +10,6 @@
 const { fetchAllMatchData } = require('./services/data-fetcher');
 const { calculateAllMetrics } = require('./engine/metric-calculator');
 const { generatePrediction } = require('./engine/prediction-generator');
-const { buildLineup, applyLineupChange } = require('./engine/lineup-manager');
 
 async function runPrediction(eventId) {
   console.log('═══════════════════════════════════════════════════');
@@ -24,31 +23,17 @@ async function runPrediction(eventId) {
     const data = await fetchAllMatchData(eventId);
     console.log('✅ Veri toplama tamamlandı.\n');
 
-    // ADIM 2: Kadroları oluştur
-    console.log('👥 [ADIM 2/4] Kadrolar hazırlanıyor...');
-    const homeLineup = buildLineup(data, 'home');
-    const awayLineup = buildLineup(data, 'away');
-
     console.log(`  Ev Sahibi: ${data.event?.event?.homeTeam?.name}`);
-    console.log(`    Formasyon: ${homeLineup.formation}`);
-    console.log(`    İlk 11: ${homeLineup.starting.map(p => p.shortName || p.name).join(', ')}`);
-    console.log(`    Sakat: ${homeLineup.injured.map(p => `${p.name} (${p.missingReason})`).join(', ') || 'Yok'}`);
-    console.log(`    Cezalı: ${homeLineup.suspended.map(p => p.name).join(', ') || 'Yok'}`);
-
-    console.log(`\n  Deplasman: ${data.event?.event?.awayTeam?.name}`);
-    console.log(`    Formasyon: ${awayLineup.formation}`);
-    console.log(`    İlk 11: ${awayLineup.starting.map(p => p.shortName || p.name).join(', ')}`);
-    console.log(`    Sakat: ${awayLineup.injured.map(p => `${p.name} (${p.missingReason})`).join(', ') || 'Yok'}`);
-    console.log(`    Cezalı: ${awayLineup.suspended.map(p => p.name).join(', ') || 'Yok'}`);
+    console.log(`  Deplasman: ${data.event?.event?.awayTeam?.name}`);
     console.log('');
 
-    // ADIM 3: 168 metriği hesapla
-    console.log('📊 [ADIM 3/4] 168 metrik hesaplanıyor...');
+    // ADIM 2: 168 metriği hesapla
+    console.log('📊 [ADIM 2/3] 168 metrik hesaplanıyor...');
     const metrics = calculateAllMetrics(data);
     console.log(`✅ ${metrics.meta.totalMetricsCalculated} metrik hesaplandı.\n`);
 
-    // ADIM 4: Tahmin üret
-    console.log('🎯 [ADIM 4/4] Tahmin üretiliyor...');
+    // ADIM 3: Tahmin üret
+    console.log('🎯 [ADIM 3/3] Tahmin üretiliyor...');
     const prediction = generatePrediction(metrics, data);
     console.log('✅ Tahmin tamamlandı.\n');
 

@@ -134,9 +134,44 @@ function getMetricAuditSummary(data, metrics) {
   return summary;
 }
 
-module.exports = { 
+/**
+ * Her metrik için hangi fallback seviyesinden geldiğini kaydeder.
+ * @param {object} audit - Audit summary objesi
+ * @param {string} metricId - Metrik ID'si (ör: 'M001')
+ * @param {string} source - 'primary' | 'standings' | 'peerAvg' | 'neutral'
+ * @param {number} confidence - 0-1 arası güvenilirlik
+ */
+function recordMetricSource(audit, metricId, source, confidence) {
+  if (!audit) return;
+  if (!audit.metricSources) audit.metricSources = {};
+  audit.metricSources[metricId] = { source, confidence };
+}
+
+/**
+ * Veri kalitesi özeti üretir — kaç metrik primary, kaç tanesi fallback.
+ * @param {object} audit - Audit summary objesi
+ * @returns {{ primary: number, standings: number, peerAvg: number, neutral: number, reliability: number }}
+ */
+function getDataQualitySummary(audit) {
+  const sources = audit?.metricSources || {};
+  const counts = { primary: 0, standings: 0, peerAvg: 0, neutral: 0 };
+  for (const m of Object.values(sources)) {
+    const src = m.source || 'neutral';
+    if (counts[src] !== undefined) counts[src]++;
+    else counts.neutral++;
+  }
+  const total = Object.keys(sources).length;
+  return {
+    ...counts,
+    reliability: total > 0 ? counts.primary / total : 0,
+  };
+}
+
+module.exports = {
   getMetricAuditSummary,
   recordBaselineTrace,
   recordSimWarning,
-  detectFallbackReason 
+  detectFallbackReason,
+  recordMetricSource,
+  getDataQualitySummary
 };

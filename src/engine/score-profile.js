@@ -439,6 +439,4 @@ module.exports = {
   extractTeamScoreProfile,
   extractMatchScoreProfile,
   blendScoreDistribution,
-  negBinomPMF,
-  estimateR,
 };

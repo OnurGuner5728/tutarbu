@@ -285,4 +285,4 @@ function binomPMF(n, k, p) {
   return Math.exp(logP);
 }
 
-module.exports = { poissonPMF, poissonExceed, samplePoisson, binomPMF, weightedAvg, clamp, round2, extractTeamStats, parseStatValue, getPositionalEfficiency };
+module.exports = { poissonPMF, poissonExceed, binomPMF, weightedAvg, clamp, round2, extractTeamStats };
