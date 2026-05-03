@@ -20,9 +20,10 @@ const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
  * Volatil lig → büyük salınımlar, stabil lig → küçük salınımlar.
  */
 function computeLeagueScale(baseline) {
+  if (!baseline) return 0.3; // güvenli nötr — baseline yoksa orta volatilite varsayımı
   const lgAvg = baseline.leagueAvgGoals ?? 1;
   const lgVol = baseline.leagueGoalVolatility ?? lgAvg * 0.3;
-  return lgVol / lgAvg;
+  return lgAvg > 0 ? lgVol / lgAvg : 0.3;
 }
 
 /**
@@ -94,11 +95,14 @@ function computeRegressionRate(baseline) {
  */
 function deriveEventCoeff(eventType, baseline) {
   const lgGoals = baseline.leagueAvgGoals ?? 1;
-  const lgShots = (baseline.shotsPerMin ?? 0.15) * 90;
-  const lgCorners = (baseline.cornerPerMin ?? 0.05) * 90;
-  const lgYellows = (baseline.yellowPerMin ?? 0.02) * 90;
-  const lgFouls = (baseline.foulRate ?? 0.15) * 90;
-  const lgOffsides = (baseline.offsideRate ?? 0.02) * 90;
+  // Hardcoded fallback'lar kaldırıldı — veri yoksa lgGoals'a dayalı oransal fallback kullanılır.
+  // Tipik oranlar: shots~13/maç, corners~5/maç, yellows~3/maç, fouls~22/maç, offsides~4/maç
+  // Bu oranlar lgGoals ile ölçeklenir → statik değil, lig gol ortalamasına bağlı.
+  const lgShots = baseline.shotsPerMin != null ? baseline.shotsPerMin * 90 : lgGoals * 5.2;
+  const lgCorners = baseline.cornerPerMin != null ? baseline.cornerPerMin * 90 : lgGoals * 2.0;
+  const lgYellows = baseline.yellowPerMin != null ? baseline.yellowPerMin * 90 : lgGoals * 1.2;
+  const lgFouls = baseline.foulRate != null ? baseline.foulRate * 90 : lgGoals * 8.8;
+  const lgOffsides = baseline.offsideRate != null ? baseline.offsideRate * 90 : lgGoals * 1.6;
 
   switch (eventType) {
     case 'goal':            return 1.0;

@@ -650,7 +650,30 @@ function getDynamicBaseline(data) {
   })();
   traces.push(`leaguePointDensity: ${leaguePointDensity?.toFixed(3) ?? 'null'}`);
 
-  // ── 26. seasonProgress — Sezon ilerleme faktörü ──
+  // ── 26. leagueCleanSheetRate — Lig geneli clean sheet oranı ──
+  // Standings'ten her takımın yenilmediği maç oranından türetilir.
+  // cleanSheet = maç sayısı - gol yiyen maç sayısı ≈ (matches - scoresAgainst > 0 count)
+  // Doğrudan CS verisi yoksa Poisson P(0; λ_against) ile yaklaşık hesaplanır.
+  const leagueCleanSheetRate = (() => {
+    const rows = data.standingsTotal?.standings?.[0]?.rows;
+    if (!Array.isArray(rows) || rows.length < 4) return null;
+    let totalCS = 0;
+    let totalMatches = 0;
+    for (const r of rows) {
+      const m = r.matches ?? r.played ?? 0;
+      if (m <= 0) continue;
+      // SofaScore standings bazen draws/wins/losses verir ama clean sheet yok.
+      // Poisson yaklaşımı: P(0 gol yemek) = e^(-GA/maç)
+      const gaPerMatch = (r.scoresAgainst ?? 0) / m;
+      const csRate = Math.exp(-gaPerMatch); // P(GA=0) Poisson approx
+      totalCS += csRate * m;
+      totalMatches += m;
+    }
+    return totalMatches > 0 ? totalCS / totalMatches : null;
+  })();
+  traces.push(`leagueCleanSheetRate: ${leagueCleanSheetRate?.toFixed(4) ?? 'null'}`);
+
+  // ── 27. seasonProgress — Sezon ilerleme faktörü ──
   // Sezon başında (ilk 5-6 hafta) baseline güvenilirliği çok düşük.
   // seasonProgress < 0.15 → tüm baseline'lara dampening uygulanmalı.
   const expectedTotalMatches = leagueTeamCount != null ? (leagueTeamCount - 1) * 2 : null;
@@ -671,7 +694,7 @@ function getDynamicBaseline(data) {
     possessionLimits, lambdaLimits, cornerGoalRate,
     leagueCompetitiveness, leagueDrawTendency,
     leagueTeamCount, leagueGoalVolatility, normMinRatio, normMaxRatio,
-    foulRate, offsideRate, throwInRate, leaguePointDensity,
+    foulRate, offsideRate, throwInRate, leaguePointDensity, leagueCleanSheetRate,
     seasonProgress, baselineReliability,
     dataQuality, dataQualityDetail: { filled: _filledCount, total: _totalCritical },
     traces,

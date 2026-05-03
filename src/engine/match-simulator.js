@@ -9,7 +9,7 @@
 const { SIM_CONFIG, getDynamicLimits } = require('./sim-config');
 const { recordBaselineTrace, recordSimWarning } = require('./audit-helper');
 const { computeWeatherMultipliers } = require('../services/weather-service');
-const { BLOCK_QF_MAP, computeAlpha, computeQualityFactors } = require('./quality-factors');
+const { computeAlpha, computeQualityFactors } = require('./quality-factors');
 const { applyZoneModifiers, computeBlockZoneModifier } = require('./lineup-impact');
 const { applyEventImpact, applyNaturalRegression, applyHalftimeRegression, updateTacticalStance, computeLeagueScale, computePressingImpactScale } = require('./event-impact');
 // METRIC_METADATA artık kullanılmıyor — tüm lig ortalamaları dinamik.
@@ -424,9 +424,13 @@ function calculateUnitImpact(blockId, metrics, selected, audit, dynamicAvgs, bas
     // EPL: CV=0.221 → amplify=4.18. %10 üstündeki takım → normalized=1.418
     const _globalCV = (baseline?.leagueGoalVolatility != null && baseline?.leagueAvgGoals > 0)
       ? baseline.leagueGoalVolatility / baseline.leagueAvgGoals : null;
-    const amplify = (_globalCV != null && nMax > 1.0 && _globalCV > 0)
+    // baselineReliability: sezon başında (ilk haftalar) amplify'ı dampeler → birimler 1.0'a yakın kalır.
+    // null ise dampening uygulanmaz (tam güven varsayılır).
+    const _blRel = baseline?.baselineReliability ?? 1.0;
+    const amplifyRaw = (_globalCV != null && nMax > 1.0 && _globalCV > 0)
       ? (nMax - 1.0) / (_globalCV * 0.5)
       : (baseline?.leagueGoalVolatility ?? 1.0);
+    const amplify = amplifyRaw * _blRel;
     const rawRatio = val / leagueAvg;
     let normalized;
     if (amplify != null) {
@@ -514,24 +518,19 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
     awayUnits[blockId] = calculateUnitImpact(blockId, awayMetrics, sel, audit, dynamicAvgs, baseline, DYN_LIMITS);
   }
 
-  // Mevki Bazlı PVKD — birimler kalite ile ölçeklenmeden ÖNCE computeProbBases'e geçilir
-  // baseline.homeMVBreakdown / awayMVBreakdown server'dan gelir
+  // PVKD — İKİ FARKLI HEDEF, İKİ AYRI UYGULAMA:
+  //   1. advanced-derived.js → birimler (behavioral units) × qf → takım güç endeksi
+  //   2. Burada → computeProbBases'te ham oranlar (shots, conv, block, GK) × sqrt(qf)
+  // Birincisi "ne kadar güçlü", ikincisi "simülasyonda oranlar ne".
+  // Birim seviyesinde PVKD burada uygulanmaz — sadece rates'e.
   const _simAlpha = computeAlpha(baseline.leagueGoalVolatility, baseline.leagueAvgGoals);
   const _simHomeBD = baseline.homeMVBreakdown ?? { GK: 0, DEF: 0, MID: 0, ATK: 0, total: 0 };
   const _simAwayBD = baseline.awayMVBreakdown ?? { GK: 0, DEF: 0, MID: 0, ATK: 0, total: 0 };
   const _simQF = computeQualityFactors(_simHomeBD, _simAwayBD, _simAlpha);
 
-  // Birimsel PVKD: mevki bazlı kalite faktörleri birimlere uygulanır
-  for (const blockId in BLOCK_QF_MAP) {
-    const qfType = BLOCK_QF_MAP[blockId];
-    if (!qfType) continue;
-    if (homeUnits[blockId] != null) homeUnits[blockId] *= _simQF.home[qfType];
-    if (awayUnits[blockId] != null) awayUnits[blockId] *= _simQF.away[qfType];
-  }
-
   // ── Bölgesel Kadro Etkisi (ZQM) ──────────────────────────────────────────
-  // PVKD piyasa değeri kalite faktörlerinden SONRA, bireysel oyuncu kalitesini
-  // mevki bazlı (G/D/M/F) behavioral unit'lere yansıtır.
+  // Workshop'ta kadro değiştiğinde her mevki bölgesinin kalite oranını
+  // behavioral unit'lere yansıtır (PVKD'den bağımsız).
   // zoneQualityRatios = { G: 0.85, D: 1.0, M: 0.95, F: 1.1 } — Workshop'ta hesaplanır.
   // Yoksa (kadro değişmedi): tüm ratios identity (1.0), applyZoneModifiers erken çıkar.
   const _hZQR = baseline.homeZoneQualityRatios ?? { G: 1.0, D: 1.0, M: 1.0, F: 1.0 };
@@ -579,15 +578,23 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
       hProb.goalConvRate *= clamp(1.0 + (hProb.xGOverPerformance - 1.0) * _xs, 1.0 - _xs, 1.0 + _xs);
     if (aProb.xGOverPerformance != null && aProb.goalConvRate != null)
       aProb.goalConvRate *= clamp(1.0 + (aProb.xGOverPerformance - 1.0) * _xs, 1.0 - _xs, 1.0 + _xs);
-    const _refCSR = baseline?.leagueCleanSheetRate ?? 0.28;
-    if (hProb.cleanSheetRate != null && aProb.gkSaveRate != null)
-      aProb.gkSaveRate = Math.min(0.95, aProb.gkSaveRate * clamp(hProb.cleanSheetRate / Math.max(_refCSR, 0.01), 0.85, 1.15));
-    if (aProb.cleanSheetRate != null && hProb.gkSaveRate != null)
-      hProb.gkSaveRate = Math.min(0.95, hProb.gkSaveRate * clamp(aProb.cleanSheetRate / Math.max(_refCSR, 0.01), 0.85, 1.15));
+    // leagueCleanSheetRate: dynamic-baseline.js'ten Poisson P(0;GA/maç) ile hesaplanır.
+    // Yön: Yüksek clean sheet → güçlü savunma → KENDİ kalecisinin işi hafifler (daha az kurtarış gerekir).
+    // Clean sheet etkisi: takımın KENDİ GK save rate'ini güçlendirir (savunma GK'yı korur).
+    const _refCSR = baseline?.leagueCleanSheetRate ?? null;
+    if (_refCSR != null && _refCSR > 0.01) {
+      if (hProb.cleanSheetRate != null && hProb.gkSaveRate != null)
+        hProb.gkSaveRate = Math.min(0.95, hProb.gkSaveRate * clamp(hProb.cleanSheetRate / _refCSR, 0.85, 1.15));
+      if (aProb.cleanSheetRate != null && aProb.gkSaveRate != null)
+        aProb.gkSaveRate = Math.min(0.95, aProb.gkSaveRate * clamp(aProb.cleanSheetRate / _refCSR, 0.85, 1.15));
+    }
+    // GK save rate alt sınır: lig ortalamasının %60'ı (ligden türetilmiş, sabit 0.40 değil)
+    const _gkFloor = baseline.gkSaveRate != null ? baseline.gkSaveRate * 0.6 : 0.40;
+    const _gkCeil = 0.95;
     if (hProb.savePctAboveExpected != null && hProb.gkSaveRate != null)
-      hProb.gkSaveRate = clamp(hProb.gkSaveRate + hProb.savePctAboveExpected * _lgCV_sim * 0.3, 0.40, 0.95);
+      hProb.gkSaveRate = clamp(hProb.gkSaveRate + hProb.savePctAboveExpected * _lgCV_sim * 0.3, _gkFloor, _gkCeil);
     if (aProb.savePctAboveExpected != null && aProb.gkSaveRate != null)
-      aProb.gkSaveRate = clamp(aProb.gkSaveRate + aProb.savePctAboveExpected * _lgCV_sim * 0.3, 0.40, 0.95);
+      aProb.gkSaveRate = clamp(aProb.gkSaveRate + aProb.savePctAboveExpected * _lgCV_sim * 0.3, _gkFloor, _gkCeil);
   }
 
   // ── Bölge-Bazlı Sim Param Ölçeklemesi ────────────────────────────────
@@ -1170,10 +1177,17 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
       // Azalan verimler: pow(rawFlow, blockRate) — doğal logaritmik sönümleme
       // dampCoeff = defProb.blockRate: gerçek blok oranı verisi (M034) — statik sınır yok
       const rawFlow = atkPower / Math.max(oppDefPower, EPS);
-      const dampCoeff = defProb.blockRate;
+      // blockRate null → dampCoeff=1.0 (nötr — sönümleme yok, rawFlow doğrudan geçer)
+      const dampCoeff = (defProb.blockRate != null && isFinite(defProb.blockRate)) ? defProb.blockRate : 1.0;
       const dampedFlow = Math.pow(Math.max(rawFlow, EPS), dampCoeff);
-      // Goal velocity cap: tek taraflı 5+ gol sonrası şut olasılığı %50 düşer
-      const goalVelocityCap = goals[side] >= 5 ? 0.50 : 1.0;
+      // Goal velocity cap: tek taraflı aşırı gol sonrası şut olasılığı düşer
+      // Eşik: lig gol ortalaması × 2 (dinamik — yüksek golcü ligde eşik yükselir)
+      // Cap: 1 / (1 + excessGoals/lgAvg) — sigmoid sönümleme, sabit %50 değil
+      const _velCapThreshold = Math.max(3, Math.ceil((baseline.leagueAvgGoals ?? 2.5) * 2));
+      const _velExcess = goals[side] - _velCapThreshold;
+      const goalVelocityCap = _velExcess > 0
+        ? 1.0 / (1.0 + _velExcess / Math.max(baseline.leagueAvgGoals ?? 2.5, 1))
+        : 1.0;
 
       // ── firstHalfGoalRate + lateGoalRate → zaman penceresi şut multiplier ────
       // Bu metrikler computeProbBases'de hesaplanıyor ama sim loop kullanmıyordu.
@@ -1214,9 +1228,13 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
           // Kalite üstünlüğü daha fazla gol değil, daha temiz fırsatlar üretir
           // gkAdj: sqrt() doğal sönümleme — statik clamp yerine matematiksel azalan verimler
           // rawGkAdj=1.0 → gkAdj=1.0, rawGkAdj=4.0 → gkAdj=2.0 (doğal tavan)
-          // gkAdj: rakip KK oranı lig ortalamasına göre normalize — veri yoksa lig ortalaması (gkAdj=1.0)
-          const defGKSave = defProb.gkSaveRate ?? baseline.gkSaveRate;
-          const rawGkAdj = (1 - defGKSave) / Math.max(1 - baseline.gkSaveRate, 0.01);
+          // gkAdj: rakip KK oranı lig ortalamasına göre normalize — veri yoksa nötr (gkAdj=1.0)
+          const defGKSave = defProb.gkSaveRate ?? baseline.gkSaveRate ?? null;
+          const _baseGKSave = baseline.gkSaveRate ?? null;
+          // Her iki veri de yoksa gkAdj = 1.0 (nötr — GK etkisi yok)
+          const rawGkAdj = (defGKSave != null && _baseGKSave != null && _baseGKSave < 0.99)
+            ? (1 - defGKSave) / Math.max(1 - _baseGKSave, 0.01)
+            : 1.0;
           const gkAdj = Math.sqrt(Math.max(rawGkAdj, 0.01));
           const goalProb = clamp(attkProb.goalConvRate * gkAdj, DYN_LIMITS.PROBABILITY.MIN, DYN_LIMITS.PROBABILITY.MAX) * (weatherGoalMult || ND.WEATHER_IDENTITY);
 
@@ -1226,12 +1244,23 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
             const sResil = isHome ? homeUnits.ZİHİNSEL_DAYANIKLILIK : awayUnits.ZİHİNSEL_DAYANIKLILIK;
             const cFragil = isHome ? awayUnits.PSIKOLOJIK_KIRILGANLIK : homeUnits.PSIKOLOJIK_KIRILGANLIK;
             const scorerKillerInst = isHome ? homeUnits.FİŞİ_ÇEKME : awayUnits.FİŞİ_ÇEKME;
-            // Morale cascade: goalConvRate / expected shots ile normalize
+            // Morale cascade: beklenen gol oranına göre sürpriz faktörü
+            // Gol nadir bir takım için (düşük xG) gol atınca morale boost büyük → sürpriz etkisi
+            // Gol sık bir takım için (yüksek xG) gol atınca boost küçük → beklenen olay
             const goalDampening = 1.0 / (goals[side] + 1);
-            const expectedShots = Math.max(attkProb.shotsPerMin * 90, 1);
-            const normalizedConv = attkProb.goalConvRate / expectedShots;
-            const oppExpShots = Math.max(defProb.shotsPerMin * 90, 1);
-            const negNormalizedConv = defProb.goalConvRate / oppExpShots;
+            // expectedGoals: shots × onTarget × conv oranı, boyut tutarlı (gol/maç birimi)
+            const expectedGoals = Math.max(
+              (attkProb.shotsPerMin ?? 0) * 90 * (attkProb.onTargetRate ?? 0) * (attkProb.goalConvRate ?? 0),
+              0.1 // minimum 0.1 gol/maç — sıfıra bölme koruması
+            );
+            const lgRef = baseline.leagueAvgGoals ?? 1;
+            // normalizedConv: 1.0 = lig ortalaması kadar gol beklentisi. <1 = underdog, >1 = favori
+            const normalizedConv = lgRef / (expectedGoals + lgRef); // sigmoid: (0, 1) aralığı
+            const oppExpGoals = Math.max(
+              (defProb.shotsPerMin ?? 0) * 90 * (defProb.onTargetRate ?? 0) * (defProb.goalConvRate ?? 0),
+              0.1
+            );
+            const negNormalizedConv = lgRef / (oppExpGoals + lgRef);
             // HT/FT cascade dampening: gerçek dünya devam oranıyla orantılı
             const htCascadeDamp = baseline._htLeadContinuation != null
               ? baseline._htLeadContinuation

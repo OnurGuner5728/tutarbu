@@ -18,6 +18,52 @@ const { computeAllLeagueAverages } = require('./league-averages');
 const { computePositionMVBreakdown } = require('./quality-factors');
 const { extractTeamScoreProfile, extractMatchScoreProfile } = require('./score-profile');
 const { computeLeagueFingerprint } = require('./league-fingerprint');
+const { mv, computeRequiredSample } = require('./metric-value');
+
+/**
+ * wrapFlatMetrics — Düz sayı metriklerini MetricValue wrapper ile sarar.
+ * Her modülün _meta.totalMatchesAnalyzed bilgisini sampleSize olarak kullanır.
+ * @param {object} flatMetrics - { M001: 1.5, M002: 0.8, ... }
+ * @param {Array<{metrics: object, source: string}>} sources - modül çıktıları ve kaynakları
+ * @param {object} [ctx] - { leagueTeamCount } opsiyonel bağlam
+ * @returns {object} - { M001: {value, confidence, sampleSize, source}, ... }
+ */
+function wrapFlatMetrics(flatMetrics, sources, ctx) {
+  const reqSample = computeRequiredSample(ctx);
+  const wrapped = {};
+
+  // Her metrik ID'sini hangi modülden geldiğini bul
+  const sourceMap = {}; // metricId → { sampleSize, sourceName }
+  for (const { metrics, source } of sources) {
+    const sampleSize = metrics?._meta?.totalMatchesAnalyzed
+      ?? metrics?._meta?.matchesAnalyzed
+      ?? metrics?._meta?.lastEventsAnalyzed
+      ?? metrics?._meta?.starterCount
+      ?? 0;
+    for (const key of Object.keys(metrics)) {
+      if (key.startsWith('_')) continue;
+      if (!/^M[0-9]{3}/i.test(key)) continue;
+      sourceMap[key] = { sampleSize, sourceName: source };
+    }
+  }
+
+  for (const [id, val] of Object.entries(flatMetrics)) {
+    if (id.startsWith('_')) { wrapped[id] = val; continue; }
+    if (!/^M[0-9]{3}/i.test(id)) { wrapped[id] = val; continue; }
+    // Zaten MetricValue wrapper ise dokunma
+    if (val != null && typeof val === 'object' && 'value' in val) {
+      wrapped[id] = val;
+      continue;
+    }
+    const src = sourceMap[id];
+    wrapped[id] = mv(val, {
+      sampleSize: src?.sampleSize ?? 0,
+      source: src?.sourceName ?? 'derived',
+      requiredSample: reqSample,
+    });
+  }
+  return wrapped;
+}
 
 /**
  * Tüm 168 metriği hesaplar.
@@ -110,10 +156,55 @@ function calculateAllMetrics(data) {
     M189: contextual.M189,          // ΔMarketMove away (logit shift)
   };
   const { M170, M171, M172, M173, M174, M175, ...contextualClean } = contextual;
-  const sharedFlat = { ...referee, ...h2h, ...contextualClean };
+  const sharedFlatRaw = { ...referee, ...h2h, ...contextualClean };
+
+  // ── MetricValue Wrapping ───────────────────────────────────────────────────
+  // Tüm düz sayı metriklerini confidence/sampleSize bilgisiyle sarar.
+  // Bu sayede downstream (calculateUnitImpact) her metriğin güvenilirliğini bilir.
+  const _standingsRows = data.standingsTotal?.standings?.[0]?.rows || [];
+  const _lgTeamCount = _standingsRows.length > 0 ? _standingsRows.length : null;
+  const _mvCtx = { leagueTeamCount: _lgTeamCount };
+
+  // baselineReliability: sezon ilerleme faktöründen türetilir — erken sezonda amplify dampening
+  const _lgMatchesPerTeam = _standingsRows.length > 0
+    ? _standingsRows.reduce((s, r) => s + (r.matches ?? r.played ?? 0), 0) / _standingsRows.length
+    : null;
+  const _expectedTotalMatches = _lgTeamCount != null ? (_lgTeamCount - 1) * 2 : null;
+  const _seasonProgress = (_expectedTotalMatches != null && _expectedTotalMatches > 0 && _lgMatchesPerTeam != null)
+    ? Math.min(1.0, _lgMatchesPerTeam / _expectedTotalMatches)
+    : null;
+  const _baselineReliability = _seasonProgress != null
+    ? Math.min(1.0, _seasonProgress / 0.3)
+    : null;
+
+  const homeSources = [
+    { metrics: homeAttack, source: 'incidents' },
+    { metrics: homeDefense, source: 'incidents' },
+    { metrics: homeForm, source: 'standings' },
+    { metrics: homePlayer, source: 'seasonStats' },
+    { metrics: homeGK, source: 'seasonStats' },
+    { metrics: homeMomentum, source: 'incidents' },
+  ];
+  const awaySources = [
+    { metrics: awayAttack, source: 'incidents' },
+    { metrics: awayDefense, source: 'incidents' },
+    { metrics: awayForm, source: 'standings' },
+    { metrics: awayPlayer, source: 'seasonStats' },
+    { metrics: awayGK, source: 'seasonStats' },
+    { metrics: awayMomentum, source: 'incidents' },
+  ];
+  const sharedSources = [
+    { metrics: referee, source: 'seasonStats' },
+    { metrics: h2h, source: 'h2h' },
+    { metrics: contextualClean, source: 'derived' },
+  ];
+
+  const homeFlat_w = wrapFlatMetrics(homeFlat, homeSources, _mvCtx);
+  const awayFlat_w = wrapFlatMetrics(awayFlat, awaySources, _mvCtx);
+  const sharedFlat = wrapFlatMetrics(sharedFlatRaw, sharedSources, _mvCtx);
 
   const allMetricIds = new Set([
-    ...Object.keys(homeFlat), ...Object.keys(awayFlat), ...Object.keys(sharedFlat)
+    ...Object.keys(homeFlat_w), ...Object.keys(awayFlat_w), ...Object.keys(sharedFlat)
   ].filter(k => /^M[0-9]{3}[a-z]?$/i.test(k)));
 
   // Dinamik lig ortalaması — standings verisinden hesaplanır
@@ -181,7 +272,7 @@ function calculateAllMetrics(data) {
     homeMatchCount: data.homeLastEvents?.length || 0,
     awayMatchCount: data.awayLastEvents?.length || 0,
     // Add flattened data for unit calculations
-    homeFlat, awayFlat, sharedFlat, allMetricIds,
+    homeFlat: homeFlat_w, awayFlat: awayFlat_w, sharedFlat, allMetricIds,
     // Dinamik lig ortalamaları ve ev sahibi avantajı
     dynamicAvgs,
     dynamicHomeAdvantage,
@@ -225,6 +316,8 @@ function calculateAllMetrics(data) {
     // TopPlayers × MissingPlayers — yıldız golcü yoksa beklenen gol atma oranı düşer
     homeTopPlayerGoalDrop: data.homeTopPlayerGoalDrop ?? 0,
     awayTopPlayerGoalDrop: data.awayTopPlayerGoalDrop ?? 0,
+    // Sezon ilerleme güvenilirliği — erken sezonda behavioral unit amplify'ı dampelenir
+    baselineReliability: _baselineReliability,
   });
 
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
@@ -242,17 +335,17 @@ function calculateAllMetrics(data) {
     home: {
       attack: homeAttack,
       defense: homeDefense,
-      form: { ...homeForm, M170: homeFlat.M170, M171: homeFlat.M171, M172: homeFlat.M172, M174: homeFlat.M174, M175: homeFlat.M175 },
+      form: { ...homeForm, M170: contextual.M170, M171: 5 - contextual.M171, M172: contextual.M172, M174: contextual.M174, M175: contextual.M175 },  // raw for display
       player: homePlayer,
       goalkeeper: homeGK,
       momentum: homeMomentum,
       compositeScores: advanced.home,
-      // Dinamik yeni metrikler — /api/metrics endpoint'ine expose etmek için
+      // Dinamik yeni metrikler — /api/metrics endpoint'ine expose etmek için (raw display)
       dynamic: {
-        M096b: homeFlat.M096b ?? null,   // Yorgunluk endeksi
-        M177: homeFlat.M177 ?? null,     // Pressing yoğunluğu
-        M178: homeFlat.M178 ?? null,     // Territorial control
-        M179: homeFlat.M179 ?? null,     // Savunma hat yüksekliği
+        M096b: homePlayer.M096b ?? null,   // Yorgunluk endeksi
+        M177: contextual.M177_home ?? null,     // Pressing yoğunluğu
+        M178: contextual.M178_home ?? null,     // Territorial control
+        M179: contextual.M179_home ?? null,     // Savunma hat yüksekliği
         M180: contextual.M180 ?? null,   // Küme düşme baskısı (home)
         M182: contextual.M182 ?? null,   // Şampiyonluk baskısı (home)
         M184: contextual.M184 ?? null,   // Tablo sıkışıklığı (home)
@@ -263,22 +356,22 @@ function calculateAllMetrics(data) {
     away: {
       attack: awayAttack,
       defense: awayDefense,
-      form: { ...awayForm, M170: awayFlat.M170, M171: awayFlat.M171, M172: awayFlat.M172, M174: awayFlat.M174, M175: awayFlat.M175 },
+      form: { ...awayForm, M170: contextual.M170, M171: 5 + contextual.M171, M172: contextual.M173, M174: (contextual.M174 > 0 ? 1 / contextual.M174 : null), M175: 100 - contextual.M175 },
       player: awayPlayer,
       goalkeeper: awayGK,
       momentum: awayMomentum,
       compositeScores: advanced.away,
-      // Dinamik yeni metrikler — /api/metrics endpoint'ine expose etmek için
+      // Dinamik yeni metrikler — /api/metrics endpoint'ine expose etmek için (raw display)
       dynamic: {
-        M096b: awayFlat.M096b ?? null,
-        M177: awayFlat.M177 ?? null,
-        M178: awayFlat.M178 ?? null,
-        M179: awayFlat.M179 ?? null,
-        M181: contextual.M181 ?? null,   // Küme düşme baskısı (away)
-        M183: contextual.M183 ?? null,   // Şampiyonluk baskısı (away)
-        M185: contextual.M185 ?? null,   // Tablo sıkışıklığı (away)
-        M187: contextual.M187 ?? null,   // ResistanceIndex (away)
-        M189: contextual.M189 ?? null,   // ΔMarketMove (away)
+        M096b: awayPlayer.M096b ?? null,          // Yorgunluk endeksi
+        M177: contextual.M177_away ?? null,        // Pressing yoğunluğu
+        M178: contextual.M178_away ?? null,        // Territorial control
+        M179: contextual.M179_away ?? null,        // Savunma hat yüksekliği
+        M181: contextual.M181 ?? null,              // Küme düşme baskısı (away)
+        M183: contextual.M183 ?? null,              // Şampiyonluk baskısı (away)
+        M185: contextual.M185 ?? null,              // Tablo sıkışıklığı (away)
+        M187: contextual.M187 ?? null,              // ResistanceIndex (away)
+        M189: contextual.M189 ?? null,              // ΔMarketMove (away)
       },
     },
     shared: {

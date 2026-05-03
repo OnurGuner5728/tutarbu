@@ -68,6 +68,56 @@ function validateMatchData(data) {
     warnings.push('awayLastEvents is missing or empty');
   }
 
+  // Statistics — period='ALL' filtresi doğrulaması
+  if (data.homeRecentMatchDetails && Array.isArray(data.homeRecentMatchDetails)) {
+    for (let i = 0; i < Math.min(data.homeRecentMatchDetails.length, 3); i++) {
+      const md = data.homeRecentMatchDetails[i];
+      const stats = md?.stats?.statistics;
+      if (Array.isArray(stats) && stats.length > 0) {
+        const hasAll = stats.some(p => p.period === 'ALL');
+        if (!hasAll) {
+          warnings.push(`homeRecentMatchDetails[${i}] has no period=ALL statistics`);
+        }
+      }
+    }
+  }
+
+  // Lineups — oyuncu name alanı kontrolü
+  if (Array.isArray(homePlayers) && homePlayers.length > 0) {
+    const namedCount = homePlayers.filter(p => p?.player?.name || p?.name).length;
+    if (namedCount < homePlayers.length * 0.5) {
+      warnings.push(`lineups.home: only ${namedCount}/${homePlayers.length} players have names`);
+    }
+  }
+  if (Array.isArray(awayPlayers) && awayPlayers.length > 0) {
+    const namedCount = awayPlayers.filter(p => p?.player?.name || p?.name).length;
+    if (namedCount < awayPlayers.length * 0.5) {
+      warnings.push(`lineups.away: only ${namedCount}/${awayPlayers.length} players have names`);
+    }
+  }
+
+  // Incidents — temel yapı kontrolü
+  if (data.homeIncidents && Array.isArray(data.homeIncidents)) {
+    for (const inc of data.homeIncidents.slice(0, 5)) {
+      if (inc && inc.incidentType == null) {
+        warnings.push('homeIncidents contains items without incidentType');
+        break;
+      }
+    }
+  }
+
+  // Numeric range validation — standings row sanity check
+  if (Array.isArray(standingsRows) && standingsRows.length >= 4) {
+    for (const row of standingsRows.slice(0, 3)) {
+      if (row.matches != null && (row.matches < 0 || row.matches > 100)) {
+        warnings.push(`standings row ${row.team?.name ?? '?'} has unreasonable matches: ${row.matches}`);
+      }
+      if (row.scoresFor != null && row.scoresFor < 0) {
+        warnings.push(`standings row ${row.team?.name ?? '?'} has negative scoresFor: ${row.scoresFor}`);
+      }
+    }
+  }
+
   // Log warnings
   if (warnings.length > 0) {
     console.warn(`[SchemaValidator] ${warnings.length} warning(s):`, warnings.join('; '));

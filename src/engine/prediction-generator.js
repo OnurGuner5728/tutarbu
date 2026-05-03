@@ -163,7 +163,11 @@ function generatePrediction(metricsResult, data, baseline, audit, rng) {
     // veri azsa Simülasyon (Davranışsal) ağırlığı artar.
     result: (() => {
       const simDist = simulation.distribution;
-      const conf = prediction.confidenceScore != null ? prediction.confidenceScore / 100 : null;
+      const _rawConf = prediction.confidenceScore != null ? prediction.confidenceScore / 100 : null;
+      // baselineReliability: sezon başında (ilk haftalar) model güvenini dampler.
+      // Sezon ilerledikçe (>%30 oynandı) → tam güven. Erken sezonda → daha çekingen tahminler.
+      const _blRel = baseline?.baselineReliability ?? 1.0;
+      const conf = _rawConf != null ? _rawConf * _blRel : null;
 
       // ── Dinamik Blend Ağırlığı (Poisson-Ağırlıklı) ───────────────────────────
       // Backtest bulgusu: Poisson-Only %64 doğruyla piyasanın üstünde.
@@ -253,14 +257,14 @@ function generatePrediction(metricsResult, data, baseline, audit, rng) {
       const compIndex = baseline?.leagueCompetitiveness ?? metricsResult.meta?.leagueCompetitiveness ?? null;
       const lgCV = (vol != null && avg != null && avg > 0) ? vol / avg : null;
       // MAX_T: ligin rekabetçilik indeksinden türetilir (dinamik)
-      // Rekabetçi lig (yüksek compIndex) → daha yüksek T (daha çok smooth)
-      // Dominant lig (düşük compIndex) → düşük T (favorilere güven)
+      // Rekabetçi lig (yüksek compIndex) → daha yüksek T (daha çok smooth — upset olasılığı yüksek)
+      // Dominant lig (düşük compIndex) → düşük T (favorilere güven — upset nadir)
       const MAX_T = compIndex != null
-        ? 1.0 + 1.0 / (compIndex + 4)  // compIndex=3→1.14, compIndex=5→1.11, compIndex=10→1.07
+        ? 1.0 + compIndex / (compIndex + 40)  // compIndex=3→1.07, compIndex=5→1.11, compIndex=10→1.20
         : (lgCV != null ? 1.0 + lgCV * 0.3 : 1.10);
-      // cvSensitivity: rekabetçi ligde düşük hassasiyet (varyans zaten yüksek)
+      // cvSensitivity: dominant ligde düşük hassasiyet (varyans düşük, favori güvenilir)
       const cvSensitivity = compIndex != null
-        ? 1.0 / (compIndex + 3)
+        ? compIndex / (compIndex * compIndex + 16)  // compIndex=3→0.12, compIndex=5→0.12, compIndex=10→0.09
         : 0.25;
       let temperature = 1.0 + cvVal * cvSensitivity;
       if (compIndex != null && compIndex > 0) {

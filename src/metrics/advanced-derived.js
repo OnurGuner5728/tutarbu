@@ -9,6 +9,7 @@ const { SIM_CONFIG } = require('../engine/sim-config');
 const { BLOCK_QF_MAP, computeAlpha, computeQualityFactors } = require('../engine/quality-factors');
 const { blendScoreDistribution } = require('../engine/score-profile');
 const { applyZoneModifiers } = require('../engine/lineup-impact');
+const { unwrap, getConfidence } = require('../engine/metric-value');
 
 function calculateAdvancedMetrics(allMetrics) {
   const { homeAttack, awayAttack, homeDefense, awayDefense, homeForm, awayForm,
@@ -44,11 +45,22 @@ function calculateAdvancedMetrics(allMetrics) {
   const peerEnhancedAvgs = { ...(dynamicAvgs || {}) };
   for (const id of allMetricIds) {
     if (peerEnhancedAvgs[id] != null) continue;
-    const hv = homeFlat[id] ?? sharedFlat[id];
-    const av = awayFlat[id] ?? sharedFlat[id];
-    const hvOk = hv != null && isFinite(hv);
-    const avOk = av != null && isFinite(av);
-    const avg = hvOk && avOk ? (hv + av) / 2 : hvOk ? hv : avOk ? av : null;
+    // MetricValue wrapper desteği: unwrap ile düz sayıya çevir, confidence ile ağırlıkla
+    const hRaw = homeFlat[id] ?? sharedFlat[id];
+    const aRaw = awayFlat[id] ?? sharedFlat[id];
+    const hVal = unwrap(hRaw);
+    const aVal = unwrap(aRaw);
+    const hvOk = hVal != null && isFinite(hVal);
+    const avOk = aVal != null && isFinite(aVal);
+    let avg;
+    if (hvOk && avOk) {
+      // Confidence-weighted average: yüksek güvenilirlikli metrik daha fazla ağırlık alır
+      const hConf = Math.max(0.01, getConfidence(hRaw));
+      const aConf = Math.max(0.01, getConfidence(aRaw));
+      avg = (hVal * hConf + aVal * aConf) / (hConf + aConf);
+    } else {
+      avg = hvOk ? hVal : avOk ? aVal : null;
+    }
     if (avg != null && avg > 0) peerEnhancedAvgs[id] = avg;
   }
 
@@ -63,6 +75,8 @@ function calculateAdvancedMetrics(allMetrics) {
     normMaxRatio: allMetrics.normMaxRatio ?? null,
     leagueGoalVolatility: allMetrics.leagueGoalVolatility ?? null,
     leagueAvgGoals: leagueAvgGoals ?? null,
+    // baselineReliability: sezon başında amplify dampening — prediction-generator'dan geçirilir
+    baselineReliability: allMetrics.baselineReliability ?? null,
   };
   for (const blockId in SIM_BLOCKS) {
     homeUnits[blockId] = calculateUnitImpact(blockId, { ...homeFlat, ...sharedFlat }, allMetricIds, null, peerEnhancedAvgs, _unitBaseline);
@@ -242,11 +256,16 @@ function calculateAdvancedMetrics(allMetrics) {
   const _cvEarly = (vol != null && leagueAvgGoals > 0) ? vol / leagueAvgGoals : null;
   const _xgLowerBound = Math.max(0.70, 1.0 - (_cvEarly ?? 0.5) * 0.60);
   const _xgUpperBound = Math.min(1.70, 1.0 + (_cvEarly ?? 0.5) * 0.80);
-  const xGCorrectionFactor = (
-    _xGToActualRatio != null &&
-    _xGToActualRatio >= _xgLowerBound &&
-    _xGToActualRatio <= _xgUpperBound
-  ) ? _xGToActualRatio : null;
+  let xGCorrectionFactor = null;
+  let _xgCorrectionSkipReason = null;
+  if (_xGToActualRatio == null) {
+    _xgCorrectionSkipReason = 'no xG or league avg data';
+  } else if (_xGToActualRatio < _xgLowerBound || _xGToActualRatio > _xgUpperBound) {
+    _xgCorrectionSkipReason = `ratio ${_xGToActualRatio.toFixed(3)} out of bounds [${_xgLowerBound.toFixed(2)}, ${_xgUpperBound.toFixed(2)}]`;
+    console.warn(`[AdvancedDerived] xGCorrectionFactor skipped: ${_xgCorrectionSkipReason}`);
+  } else {
+    xGCorrectionFactor = _xGToActualRatio;
+  }
 
   // _blendRate: 5. parametre olarak scoreProfile.avgConceded eklendi.
   // homeAtkRaw → rakibin (away) yediği gol ortalaması (awayScoreProfile.avgConceded) kullanılır.
@@ -257,7 +276,7 @@ function calculateAdvancedMetrics(allMetrics) {
     const xgW = Math.min(5, matchCount || 5);
     if (xg != null && xgW > 0) {
       const xgCorrected = xGCorrectionFactor != null ? xg * xGCorrectionFactor : xg;
-      sources.push({ val: xgCorrected, w: xgW });
+      if (isFinite(xgCorrected)) sources.push({ val: xgCorrected, w: xgW });
     }
     if (stSpec != null && nSt > 0) sources.push({ val: stSpec, w: nSt });
     const specW = Math.max(1, Math.floor((matchCount || 20) / 2));
@@ -540,8 +559,8 @@ function calculateAdvancedMetrics(allMetrics) {
     if (referenceTotalGoals != null && referenceTotalGoals > 0 && referenceReliability > 0) {
       const calibrationRatio = referenceTotalGoals / lambdaSum;
 
-      // Yalnızca deflasyon varsa uygula (ratio > 1.10 = %10'dan fazla düşük)
-      // Enflasyon durumunda (ratio < 1.0) müdahale etme — lambda zaten yüksek
+      // Yalnızca Poisson eksik kaldığında düzelt (ratio > 1.10 = gerçek goller Poisson'dan %10+ fazla)
+      // ratio < 1.0 = Poisson zaten yüksek tahmin yapıyor → müdahale etme
       if (calibrationRatio > 1.10) {
         // scalingFactor: reliability ne kadar yüksekse referansa o kadar yaklaş
         // exponent = reliability × 0.5 → [0, 0.5] aralığı → factor [1, ratio^0.5]
@@ -656,6 +675,8 @@ function calculateAdvancedMetrics(allMetrics) {
     //   D_poisson: lig lambda'larında saf Poisson'ın tahmin ettiği beraberlik oranı
     //   Paydaki: hangi skorların τ tarafından düzeltildiği (0-0, 1-0, 0-1, 1-1)
     const rho = (() => {
+      // Veri yoksa: ρ ≈ -0.10 (futbolda evrensel gözlem: düşük skorlar bağımsız Poisson'dan fazla).
+      // Bu değer sabit bir fallback — dinamik hesaplama için yeterli veri olmadığında kullanılır.
       if (leagueAvgGoals == null || leagueAvgGoals <= 0) return -0.10;
       const lambdaLg = leagueAvgGoals / 2;
       // Gözlemlenen beraberlik oranı (öncelik sırası):
@@ -674,7 +695,7 @@ function calculateAdvancedMetrics(allMetrics) {
       const P00 = Math.pow(poissonPMF(0, lambdaLg), 2);
       const P11 = Math.pow(poissonPMF(1, lambdaLg), 2);
       const denom = P00 * lambdaLg * lambdaLg + P11;
-      const raw = denom > 0.001 ? -(D_obs - D_poiss) / denom : -0.10;
+      const raw = denom > 0.001 ? -(D_obs - D_poiss) / denom : -0.10; // denom ≈ 0 → hesaplama anlamsız, evrensel fallback
       // Gerçekçi aralık: [-0.20, 0.00]
       return Math.max(-0.20, Math.min(0.00, raw));
     })();
