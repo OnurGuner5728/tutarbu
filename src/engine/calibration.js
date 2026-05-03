@@ -327,8 +327,9 @@ function loadCalibration(paramsPath) {
     const params = JSON.parse(fs.readFileSync(filePath, 'utf8'));
     // Kalibrasyon yaşı kontrolü: 30 günden eskiyse devre dışı bırak
     const MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 gün
-    if (params?.lastUpdated) {
-      const age = Date.now() - new Date(params.lastUpdated).getTime();
+    const _tsField = params?.lastUpdated ?? params?.trainedAt ?? null;
+    if (_tsField) {
+      const age = Date.now() - new Date(_tsField).getTime();
       if (age > MAX_AGE_MS) {
         console.warn(`[calibration] Params are ${Math.round(age / (24*60*60*1000))} days old (>30d) — disabled`);
         params._stale = true;
@@ -359,6 +360,10 @@ function loadCalibration(paramsPath) {
  */
 function saveCalibration(params, paramsPath) {
   const filePath = paramsPath ?? PARAMS_FILE;
+  // Ensure both timestamp fields exist for compatibility
+  const ts = params.trainedAt ?? params.lastUpdated ?? new Date().toISOString();
+  params.trainedAt = ts;
+  params.lastUpdated = ts;
   fs.writeFileSync(filePath, JSON.stringify(params, null, 2), 'utf8');
 }
 

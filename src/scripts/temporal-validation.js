@@ -1,17 +1,14 @@
 /**
  * temporal-validation.js — Temporal Split Out-of-Sample Validation
  *
- * Backtest verisini zamana göre böler: ilk %70 train, son %30 test.
- * Train set'ten kalibrasyon parametreleri öğrenir, test set'te değerlendirir.
+ * Backtest verisini zamana gore boler: ilk %70 train, son %30 test.
+ * Train set'ten kalibrasyon parametreleri ogrenir, test set'te degerlendirir.
  *
- * Kullanım: node src/scripts/temporal-validation.js <backtest-results.json>
+ * Kullanim: node src/scripts/temporal-validation.js <backtest-results.json>
  *
- * backtest-results.json formatı:
- *   [{
- *     eventId, timestamp (ISO veya epoch ms),
- *     predictions: { homeWin, draw, awayWin },
- *     actual: '1'|'X'|'2'
- *   }, ...]
+ * Her iki backtest formati da desteklenir:
+ *   Format A (eski): [{ predictions:{homeWin,draw,awayWin}, actual, timestamp }]
+ *   Format B (backtest-runner): { results:[{ probHome,probDraw,probAway, actualResult, matchDate }] }
  */
 
 'use strict';
@@ -19,9 +16,36 @@
 const fs = require('fs');
 const path = require('path');
 
-/**
- * Brier score: düşük = daha iyi
- */
+// ---------------------------------------------------------------------------
+// Format normalization — backtest-runner ciktisini script formatina cevirir
+// ---------------------------------------------------------------------------
+function normalizeData(raw) {
+  // Unwrap {results:[...]} wrapper
+  let arr = Array.isArray(raw) ? raw : (Array.isArray(raw.results) ? raw.results : []);
+
+  return arr.map(d => {
+    // Already in expected format?
+    if (d.homeWin != null && d.actual != null) return d;
+
+    // Backtest-runner format: probHome/probDraw/probAway + actualResult + matchDate
+    return {
+      homeWin: d.probHome ?? d.predictions?.homeWin ?? 33.3,
+      draw:    d.probDraw ?? d.predictions?.draw ?? 33.3,
+      awayWin: d.probAway ?? d.predictions?.awayWin ?? 33.3,
+      actual:  d.actualResult ?? d.actual ?? 'X',
+      timestamp: d.matchDate ?? d.timestamp ?? d.date ?? null,
+      // Preserve extra fields
+      tournamentId: d.tournamentId ?? null,
+      confidence: d.confidence ?? null,
+      confidenceTier: d.confidenceTier ?? null,
+    };
+  }).filter(d => d.actual === '1' || d.actual === 'X' || d.actual === '2');
+}
+
+// ---------------------------------------------------------------------------
+// Scoring functions
+// ---------------------------------------------------------------------------
+
 function brierScore(predictions) {
   if (predictions.length === 0) return NaN;
   let total = 0;
@@ -37,9 +61,6 @@ function brierScore(predictions) {
   return total / predictions.length;
 }
 
-/**
- * Log-loss (cross-entropy): düşük = daha iyi
- */
 function logLoss(predictions) {
   if (predictions.length === 0) return NaN;
   const EPS = 1e-15;
@@ -56,10 +77,6 @@ function logLoss(predictions) {
   return total / predictions.length;
 }
 
-/**
- * Kalibrasyon verisi: tahmin aralıklarına göre gerçekleşme oranı
- * Örn: %40-50 arası tahminlerin kaçı gerçekleşti?
- */
 function calibrationBins(predictions, nBins = 10) {
   const bins = Array.from({ length: nBins }, () => ({ predicted: 0, actual: 0, count: 0 }));
 
@@ -86,9 +103,6 @@ function calibrationBins(predictions, nBins = 10) {
   }));
 }
 
-/**
- * Expected Calibration Error (ECE)
- */
 function ece(calibBins) {
   let totalWeightedGap = 0;
   let totalCount = 0;
@@ -101,11 +115,10 @@ function ece(calibBins) {
   return totalCount > 0 ? totalWeightedGap / totalCount : NaN;
 }
 
-/**
- * Basit Platt scaling: logistic recalibration
- * p_calibrated = 1 / (1 + exp(-(a * logit(p) + b)))
- * a, b parametreleri train seti üzerinde grid search ile optimize edilir.
- */
+// ---------------------------------------------------------------------------
+// Platt scaling (grid search)
+// ---------------------------------------------------------------------------
+
 function fitPlattParams(trainData) {
   const EPS = 1e-7;
   const logit = p => Math.log(Math.max(EPS, p) / Math.max(EPS, 1 - p));
@@ -142,9 +155,6 @@ function fitPlattParams(trainData) {
   return { a: bestA, b: bestB };
 }
 
-/**
- * Platt scaling uygula
- */
 function applyPlatt(predictions, a, b) {
   const EPS = 1e-7;
   const logit = p => Math.log(Math.max(EPS, p) / Math.max(EPS, 1 - p));
@@ -164,16 +174,26 @@ function applyPlatt(predictions, a, b) {
   });
 }
 
+// ---------------------------------------------------------------------------
+// Main
+// ---------------------------------------------------------------------------
+
 async function runValidation(backtestPath) {
   if (!fs.existsSync(backtestPath)) {
     console.error(`Backtest file not found: ${backtestPath}`);
     process.exit(1);
   }
 
-  const data = JSON.parse(fs.readFileSync(backtestPath, 'utf8'));
+  const raw = JSON.parse(fs.readFileSync(backtestPath, 'utf8'));
+  const data = normalizeData(raw);
   console.log(`Loaded ${data.length} backtest results`);
 
-  // Zamana göre sırala
+  if (data.length < 20) {
+    console.error('Not enough data for temporal validation (need >= 20).');
+    process.exit(1);
+  }
+
+  // Zamana gore sirala
   const sorted = [...data].sort((a, b) => {
     const tA = a.timestamp ? new Date(a.timestamp).getTime() : 0;
     const tB = b.timestamp ? new Date(b.timestamp).getTime() : 0;
@@ -192,48 +212,64 @@ async function runValidation(backtestPath) {
     process.exit(1);
   }
 
-  // ── Uncalibrated test performance ──
+  // -- Uncalibrated test performance --
   const testBrier = brierScore(test);
   const testLogLoss = logLoss(test);
   const testCalibBins = calibrationBins(test);
   const testECE = ece(testCalibBins);
 
-  console.log('\n── Uncalibrated Test Set ──');
+  console.log('\n-- Uncalibrated Test Set --');
   console.log(`Brier Score:  ${testBrier.toFixed(4)}`);
   console.log(`Log Loss:     ${testLogLoss.toFixed(4)}`);
   console.log(`ECE:          ${testECE.toFixed(4)}`);
 
-  // ── Train set'ten Platt parametreleri öğren ──
+  // -- Train set'ten Platt parametreleri ogren --
   const platt = fitPlattParams(train);
   console.log(`\nPlatt params (from train): a=${platt.a.toFixed(2)}, b=${platt.b.toFixed(2)}`);
 
-  // ── Calibrated test performance ──
+  // -- Calibrated test performance --
   const calibratedTest = applyPlatt(test, platt.a, platt.b);
   const calBrier = brierScore(calibratedTest);
   const calLogLoss = logLoss(calibratedTest);
   const calCalibBins = calibrationBins(calibratedTest);
   const calECE = ece(calCalibBins);
 
-  console.log('\n── Calibrated Test Set ──');
+  console.log('\n-- Calibrated Test Set --');
   console.log(`Brier Score:  ${calBrier.toFixed(4)}`);
   console.log(`Log Loss:     ${calLogLoss.toFixed(4)}`);
   console.log(`ECE:          ${calECE.toFixed(4)}`);
 
-  console.log(`\nCalibration Δ Brier: ${(calBrier - testBrier).toFixed(4)} (negative = improvement)`);
-  console.log(`Calibration Δ ECE:   ${(calECE - testECE).toFixed(4)} (negative = improvement)`);
+  console.log(`\nCalibration D Brier: ${(calBrier - testBrier).toFixed(4)} (negative = improvement)`);
+  console.log(`Calibration D ECE:   ${(calECE - testECE).toFixed(4)} (negative = improvement)`);
 
-  // ── Train set metrics for comparison ──
+  // -- Train set metrics for comparison --
   const trainBrier = brierScore(train);
   const trainLogLoss = logLoss(train);
 
-  console.log('\n── Train Set (for reference) ──');
+  console.log('\n-- Train Set (for reference) --');
   console.log(`Brier Score:  ${trainBrier.toFixed(4)}`);
   console.log(`Log Loss:     ${trainLogLoss.toFixed(4)}`);
 
   const overfit = testBrier - trainBrier;
   console.log(`\nOverfit gap: ${overfit.toFixed(4)} (large positive = overfitting)`);
 
-  // ── Sonuçları kaydet ──
+  // -- Per-confidence-tier breakdown --
+  const tiers = {};
+  for (const d of test) {
+    const tier = d.confidenceTier || 'UNKNOWN';
+    if (!tiers[tier]) tiers[tier] = [];
+    tiers[tier].push(d);
+  }
+  if (Object.keys(tiers).length > 1) {
+    console.log('\n-- Per-Tier Test Brier --');
+    for (const [tier, items] of Object.entries(tiers)) {
+      if (items.length >= 5) {
+        console.log(`  ${tier}: ${brierScore(items).toFixed(4)} (n=${items.length})`);
+      }
+    }
+  }
+
+  // -- Sonuclari kaydet --
   const results = {
     timestamp: new Date().toISOString(),
     totalSamples: data.length,
@@ -275,7 +311,7 @@ async function runValidation(backtestPath) {
 
 const backtestFile = process.argv[2];
 if (!backtestFile) {
-  console.log('Kullanım: node src/scripts/temporal-validation.js <backtest-results.json>');
+  console.log('Kullanim: node src/scripts/temporal-validation.js <backtest-results.json>');
   process.exit(0);
 }
 

@@ -1,20 +1,14 @@
 /**
- * baseline-comparison.js — Basit Poisson Baseline vs Tam Model Karşılaştırması
+ * baseline-comparison.js — Basit Poisson Baseline vs Tam Model Karsilastirmasi
  *
- * Basit Poisson modeli (sadece standings'ten λ_home + λ_away) ile
- * tam modelin Brier score karşılaştırmasını yapar.
+ * Basit Poisson modeli (sadece standings'ten lambda_home + lambda_away) ile
+ * tam modelin Brier score karsilastirmasini yapar.
  *
- * Kullanım: node src/scripts/baseline-comparison.js <backtest-results.json>
+ * Kullanim: node src/scripts/baseline-comparison.js <backtest-results.json>
  *
- * backtest-results.json formatı:
- *   [{
- *     eventId,
- *     predictions: { homeWin, draw, awayWin },          // tam model (%)
- *     simpleLambda: { home: λH, away: λA },              // basit model lambdaları (opsiyonel)
- *     actual: '1'|'X'|'2'
- *   }, ...]
- *
- * simpleLambda yoksa sadece tam model Brier score hesaplanır.
+ * Her iki backtest formati da desteklenir:
+ *   Format A: [{ predictions:{homeWin,draw,awayWin}, simpleLambda:{home,away}, actual }]
+ *   Format B: { results:[{ probHome,probDraw,probAway, poisson:{lambdaHome,lambdaAway}, actualResult }] }
  */
 
 'use strict';
@@ -23,10 +17,39 @@ const fs = require('fs');
 const path = require('path');
 const { poissonPMF } = require('../engine/math-utils');
 
-/**
- * Brier score: düşük = daha iyi
- * BS = (1/N) * Σ Σ (p_ij - o_ij)²
- */
+// ---------------------------------------------------------------------------
+// Format normalization
+// ---------------------------------------------------------------------------
+function normalizeData(raw) {
+  let arr = Array.isArray(raw) ? raw : (Array.isArray(raw.results) ? raw.results : []);
+
+  return arr.map(d => {
+    const homeWin = d.homeWin ?? d.probHome ?? d.predictions?.homeWin ?? null;
+    const draw    = d.draw ?? d.probDraw ?? d.predictions?.draw ?? null;
+    const awayWin = d.awayWin ?? d.probAway ?? d.predictions?.awayWin ?? null;
+    const actual  = d.actual ?? d.actualResult ?? null;
+
+    // Lambda: try simpleLambda first, then poisson object
+    const lambdaHome = d.simpleLambda?.home ?? d.poisson?.lambdaHome ?? null;
+    const lambdaAway = d.simpleLambda?.away ?? d.poisson?.lambdaAway ?? null;
+
+    if (homeWin == null || actual == null) return null;
+
+    return {
+      homeWin, draw, awayWin, actual,
+      simpleLambda: (lambdaHome != null && lambdaAway != null)
+        ? { home: lambdaHome, away: lambdaAway }
+        : null,
+      tournamentId: d.tournamentId ?? null,
+      confidenceTier: d.confidenceTier ?? null,
+    };
+  }).filter(d => d != null && (d.actual === '1' || d.actual === 'X' || d.actual === '2'));
+}
+
+// ---------------------------------------------------------------------------
+// Scoring
+// ---------------------------------------------------------------------------
+
 function brierScore(predictions) {
   if (predictions.length === 0) return NaN;
   let total = 0;
@@ -42,10 +65,6 @@ function brierScore(predictions) {
   return total / predictions.length;
 }
 
-/**
- * Basit Poisson modelinden 1X2 olasılıkları üret.
- * Dixon-Coles düzeltmesi (düşük skorlar için) opsiyonel.
- */
 function simplePoissonProbs(lambdaHome, lambdaAway, maxGoals = 10) {
   let homeWin = 0, draw = 0, awayWin = 0;
   for (let h = 0; h <= maxGoals; h++) {
@@ -56,7 +75,6 @@ function simplePoissonProbs(lambdaHome, lambdaAway, maxGoals = 10) {
       else awayWin += prob;
     }
   }
-  // Normalize
   const total = homeWin + draw + awayWin;
   if (total <= 0) return { homeWin: 33.3, draw: 33.3, awayWin: 33.3 };
   return {
@@ -66,13 +84,9 @@ function simplePoissonProbs(lambdaHome, lambdaAway, maxGoals = 10) {
   };
 }
 
-/**
- * Paired difference test: tam model - basit model farkının anlamlılığı
- * Bootstrap CI ile.
- */
 function bootstrapDifference(fullBriers, simpleBriers, nBoot = 5000) {
   const n = fullBriers.length;
-  if (n === 0) return { mean: 0, ci95: [0, 0] };
+  if (n === 0) return { mean: 0, ci95: [0, 0], significant: false };
 
   const diffs = fullBriers.map((f, i) => f - simpleBriers[i]);
   const meanDiff = diffs.reduce((s, d) => s + d, 0) / n;
@@ -94,9 +108,13 @@ function bootstrapDifference(fullBriers, simpleBriers, nBoot = 5000) {
   return {
     mean: meanDiff,
     ci95: [lo, hi],
-    significant: (lo > 0 || hi < 0), // CI sıfırı içermiyorsa anlamlı
+    significant: (lo > 0 || hi < 0),
   };
 }
+
+// ---------------------------------------------------------------------------
+// Main
+// ---------------------------------------------------------------------------
 
 async function runComparison(backtestPath) {
   if (!fs.existsSync(backtestPath)) {
@@ -104,35 +122,47 @@ async function runComparison(backtestPath) {
     process.exit(1);
   }
 
-  const data = JSON.parse(fs.readFileSync(backtestPath, 'utf8'));
+  const raw = JSON.parse(fs.readFileSync(backtestPath, 'utf8'));
+  const data = normalizeData(raw);
   console.log(`Loaded ${data.length} backtest results`);
 
-  // Tam model Brier score
+  // Full model Brier score
   const fullBrier = brierScore(data);
   console.log(`Full Model Brier Score: ${fullBrier.toFixed(4)}`);
 
-  // Basit Poisson model Brier score (simpleLambda varsa)
-  const withLambda = data.filter(d => d.simpleLambda?.home != null && d.simpleLambda?.away != null);
+  // Random baseline
+  const randomBrier = 2/3; // 0.6667
+  console.log(`Random Baseline Brier:  ${randomBrier.toFixed(4)}`);
+  console.log(`Skill vs Random:        ${((1 - fullBrier / randomBrier) * 100).toFixed(1)}%`);
+
+  // Simple Poisson model (where lambda data available)
+  const withLambda = data.filter(d => d.simpleLambda != null);
 
   const results = {
-    fullModelBrier: fullBrier,
+    fullModelBrier: +fullBrier.toFixed(4),
+    randomBrier: +randomBrier.toFixed(4),
+    skillVsRandom: +((1 - fullBrier / randomBrier) * 100).toFixed(1),
     sampleSize: data.length,
     timestamp: new Date().toISOString(),
   };
 
   if (withLambda.length > 0) {
+    console.log(`\nSimple Poisson comparison: ${withLambda.length} matches with lambda data`);
+
     const simplePredictions = withLambda.map(d => {
       const probs = simplePoissonProbs(d.simpleLambda.home, d.simpleLambda.away);
       return { ...probs, actual: d.actual };
     });
 
     const simpleBrier = brierScore(simplePredictions);
+    const fullSubset = brierScore(withLambda);
     console.log(`Simple Poisson Brier Score: ${simpleBrier.toFixed(4)}`);
-    console.log(`Improvement: ${((simpleBrier - fullBrier) * 100).toFixed(2)}% (negative = full model worse)`);
+    console.log(`Full Model (subset) Brier:  ${fullSubset.toFixed(4)}`);
+    console.log(`Improvement: ${((simpleBrier - fullSubset) / simpleBrier * 100).toFixed(2)}% (positive = full model better)`);
 
     // Per-match Brier scores for bootstrap
     const fullPerMatch = withLambda.map(d => {
-      const probs = [d.predictions.homeWin / 100, d.predictions.draw / 100, d.predictions.awayWin / 100];
+      const probs = [d.homeWin / 100, d.draw / 100, d.awayWin / 100];
       const actual = d.actual === '1' ? [1, 0, 0] : d.actual === 'X' ? [0, 1, 0] : [0, 0, 1];
       return probs.reduce((s, p, i) => s + Math.pow(p - actual[i], 2), 0);
     });
@@ -143,27 +173,58 @@ async function runComparison(backtestPath) {
     });
 
     const boot = bootstrapDifference(fullPerMatch, simplePerMatch);
-    console.log(`Bootstrap Δ mean: ${boot.mean.toFixed(4)}`);
+    console.log(`Bootstrap D mean: ${boot.mean.toFixed(4)} (negative = full model better)`);
     console.log(`Bootstrap 95% CI: [${boot.ci95[0].toFixed(4)}, ${boot.ci95[1].toFixed(4)}]`);
     console.log(`Statistically significant: ${boot.significant}`);
 
-    results.simpleModelBrier = simpleBrier;
-    results.improvement = simpleBrier - fullBrier;
-    results.bootstrap = boot;
+    results.simpleModelBrier = +simpleBrier.toFixed(4);
+    results.fullModelSubsetBrier = +fullSubset.toFixed(4);
+    results.improvement = +((simpleBrier - fullSubset) / simpleBrier * 100).toFixed(2);
+    results.bootstrap = {
+      mean: +boot.mean.toFixed(4),
+      ci95: [+boot.ci95[0].toFixed(4), +boot.ci95[1].toFixed(4)],
+      significant: boot.significant,
+    };
     results.simpleModelSampleSize = withLambda.length;
+
+    // Per-tier comparison
+    const tiers = {};
+    for (let i = 0; i < withLambda.length; i++) {
+      const tier = withLambda[i].confidenceTier || 'ALL';
+      if (!tiers[tier]) tiers[tier] = { full: [], simple: [] };
+      tiers[tier].full.push(fullPerMatch[i]);
+      tiers[tier].simple.push(simplePerMatch[i]);
+    }
+    if (Object.keys(tiers).length > 1) {
+      console.log('\n-- Per-Tier Comparison --');
+      results.perTier = {};
+      for (const [tier, d] of Object.entries(tiers)) {
+        if (d.full.length >= 5) {
+          const avgFull = d.full.reduce((s, v) => s + v, 0) / d.full.length;
+          const avgSimple = d.simple.reduce((s, v) => s + v, 0) / d.simple.length;
+          console.log(`  ${tier}: Full=${avgFull.toFixed(4)}, Simple=${avgSimple.toFixed(4)}, D=${(avgFull - avgSimple).toFixed(4)} (n=${d.full.length})`);
+          results.perTier[tier] = {
+            fullBrier: +avgFull.toFixed(4),
+            simpleBrier: +avgSimple.toFixed(4),
+            delta: +(avgFull - avgSimple).toFixed(4),
+            n: d.full.length,
+          };
+        }
+      }
+    }
   } else {
-    console.log('No simpleLambda data found — only full model Brier reported.');
-    results.note = 'No simpleLambda data in backtest file. Add simpleLambda: { home, away } to each entry for comparison.';
+    console.log('\nNo lambda data found. Add poisson:{lambdaHome,lambdaAway} to backtest results for comparison.');
+    results.note = 'No lambda data in backtest file.';
   }
 
   const outputPath = path.join(path.dirname(backtestPath), 'baseline-comparison.json');
   fs.writeFileSync(outputPath, JSON.stringify(results, null, 2), 'utf8');
-  console.log(`Results saved to: ${outputPath}`);
+  console.log(`\nResults saved to: ${outputPath}`);
 }
 
 const backtestFile = process.argv[2];
 if (!backtestFile) {
-  console.log('Kullanım: node src/scripts/baseline-comparison.js <backtest-results.json>');
+  console.log('Kullanim: node src/scripts/baseline-comparison.js <backtest-results.json>');
   process.exit(0);
 }
 

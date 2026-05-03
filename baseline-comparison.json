@@ -1,0 +1,8 @@
+{
+  "fullModelBrier": null,
+  "randomBrier": 0.6667,
+  "skillVsRandom": null,
+  "sampleSize": 0,
+  "timestamp": "2026-05-03T21:40:09.604Z",
+  "note": "No lambda data in backtest file."
+}

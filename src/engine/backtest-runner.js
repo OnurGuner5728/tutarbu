@@ -195,7 +195,9 @@ async function runBacktest(date, matchLimit = 10) {
 
         const coverageCtrl = report.coverageControl || {};
         const resultEntry = {
+          matchId: match.id,
           match: matchLabel,
+          matchDate: match.startTimestamp ? new Date(match.startTimestamp * 1000).toISOString().split('T')[0] : date,
           tournament: match.tournament?.name || '',
           tournamentId: match.tournament?.uniqueTournament?.id || null,
           actual: `${realHS}-${realAS}`,
@@ -219,6 +221,16 @@ async function runBacktest(date, matchLimit = 10) {
           confidenceTier: coverageCtrl.confidenceTier || 'UNKNOWN',
           maxProbability: coverageCtrl.maxProbability || 0,
           isHighConfidence: coverageCtrl.isHighConfidence || false,
+          // Script uyumluluğu: Poisson lambda ve ayrı motor sonuçları
+          poisson: poissonRes ? {
+            homeWin: poissonRes.homeWin, draw: poissonRes.draw, awayWin: poissonRes.awayWin,
+            predicted: poissonRes.predicted,
+            lambdaHome: poissonRes.lambdaHome, lambdaAway: poissonRes.lambdaAway,
+          } : null,
+          simulation: simRes ? {
+            homeWin: simRes.homeWin, draw: simRes.draw, awayWin: simRes.awayWin,
+            predicted: simRes.predicted,
+          } : null,
           restDays: {
             home: report.metadata?.homeRestDays ?? null,
             away: report.metadata?.awayRestDays ?? null,

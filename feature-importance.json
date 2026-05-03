@@ -1,0 +1,568 @@
+{
+  "timestamp": "2026-05-03T21:39:45.865Z",
+  "sampleSize": 480,
+  "engines": {
+    "final": {
+      "brier": 0.6106,
+      "accuracy": 51.2,
+      "n": 480
+    },
+    "poisson": {
+      "brier": 0.6073,
+      "accuracy": 58.8,
+      "n": 480
+    },
+    "simulation": {
+      "brier": 0.6504,
+      "accuracy": 52.3,
+      "n": 480
+    },
+    "uniform": 0.6667,
+    "naiveFavorite": 0.975
+  },
+  "confidenceTiers": {
+    "MEDIUM": {
+      "brier": 0.6266,
+      "accuracy": 48.4,
+      "n": 91,
+      "avgMaxProb": 63.3
+    },
+    "LOW": {
+      "brier": 0.6563,
+      "accuracy": 35.6,
+      "n": 146,
+      "avgMaxProb": 47.2
+    },
+    "HIGH": {
+      "brier": 0.5771,
+      "accuracy": 61.7,
+      "n": 243,
+      "avgMaxProb": 87.1
+    }
+  },
+  "tournaments": {
+    "8": {
+      "name": "LaLiga",
+      "brier": 0.6425,
+      "accuracy": 60,
+      "n": 5
+    },
+    "20": {
+      "name": "Eliteserien",
+      "brier": 0.5203,
+      "accuracy": 80,
+      "n": 5
+    },
+    "23": {
+      "name": "Serie A",
+      "brier": 0.8174,
+      "accuracy": 16.7,
+      "n": 6
+    },
+    "34": {
+      "name": "Ligue 1",
+      "brier": 0.5976,
+      "accuracy": 60,
+      "n": 5
+    },
+    "38": {
+      "name": "Pro League, Relegation/Promotion Playoff",
+      "brier": 0.3489,
+      "accuracy": 100,
+      "n": 6
+    },
+    "39": {
+      "name": "Danish Superliga, Relegation round",
+      "brier": 0.577,
+      "accuracy": 50,
+      "n": 6
+    },
+    "40": {
+      "name": "Allsvenskan",
+      "brier": 0.7019,
+      "accuracy": 37.5,
+      "n": 8
+    },
+    "42": {
+      "name": "Regionalliga North",
+      "brier": 0.7945,
+      "accuracy": 20,
+      "n": 5
+    },
+    "52": {
+      "name": "Trendyol Süper Lig",
+      "brier": 0.6535,
+      "accuracy": 60,
+      "n": 5
+    },
+    "54": {
+      "name": "LaLiga 2",
+      "brier": 0.5387,
+      "accuracy": 57.1,
+      "n": 7
+    },
+    "98": {
+      "name": "1. Lig",
+      "brier": 0.6758,
+      "accuracy": 42.9,
+      "n": 7
+    },
+    "155": {
+      "name": "Liga Profesional de Fútbol, Apertura",
+      "brier": 0.6028,
+      "accuracy": 60,
+      "n": 5
+    },
+    "188": {
+      "name": "Efsta deild",
+      "brier": 0.5239,
+      "accuracy": 80,
+      "n": 5
+    },
+    "196": {
+      "name": "J1 League, East",
+      "brier": 0.5792,
+      "accuracy": 66.7,
+      "n": 9
+    },
+    "197": {
+      "name": "Virsliga",
+      "brier": 0.6908,
+      "accuracy": 40,
+      "n": 5
+    },
+    "203": {
+      "name": "Premier League",
+      "brier": 0.4786,
+      "accuracy": 80,
+      "n": 5
+    },
+    "210": {
+      "name": "Mozzart Bet Superliga, Relegation Round",
+      "brier": 0.6483,
+      "accuracy": 50,
+      "n": 8
+    },
+    "238": {
+      "name": "Liga Portugal Betclic",
+      "brier": 0.6168,
+      "accuracy": 60,
+      "n": 5
+    },
+    "239": {
+      "name": "Liga Portugal 2",
+      "brier": 0.6303,
+      "accuracy": 33.3,
+      "n": 6
+    },
+    "240": {
+      "name": "LigaPro Serie A, Primera Etapa",
+      "brier": 0.6563,
+      "accuracy": 60,
+      "n": 5
+    },
+    "247": {
+      "name": "First Professional League, Relegation Round",
+      "brier": 0.6344,
+      "accuracy": 40,
+      "n": 5
+    },
+    "266": {
+      "name": "Premier League, Championship Round",
+      "brier": 0.6365,
+      "accuracy": 40,
+      "n": 5
+    },
+    "325": {
+      "name": "Brasileirão Betano",
+      "brier": 0.5064,
+      "accuracy": 83.3,
+      "n": 6
+    },
+    "384": {
+      "name": "CONMEBOL Libertadores, Group B",
+      "brier": 0.5915,
+      "accuracy": 50,
+      "n": 6
+    },
+    "390": {
+      "name": "Brasileirão Série B",
+      "brier": 0.6375,
+      "accuracy": 33.3,
+      "n": 6
+    },
+    "402": {
+      "name": "J2/J3 League, East A",
+      "brier": 0.6115,
+      "accuracy": 45,
+      "n": 20
+    },
+    "406": {
+      "name": "Liga 1, Apertura",
+      "brier": 0.652,
+      "accuracy": 33.3,
+      "n": 6
+    },
+    "480": {
+      "name": "CONMEBOL Sudamericana, Group C",
+      "brier": 0.5685,
+      "accuracy": 66.7,
+      "n": 6
+    },
+    "703": {
+      "name": "Primera B Nacional",
+      "brier": 0.6248,
+      "accuracy": 53.8,
+      "n": 13
+    },
+    "808": {
+      "name": "Egyptian Premier League, Relegation Round",
+      "brier": 0.5852,
+      "accuracy": 57.1,
+      "n": 7
+    },
+    "825": {
+      "name": "Stars League",
+      "brier": 0.6074,
+      "accuracy": 50,
+      "n": 6
+    },
+    "1015": {
+      "name": "Indonesia Super League",
+      "brier": 0.3941,
+      "accuracy": 100,
+      "n": 7
+    },
+    "1032": {
+      "name": "Thai League 1",
+      "brier": 0.6892,
+      "accuracy": 28.6,
+      "n": 7
+    },
+    "1281": {
+      "name": "Brasileirão Série C",
+      "brier": 0.6535,
+      "accuracy": 33.3,
+      "n": 6
+    },
+    "2120": {
+      "name": "Division 1",
+      "brier": 0.4901,
+      "accuracy": 66.7,
+      "n": 6
+    },
+    "10326": {
+      "name": "Brasileirão Série D, Group A1",
+      "brier": 0.6471,
+      "accuracy": 54.5,
+      "n": 11
+    },
+    "11341": {
+      "name": "U23 Championship, Championship Round",
+      "brier": 0.6894,
+      "accuracy": 62.5,
+      "n": 8
+    },
+    "11446": {
+      "name": "Serie C, Group C",
+      "brier": 0.6461,
+      "accuracy": 22.2,
+      "n": 9
+    },
+    "11447": {
+      "name": "Serie C, Group B",
+      "brier": 0.5943,
+      "accuracy": 55.6,
+      "n": 9
+    },
+    "11615": {
+      "name": "Liga Bantrab, Clausura",
+      "brier": 0.5779,
+      "accuracy": 50,
+      "n": 6
+    },
+    "17101": {
+      "name": "Liga 3, Relegation Round, Group 1",
+      "brier": 0.7331,
+      "accuracy": 20,
+      "n": 5
+    },
+    "18641": {
+      "name": "MLS Next Pro",
+      "brier": 0.5393,
+      "accuracy": 50,
+      "n": 8
+    },
+    "25492": {
+      "name": "Baller League UK",
+      "brier": 0.4725,
+      "accuracy": 66.7,
+      "n": 6
+    }
+  },
+  "drawDetection": {
+    "actualDrawRate": 24,
+    "avgPredictedDrawProb": 29.9,
+    "gap": -6,
+    "drawRecall": {
+      "correctlyPredicted": 21,
+      "total": 115,
+      "rate": 18.3,
+      "avgDrawProb": 31.5
+    },
+    "drawPrecision": {
+      "actuallyDraw": 21,
+      "total": 65,
+      "precision": 32.3
+    }
+  },
+  "calibrationGaps": {
+    "home": [
+      {
+        "range": "0-20%",
+        "min": 0,
+        "max": 20,
+        "count": 58,
+        "avgPred": 15.4,
+        "actualRate": 17.2,
+        "gap": -1.8
+      },
+      {
+        "range": "20-40%",
+        "min": 20,
+        "max": 40,
+        "count": 331,
+        "avgPred": 29.8,
+        "actualRate": 38.7,
+        "gap": -8.8
+      },
+      {
+        "range": "40-60%",
+        "min": 40,
+        "max": 60,
+        "count": 90,
+        "avgPred": 44.9,
+        "actualRate": 84.4,
+        "gap": -39.6
+      },
+      {
+        "range": "60-80%",
+        "min": 60,
+        "max": 80,
+        "count": 1,
+        "avgPred": null,
+        "actualRate": null,
+        "gap": null
+      },
+      {
+        "range": "80-100%",
+        "min": 80,
+        "max": 100,
+        "count": 0,
+        "avgPred": null,
+        "actualRate": null,
+        "gap": null
+      }
+    ],
+    "draw": [
+      {
+        "range": "0-20%",
+        "min": 0,
+        "max": 20,
+        "count": 11,
+        "avgPred": 18.6,
+        "actualRate": 18.2,
+        "gap": 0.4
+      },
+      {
+        "range": "20-40%",
+        "min": 20,
+        "max": 40,
+        "count": 414,
+        "avgPred": 27.9,
+        "actualRate": 23.2,
+        "gap": 4.7
+      },
+      {
+        "range": "40-60%",
+        "min": 40,
+        "max": 60,
+        "count": 47,
+        "avgPred": 45,
+        "actualRate": 27.7,
+        "gap": 17.4
+      },
+      {
+        "range": "60-80%",
+        "min": 60,
+        "max": 80,
+        "count": 8,
+        "avgPred": 63.2,
+        "actualRate": 50,
+        "gap": 13.2
+      },
+      {
+        "range": "80-100%",
+        "min": 80,
+        "max": 100,
+        "count": 0,
+        "avgPred": null,
+        "actualRate": null,
+        "gap": null
+      }
+    ],
+    "away": [
+      {
+        "range": "0-20%",
+        "min": 0,
+        "max": 20,
+        "count": 14,
+        "avgPred": 16.7,
+        "actualRate": 7.1,
+        "gap": 9.5
+      },
+      {
+        "range": "20-40%",
+        "min": 20,
+        "max": 40,
+        "count": 253,
+        "avgPred": 33.5,
+        "actualRate": 16.6,
+        "gap": 16.9
+      },
+      {
+        "range": "40-60%",
+        "min": 40,
+        "max": 60,
+        "count": 205,
+        "avgPred": 46.6,
+        "actualRate": 48.3,
+        "gap": -1.7
+      },
+      {
+        "range": "60-80%",
+        "min": 60,
+        "max": 80,
+        "count": 8,
+        "avgPred": 61.8,
+        "actualRate": 100,
+        "gap": -38.2
+      },
+      {
+        "range": "80-100%",
+        "min": 80,
+        "max": 100,
+        "count": 0,
+        "avgPred": null,
+        "actualRate": null,
+        "gap": null
+      }
+    ]
+  },
+  "surprises": {
+    "worst10": [
+      {
+        "predicted": "10/66/24",
+        "actual": "1",
+        "brier": 1.3009
+      },
+      {
+        "predicted": "12/64/24",
+        "actual": "1",
+        "brier": 1.2443
+      },
+      {
+        "predicted": "12/38/50",
+        "actual": "1",
+        "brier": 1.1639
+      },
+      {
+        "predicted": "13/47/40",
+        "actual": "1",
+        "brier": 1.1503
+      },
+      {
+        "predicted": "23/17/59",
+        "actual": "X",
+        "brier": 1.085
+      },
+      {
+        "predicted": "18/56/26",
+        "actual": "1",
+        "brier": 1.043
+      },
+      {
+        "predicted": "17/38/46",
+        "actual": "1",
+        "brier": 1.0419
+      },
+      {
+        "predicted": "22/65/13",
+        "actual": "1",
+        "brier": 1.0405
+      },
+      {
+        "predicted": "18/51/31",
+        "actual": "1",
+        "brier": 1.032
+      },
+      {
+        "predicted": "19/26/55",
+        "actual": "1",
+        "brier": 1.0258
+      }
+    ],
+    "best10": [
+      {
+        "predicted": "12/64/23",
+        "actual": "X",
+        "brier": 0.1977
+      },
+      {
+        "predicted": "16/21/63",
+        "actual": "2",
+        "brier": 0.2042
+      },
+      {
+        "predicted": "3/31/66",
+        "actual": "2",
+        "brier": 0.2142
+      },
+      {
+        "predicted": "17/61/21",
+        "actual": "X",
+        "brier": 0.2251
+      },
+      {
+        "predicted": "18/61/21",
+        "actual": "X",
+        "brier": 0.2279
+      },
+      {
+        "predicted": "14/25/61",
+        "actual": "2",
+        "brier": 0.2307
+      },
+      {
+        "predicted": "10/28/62",
+        "actual": "2",
+        "brier": 0.2323
+      },
+      {
+        "predicted": "11/62/27",
+        "actual": "X",
+        "brier": 0.2336
+      },
+      {
+        "predicted": "16/24/61",
+        "actual": "2",
+        "brier": 0.2355
+      },
+      {
+        "predicted": "60/17/23",
+        "actual": "1",
+        "brier": 0.2397
+      }
+    ]
+  }
+}
