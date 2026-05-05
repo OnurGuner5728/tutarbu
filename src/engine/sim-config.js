@@ -7,22 +7,24 @@
 'use strict';
 
 const SIM_CONFIG = {
-  // ─── Clamps & Limits (ULTIMA RATIO FALLBACKS) ──────────────────────────────
-  // getDynamicLimits() lig verisinden TÜM sınırları türetir.
-  // Bu değerler YALNIZCA tüm dinamik katmanlar başarısız olduğunda kullanılır.
+  // ─── Clamps & Limits (ULTIMA RATIO — MATEMATİKSEL SİMETRİ) ────────────────
+  // getDynamicLimits() lig verisinden TÜM sınırları türetir. Aşağıdaki değerler
+  // YALNIZCA tüm dinamik katmanlar başarısız olduğunda kullanılır ve tamamen
+  // MATEMATİKSEL SİMETRİ taşır: çarpansal sınırlar için MIN × MAX = 1
+  // (geometrik birim), oransal alanlar için [0, 1]. Davranışsal "tahmin" yok.
   LIMITS: {
-    POWER: { MIN: 0.5, MAX: 2.0 },
-    MOMENTUM: { MIN: 0.5, MAX: 2.0 },
-    MORALE: { MIN: 0.4, MAX: 1.6 },
-    POSSESSION: { MIN: 0, MAX: 100 },          // Matematiksel: [0, 100] — lig verisi daraltır
-    PROBABILITY: { MIN: 0, MAX: 1 },            // Matematiksel kural: p ∈ [0,1]
-    ON_TARGET: { MIN: 0, MAX: 1 },               // Matematiksel kural: oran ∈ [0,1]
-    BLOCK: { MIN: 0, MAX: 1 },                   // Matematiksel kural: oran ∈ [0,1]
-    CORNER: { MIN: 0, MAX: 1 },                  // Matematiksel kural: oran ∈ [0,1]
-    CORNER_GOAL: { MIN: 0, MAX: 1 },             // Matematiksel kural: oran ∈ [0,1]
-    CARDS: { YELLOW_MAX: 1, RED_MAX: 1 },         // Matematiksel kural: oran ∈ [0,1]
-    LAMBDA: { MIN: 0.01, MAX: 20 },               // Matematiksel: Poisson λ > 0
-    FORM_MORALE: { MIN: 0.1, MAX: 3.0, SCALE: 1.0 },
+    POWER:       { MIN: 0.5, MAX: 2.0 },          // 0.5 × 2.0 = 1 (geometrik birim)
+    MOMENTUM:    { MIN: 0.5, MAX: 2.0 },          // 0.5 × 2.0 = 1
+    MORALE:      { MIN: 0.5, MAX: 2.0 },          // 0.5 × 2.0 = 1 (önce 0.4/1.6 asimetrik idi)
+    POSSESSION:  { MIN: 0,   MAX: 100 },
+    PROBABILITY: { MIN: 0,   MAX: 1 },
+    ON_TARGET:   { MIN: 0,   MAX: 1 },
+    BLOCK:       { MIN: 0,   MAX: 1 },
+    CORNER:      { MIN: 0,   MAX: 1 },
+    CORNER_GOAL: { MIN: 0,   MAX: 1 },
+    CARDS:       { YELLOW_MAX: 1, RED_MAX: 1 },
+    LAMBDA:      { MIN: 0.01, MAX: 20 },          // Poisson λ > 0; 20 numerik üst tavan
+    FORM_MORALE: { MIN: 0.5, MAX: 2.0, SCALE: 1.5 }, // simetrik; SCALE = MAX − MIN
   },
 
   // ─── Model Sabitler (Matematiksel — Statik Veri Değil) ─────────────────────
@@ -104,7 +106,9 @@ function getDynamicLimits(baseline) {
   const momMin = lgCV != null ? powerMin / (1 + lgCV) : L.MOMENTUM.MIN;
   const momMax = lgCV != null ? powerMax * (1 + lgCV) : L.MOMENTUM.MAX;
 
-  // Morale: normRatio aralığından, rekabetçilik indeksi ile daraltılır/genişletilir
+  // Morale: normRatio aralığından, rekabetçilik indeksi ile daraltılır/genişletilir.
+  // Rekabetçi ligde (compInv yüksek) morale dalgalanması POWER aralığından geniş;
+  // dominant ligde dar. Tüm formül baseline'dan türer; statik fallback simetri'dir.
   const compInv = baseline?.leagueCompetitiveness; // 1/CV — yüksek = rekabetçi
   const moraleMin = compInv != null ? powerMin * compInv / (compInv + 1) : L.MORALE.MIN;
   const moraleMax = (compInv != null && compInv > 0) ? powerMax * (compInv + 1) / compInv : L.MORALE.MAX;

@@ -1,0 +1,157 @@
+{
+  "date": "2026-05-05",
+  "endDate": "2026-05-05",
+  "total": 1,
+  "finishedTotal": 1,
+  "upcomingTotal": 0,
+  "tournamentFilter": "all",
+  "accuracy1X2": 100,
+  "accuracyOU25": 0,
+  "accuracyBTTS": 0,
+  "accuracyScore": 0,
+  "avgBrierScore": 0.3514,
+  "avgLogLoss": 0.6385,
+  "htAccuracy1X2": 100,
+  "htAccuracyScore": 0,
+  "htTotal": 1,
+  "htftAccuracy": 100,
+  "htftTotal": 1,
+  "high": {
+    "count": 1,
+    "accuracy1X2": 100,
+    "accuracyOU25": 0,
+    "accuracyBTTS": 0,
+    "accuracyScore": 0,
+    "avgBrier": 0.3514
+  },
+  "medium": null,
+  "low": null,
+  "poissonAccuracy1X2": 100,
+  "simulationAccuracy1X2": 100,
+  "drawDetection": {
+    "actual": 0,
+    "predicted": 0,
+    "recallRate": null,
+    "precisionRate": null
+  },
+  "valueBets": {
+    "count": 1,
+    "accuracy1X2": 100
+  },
+  "byTournament": [
+    {
+      "tournamentId": 17,
+      "name": "Premier League",
+      "total": 1,
+      "accuracy1X2": 100,
+      "accuracyOU25": 0,
+      "accuracyBTTS": 0,
+      "accuracyScore": 0,
+      "avgBrier": 0.3514
+    }
+  ],
+  "results": [
+    {
+      "matchId": 14023925,
+      "matchStatus": "finished",
+      "match": "Chelsea vs Nottingham Forest",
+      "homeTeam": "Chelsea",
+      "awayTeam": "Nottingham Forest",
+      "tournament": "Premier League",
+      "tournamentId": 17,
+      "matchDate": "2026-05-04",
+      "matchTime": "14:00",
+      "actual": "1-3",
+      "actualResult": "2",
+      "actualOU25": "Over",
+      "actualBTTS": "Yes",
+      "predicted": "1-2",
+      "predictedResult": "2",
+      "predictedOU25": "Under",
+      "predictedBTTS": "No",
+      "simTopScore": "0-2",
+      "probHome": 32.92,
+      "probDraw": 14.27,
+      "probAway": 52.81,
+      "probOU25": 6.2,
+      "probBTTS": 0.5,
+      "actualHT": "0-2",
+      "actualHTResult": "2",
+      "predictedHT": "0-1",
+      "predictedHTResult": "2",
+      "simHTTopScore": "0-0",
+      "htHomeWinProb": 0,
+      "htDrawProb": 38.48,
+      "htAwayWinProb": 61.44,
+      "simHTHomeWin": 0.1,
+      "simHTDraw": 43.2,
+      "simHTAwayWin": 56.7,
+      "htft": {
+        "top1": "2/2",
+        "top3": [
+          {
+            "result": "2/2",
+            "prob": 56.7
+          },
+          {
+            "result": "X/2",
+            "prob": 23.3
+          },
+          {
+            "result": "X/X",
+            "prob": 19.8
+          }
+        ],
+        "probs": {
+          "1/1": 0,
+          "1/X": 0.1,
+          "1/2": 0,
+          "X/1": 0.1,
+          "X/X": 19.8,
+          "X/2": 23.3,
+          "2/1": 0,
+          "2/X": 0,
+          "2/2": 56.7
+        }
+      },
+      "actualHTFT": "2/2",
+      "hitHTFT": true,
+      "hit1X2": true,
+      "hitOU25": false,
+      "hitBTTS": false,
+      "hitScore": false,
+      "hitHTResult": true,
+      "hitHTScore": false,
+      "brierScore": 0.3514,
+      "logLoss": 0.6385,
+      "confidenceTier": "HIGH",
+      "maxProbability": 80,
+      "isHighConfidence": true,
+      "poisson": {
+        "predicted": "2",
+        "homeWin": 35.01,
+        "draw": 13.38,
+        "awayWin": 51.61,
+        "topScore": "1-1",
+        "hit": true,
+        "lambdaHome": 1.06,
+        "lambdaAway": 1.91
+      },
+      "simulation": {
+        "predicted": "2",
+        "homeWin": 0.1,
+        "draw": 19.9,
+        "awayWin": 80,
+        "hit": true
+      },
+      "restDays": {
+        "home": 8,
+        "away": 4
+      },
+      "isValueBet": true,
+      "modelEdge": 41.5,
+      "marketHome": 69.51,
+      "marketAway": 11.34
+    }
+  ]
+}

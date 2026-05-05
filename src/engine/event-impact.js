@@ -20,10 +20,13 @@ const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
  * Volatil lig → büyük salınımlar, stabil lig → küçük salınımlar.
  */
 function computeLeagueScale(baseline) {
-  if (!baseline) return 0.3; // güvenli nötr — baseline yoksa orta volatilite varsayımı
-  const lgAvg = baseline.leagueAvgGoals ?? 1;
-  const lgVol = baseline.leagueGoalVolatility ?? lgAvg * 0.3;
-  return lgAvg > 0 ? lgVol / lgAvg : 0.3;
+  // Saf veri türevi: vol/avg = lig CV'si. Statik fallback'lar (0.3) KALDIRILDI.
+  // Veri yoksa null döner — caller "yok" sinyalini ele almalı.
+  if (!baseline) return null;
+  const lgAvg = baseline.leagueAvgGoals;
+  const lgVol = baseline.leagueGoalVolatility;
+  if (lgAvg == null || lgVol == null || lgAvg <= 0) return null;
+  return lgVol / lgAvg;
 }
 
 /**
@@ -36,15 +39,13 @@ function computeTerritoryImpactScale(baseline) {
   const pMin = baseline.possessionLimits?.min;
   const pMax = baseline.possessionLimits?.max;
   if (pMin != null && pMax != null && pMax > pMin) {
-    // Gerçek possession yayılımı: ligteki max-min farkı (0-1 aralığında)
-    const spread = (pMax - pMin) / 100;
-    // Her territory biriminin possession'a katkısı spread oranında
-    return spread;
+    return (pMax - pMin) / 100;
   }
-  // Fallback: lig volatilitesi × rekabet yoğunluğu
+  // Fallback: lig volatilitesi × yoğunluk — TÜM bileşenler veriden, sabit yok.
   const lgScale = computeLeagueScale(baseline);
-  const density = baseline.leaguePointDensity ?? 1;
-  const lgAvg = baseline.leagueAvgGoals ?? 1;
+  const density = baseline.leaguePointDensity;
+  const lgAvg = baseline.leagueAvgGoals;
+  if (lgScale == null || density == null || lgAvg == null || lgAvg + density <= 0) return null;
   return lgScale * density / (lgAvg + density);
 }
 
@@ -55,14 +56,19 @@ function computeTerritoryImpactScale(baseline) {
  */
 function computePressingImpactScale(baseline) {
   const lgScale = computeLeagueScale(baseline);
-  // Faul oranı lig agresifliğini temsil eder — pressing yoğunluğuyla doğrudan ilişkili
+  if (lgScale == null) return null;
   const foulRate = baseline.foulRate ?? null;
+  const lgAvg = baseline.leagueAvgGoals;
+  if (lgAvg == null || lgAvg <= 0) return null;
+
   if (foulRate != null) {
-    // Normalize: faulRate × 90 = maç başı faul sayısı; lig ortalamasına böl
-    const lgAvg = baseline.leagueAvgGoals ?? 1;
-    return lgScale * (foulRate * 90) / (lgAvg * 10); // 10: faul/gol oranı normalize
+    // foulsPerMatch / goalsPerMatch — gerçek lig oranı (sabit "10" KALDIRILDI).
+    const foulsPerMatch = foulRate * 90;
+    const totalGoalsPerMatch = lgAvg * 2; // home+away
+    if (totalGoalsPerMatch <= 0) return null;
+    // Pressing etki = lgScale × (faul yoğunluğu / gol yoğunluğu) — saf veri oranı
+    return lgScale * foulsPerMatch / (foulsPerMatch + totalGoalsPerMatch);
   }
-  const lgAvg = baseline.leagueAvgGoals ?? 1;
   const density = baseline.leaguePointDensity ?? lgAvg;
   return lgScale * density / (lgAvg + density);
 }
@@ -73,20 +79,20 @@ function computePressingImpactScale(baseline) {
  * Dar yayılım → rakipler hızla toparlar → hızlı regresyon.
  */
 function computeRegressionRate(baseline) {
-  const lgTeamCount = baseline.leagueTeamCount ?? 20;
+  // lgTeamCount'in 20 statik fallback'i KALDIRILDI — yoksa null.
+  const lgTeamCount = baseline.leagueTeamCount;
+  if (lgTeamCount == null || lgTeamCount <= 0) return null;
   const pMin = baseline.possessionLimits?.min;
   const pMax = baseline.possessionLimits?.max;
   if (pMin != null && pMax != null && pMax > pMin) {
-    const spread = (pMax - pMin) / 100; // [0,1]
-    // Geniş spread → takımlar dominant, bölgeyi tutarlar → regresyon yavaş
-    // Dar spread → rekabetçi lig, hızla toparlanır → regresyon hızlı
-    // Formül: (1 - spread) / lgTeamCount
+    const spread = (pMax - pMin) / 100;
     return (1 - spread) / lgTeamCount;
   }
-  // Fallback: lig rekabetçilik indeksinden türet
-  const comp = baseline.leagueCompetitiveness ?? 1;
+  // Fallback: lig rekabetçilik + scale'den (sabit min "0.1" KALDIRILDI)
+  const comp = baseline.leagueCompetitiveness;
   const lgScale = computeLeagueScale(baseline);
-  return lgScale / (lgTeamCount * Math.max(comp, 0.1));
+  if (comp == null || comp <= 0 || lgScale == null) return null;
+  return lgScale / (lgTeamCount * comp);
 }
 
 /**
@@ -94,33 +100,44 @@ function computeRegressionRate(baseline) {
  * Gol = 1.0 referans. Diğer olaylar gole göre oransal (nadir olay → büyük etki).
  */
 function deriveEventCoeff(eventType, baseline) {
-  const lgGoals = baseline.leagueAvgGoals ?? 1;
-  // Hardcoded fallback'lar kaldırıldı — veri yoksa lgGoals'a dayalı oransal fallback kullanılır.
-  // Tipik oranlar: shots~13/maç, corners~5/maç, yellows~3/maç, fouls~22/maç, offsides~4/maç
-  // Bu oranlar lgGoals ile ölçeklenir → statik değil, lig gol ortalamasına bağlı.
-  const lgShots = baseline.shotsPerMin != null ? baseline.shotsPerMin * 90 : lgGoals * 5.2;
-  const lgCorners = baseline.cornerPerMin != null ? baseline.cornerPerMin * 90 : lgGoals * 2.0;
-  const lgYellows = baseline.yellowPerMin != null ? baseline.yellowPerMin * 90 : lgGoals * 1.2;
-  const lgFouls = baseline.foulRate != null ? baseline.foulRate * 90 : lgGoals * 8.8;
-  const lgOffsides = baseline.offsideRate != null ? baseline.offsideRate * 90 : lgGoals * 1.6;
+  const lgGoals = baseline.leagueAvgGoals ?? null;
+  // SAF VERİ TÜREVİ: tüm oranlar baseline'da hesaplanmış lig ortalamalarından gelir.
+  // Hardcoded sabit oranlar (5.2, 2.0, 1.2, 8.8, 1.6) ve switch içi fallback bölme
+  // sabitleri (25, 50, 100, 17, 10, 3, 22, 66, 4, 125, 6) KALDIRILDI.
+  // Veri yoksa coefficient null döner — caller bu olayı atlamalı.
+  const lgShots    = baseline.shotsPerMin    != null ? baseline.shotsPerMin    * 90 : null;
+  const lgCorners  = baseline.cornerPerMin   != null ? baseline.cornerPerMin   * 90 : null;
+  const lgYellows  = baseline.yellowPerMin   != null ? baseline.yellowPerMin   * 90 : null;
+  const lgReds     = baseline.redPerMin      != null ? baseline.redPerMin      * 90 : null;
+  const lgFouls    = baseline.foulRate       != null ? baseline.foulRate       * 90 : null;
+  const lgOffsides = baseline.offsideRate    != null ? baseline.offsideRate    * 90 : null;
+
+  if (lgGoals == null) return null;
+
+  // Helper: gol referansa göre olay başına etki ratio
+  const r = (lgEventCount) => (lgEventCount != null && lgEventCount > 0)
+    ? lgGoals / lgEventCount : null;
 
   switch (eventType) {
     case 'goal':            return 1.0;
     case 'penalty_scored':  return 1.0;
-    case 'shot_on_target':  return lgShots > 0 ? lgGoals / lgShots : lgGoals / 25;
-    case 'shot_blocked':    return lgShots > 0 ? lgGoals / (lgShots * 2) : lgGoals / 50;
-    case 'shot_off_target': return lgShots > 0 ? lgGoals / (lgShots * 4) : lgGoals / 100;
-    case 'big_save':        return lgShots > 0 ? lgGoals / lgShots * 1.5 : lgGoals / 17;
-    case 'corner':          return lgCorners > 0 ? lgGoals / lgCorners : lgGoals / 10;
-    case 'free_kick':       return lgCorners > 0 ? lgGoals / lgCorners : lgGoals / 10;
-    case 'yellow_card':     return lgYellows > 0 ? lgGoals / lgYellows : lgGoals / 3;
-    case 'red_card':        return lgYellows > 0 ? (lgGoals / lgYellows) * 3 : lgGoals;
-    case 'foul':            return lgFouls > 0 ? lgGoals / lgFouls : lgGoals / 22;
-    case 'throw_in':        return lgFouls > 0 ? lgGoals / (lgFouls * 3) : lgGoals / 66;
-    case 'offside':         return lgOffsides > 0 ? lgGoals / lgOffsides : lgGoals / 4;
-    case 'goal_kick':       return lgShots > 0 ? lgGoals / (lgShots * 5) : lgGoals / 125;
-    case 'penalty_missed':  return 1.0;
-    case 'substitution':    return lgYellows > 0 ? lgGoals / (lgYellows * 2) : lgGoals / 6;
+    case 'penalty_missed':  return 1.0;  // Aynı şut hacmi/şans, sonuç farkı sıfır gol
+    case 'shot_on_target':  return r(lgShots);
+    case 'shot_blocked':    return lgShots != null ? r(lgShots * 2) : null;
+    case 'shot_off_target': return lgShots != null ? r(lgShots * 4) : null;
+    // big_save: shot_on_target'tan biraz daha yüksek etki — kritik kurtarış. Saves/SOT oranı
+    // baseline'dan türetilebiliyorsa kullan; yoksa shot_on_target ile aynı (üst-eşitliği).
+    case 'big_save':        return r(lgShots);
+    case 'corner':          return r(lgCorners);
+    case 'free_kick':       return r(lgCorners);  // Tehlikeli serbest vuruş ≈ köşe yoğunluğu
+    case 'yellow_card':     return r(lgYellows);
+    // red_card: kart başına gol etkisi. lgReds varsa direkt; yoksa yellow ile yaklaşıkla
+    case 'red_card':        return lgReds != null ? r(lgReds) : (lgYellows != null ? lgGoals / lgYellows : null);
+    case 'foul':            return r(lgFouls);
+    case 'throw_in':        return lgFouls != null ? r(lgFouls * 3) : null;
+    case 'offside':         return r(lgOffsides);
+    case 'goal_kick':       return lgShots != null ? r(lgShots * 5) : null;
+    case 'substitution':    return lgYellows != null ? r(lgYellows * 2) : null;
     default:                return 0;
   }
 }
@@ -234,11 +251,13 @@ function applyEventImpact(eventType, actorSide, reactorSide, minute, state, home
   const actorUnits = actorSide === 'home' ? homeUnits : awayUnits;
   const reactorUnits = reactorSide === 'home' ? homeUnits : awayUnits;
 
-  // 1. Lig ölçeği — dinamik
+  // 1. Lig ölçeği — dinamik. Veri yoksa olay state'i etkilemez (nötr çıkış).
   const lgScale = computeLeagueScale(baseline);
+  if (lgScale == null) return;
 
-  // 2. Olay katsayısı — lig frekanslarından
+  // 2. Olay katsayısı — lig frekanslarından. Yoksa atla.
   const eventCoeff = deriveEventCoeff(eventType, baseline);
+  if (eventCoeff == null) return;
 
   // 3. Birim çarpanları — davranış matrislerinden
   const { actorMod, reactorMod } = computeUnitModifier(eventType, actorUnits, reactorUnits);
@@ -252,10 +271,11 @@ function applyEventImpact(eventType, actorSide, reactorSide, minute, state, home
   const matchProgress = minute / 90;
   const macSonuUnit = actorSide === 'home' ? (homeUnits.MAC_SONU ?? 1) : (awayUnits.MAC_SONU ?? 1);
   const macBasiUnit = actorSide === 'home' ? (homeUnits.MAC_BASLANGICI ?? 1) : (awayUnits.MAC_BASLANGICI ?? 1);
-  // Eğer birimler nötr (1.0), lig volatilitesi zaman amplifikasyonu üstlenir
+  // Eğer birimler nötr (1.0), lig volatilitesi zaman amplifikasyonu üstlenir.
+  // Sabit "0.5" çarpanı KALDIRILDI — lgScale tek başına ölçek taşır.
   const _macRatio = macSonuUnit / _s(macBasiUnit);
   const _timeAmp = (Math.abs(_macRatio - 1.0) < 0.01)
-    ? (1.0 + lgScale * 0.5) // Nötr birim: lgScale × 0.5 ile maç sonu yoğunlaşır
+    ? (1.0 + (lgScale ?? 0))
     : _macRatio;
   const timeMod = 1 + matchProgress * (_timeAmp - 1);
 
@@ -271,25 +291,25 @@ function applyEventImpact(eventType, actorSide, reactorSide, minute, state, home
   const as = state[actorSide];
   const rs = state[reactorSide];
 
-  // Momentum — doğrudan lgScale zaten ölçekliyor
   as.momentum = clamp(as.momentum + matrix.actorMom * actorDelta,
     DYN_LIMITS.MOMENTUM.MIN, DYN_LIMITS.MOMENTUM.MAX);
   rs.momentum = clamp(rs.momentum + matrix.reactorMom * reactorDelta,
     DYN_LIMITS.MOMENTUM.MIN, DYN_LIMITS.MOMENTUM.MAX);
 
-  // Morale — doğrudan lgScale zaten ölçekliyor
   as.morale = clamp(as.morale + matrix.actorMorale * actorDelta,
     DYN_LIMITS.MORALE.MIN, DYN_LIMITS.MORALE.MAX);
   rs.morale = clamp(rs.morale + matrix.reactorMorale * reactorDelta,
     DYN_LIMITS.MORALE.MIN, DYN_LIMITS.MORALE.MAX);
 
-  // Territory — terrScale lig verisinden türetilir
-  as.territory = clamp(as.territory + matrix.actorTerr * actorDelta * terrScale, 0, 1);
-  rs.territory = clamp(rs.territory + matrix.reactorTerr * reactorDelta * terrScale, 0, 1);
-
-  // Pressing — pressScale lig verisinden türetilir
-  as.pressing = clamp(as.pressing + matrix.actorPress * actorDelta * pressScale, 0, 1);
-  rs.pressing = clamp(rs.pressing + matrix.reactorPress * reactorDelta * pressScale, 0, 1);
+  // Territory ve pressing — scale veri yoksa o boyut etkilenmez (NaN korumalı).
+  if (terrScale != null) {
+    as.territory = clamp(as.territory + matrix.actorTerr * actorDelta * terrScale, 0, 1);
+    rs.territory = clamp(rs.territory + matrix.reactorTerr * reactorDelta * terrScale, 0, 1);
+  }
+  if (pressScale != null) {
+    as.pressing = clamp(as.pressing + matrix.actorPress * actorDelta * pressScale, 0, 1);
+    rs.pressing = clamp(rs.pressing + matrix.reactorPress * reactorDelta * pressScale, 0, 1);
+  }
 
   // Recent actions tracking
   if (!as.recentActions) as.recentActions = [];
@@ -321,8 +341,10 @@ function applyNaturalRegression(sideState, units, baseline, initialMomentum, ini
 
   // Pressing regresyonu: yorgunluk × (1/KADRO_DERINLIGI) ile modüleli
   const lgScale = computeLeagueScale(baseline);
-  const pressDecay = (sideState.fatigue ?? 0) * (1 / _s(units.KADRO_DERINLIGI)) * lgScale * baseRegRate;
-  sideState.pressing = Math.max(0, sideState.pressing - pressDecay);
+  if (lgScale != null) {
+    const pressDecay = (sideState.fatigue ?? 0) * (1 / _s(units.KADRO_DERINLIGI)) * lgScale * baseRegRate;
+    sideState.pressing = Math.max(0, sideState.pressing - pressDecay);
+  }
 }
 
 /**
@@ -331,6 +353,7 @@ function applyNaturalRegression(sideState, units, baseline, initialMomentum, ini
  */
 function applyHalftimeRegression(sideState, units, baseline, initialMomentum, initialMorale, initialPressing) {
   const lgScale = computeLeagueScale(baseline);
+  if (lgScale == null) return; // Lig verisi yoksa devre arası etkisi uygulanmaz
   const menajerEffect = (units.MENAJER_STRATEJISI ?? 1.0) * lgScale;
 
   // HT/FT reversal boost: geri dönüş oranı yüksek liglerde regresyon güçlenir
@@ -363,6 +386,7 @@ function applyHalftimeRegression(sideState, units, baseline, initialMomentum, in
 function updateTacticalStance(sideState, units, goalDiff, expectedGoals, oppUnits, baseline) {
   const comfortThreshold = Math.max(1, Math.ceil(expectedGoals));
   const lgScale = computeLeagueScale(baseline);
+  if (lgScale == null) return; // Lig verisi yoksa stance değişmez
 
   if (goalDiff >= comfortThreshold) {
     // Önde ve fark açık → defansa çekilme eğilimi

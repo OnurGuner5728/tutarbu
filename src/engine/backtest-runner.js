@@ -6,10 +6,12 @@
 
 const api = require('../services/playwright-client');
 const { fetchAllMatchData } = require('../services/data-fetcher');
+const { applyAsOfFilter } = require('../services/as-of-filter');
 const { calculateAllMetrics } = require('./metric-calculator');
 const { generatePrediction } = require('./prediction-generator');
 const { getDynamicBaseline } = require('./dynamic-baseline');
 const { computePositionMVBreakdown } = require('./quality-factors');
+const learning = require('../learning');
 
 // Top 5 ligi + önemli turnuvalar için filtreleme (opsiyonel)
 const TOP_TOURNAMENT_IDS = new Set([
@@ -25,8 +27,18 @@ const TOP_TOURNAMENT_IDS = new Set([
   37,   // Primeira Liga
 ]);
 
-async function runBacktest(date, matchLimit = 10) {
-  console.log(`\x1b[35m[Backtest] Starting backtest for date: ${date} (limit: ${matchLimit})\x1b[0m`);
+/**
+ * @param {string} date
+ * @param {number} matchLimit
+ * @param {object} [opts]
+ * @param {string} [opts.asOfMode]   'pre-match' (default) | 'as-played'.
+ *                  pre-match: maç başlama saatinden ÖNCE oluşmuş veriyi kullanır
+ *                  (oynanan maç verisi kendi tahminine sızmaz).
+ *                  as-played: tüm güncel veriyi kullanır (eski davranış).
+ */
+async function runBacktest(date, matchLimit = 10, opts = {}) {
+  const asOfMode = opts.asOfMode || 'pre-match';
+  console.log(`\x1b[35m[Backtest] Starting backtest for date: ${date} (limit: ${matchLimit}, asOf=${asOfMode})\x1b[0m`);
 
   try {
     await api.initBrowser();
@@ -95,7 +107,23 @@ async function runBacktest(date, matchLimit = 10) {
       try {
         // Fetch full data
         const fullData = await fetchAllMatchData(match.id);
-        
+
+        // ── As-of disiplini: pre-match modunda maç sonrası verilerini at ─────
+        if (asOfMode === 'pre-match') {
+          const _kickoffTs = match.startTimestamp ?? fullData?.event?.event?.startTimestamp ?? null;
+          if (_kickoffTs) {
+            applyAsOfFilter(fullData, { cutoffTs: _kickoffTs - 1 });
+            const _meta = fullData._asOfMeta;
+            if (_meta) {
+              const _kept = _meta.filtered.reduce((s, f) => s + f.kept, 0);
+              const _total = _meta.filtered.reduce((s, f) => s + f.total, 0);
+              console.log(`\x1b[90m[AsOf] cutoff=${_meta.cutoffISO} | filtered ${_kept}/${_total} events | leaked: ${_meta.leakedFields.join(',') || 'none'}\x1b[0m`);
+            }
+          } else {
+            console.warn(`\x1b[33m[AsOf] kickoff_ts yok — filtre uygulanmadı\x1b[0m`);
+          }
+        }
+
         // Calculate metrics
         const metrics = calculateAllMetrics(fullData);
         
@@ -284,9 +312,40 @@ async function runBacktest(date, matchLimit = 10) {
           })(),
         });
 
+        // ── Learning Layer: outcome'u kaydet ve residual hesapla ─────────────
+        try {
+          learning.persistOutcome({
+            matchId: match.id,
+            kickoffTs: match.startTimestamp ?? null,
+            tournamentId: match.tournament?.uniqueTournament?.id ?? null,
+            homeTeamId: match.homeTeam?.id ?? null,
+            awayTeamId: match.awayTeam?.id ?? null,
+            homeScore: realHS,
+            awayScore: realAS,
+            htHome: match.homeScore?.period1 ?? null,
+            htAway: match.awayScore?.period1 ?? null,
+          });
+        } catch (e) {
+          console.warn(`[Learning] outcome kaydı başarısız ${match.id}: ${e?.message || e}`);
+        }
+
       } catch (err) {
         console.error(`[Backtest] Error processing ${matchLabel}: ${err.message}`);
       }
+    }
+
+    // ── Toplu reconcile (residual eşleştirme) ──────────────────────────────────
+    try {
+      const rec = learning.reconcileResiduals();
+      if (rec.updated > 0) {
+        console.log(`\x1b[35m[Learning] reconcile: ${rec.updated} eksik residual hesaplandı\x1b[0m`);
+      }
+      const stats = learning.getStats();
+      if (stats) {
+        console.log(`\x1b[35m[Learning] store: predictions=${stats.predictions} outcomes=${stats.outcomes} residuals=${stats.residuals} fingerprints=${stats.fingerprints}\x1b[0m`);
+      }
+    } catch (e) {
+      console.warn('[Learning] reconcile başarısız:', e?.message || e);
     }
 
     // 3. Overall Report
@@ -391,7 +450,13 @@ async function runBacktest(date, matchLimit = 10) {
   }
 }
 
-// Get date and match count from args
+// CLI: node backtest-runner.js <date> <limit> [as-of-mode]
+//   as-of-mode: 'pre-match' (default) | 'as-played'
 const targetDate = process.argv[2] || new Date(Date.now() - 86400000).toISOString().split('T')[0];
 const matchLimit = parseInt(process.argv[3], 10) || 10;
-runBacktest(targetDate, matchLimit);
+const asOfMode = (process.argv[4] || 'pre-match').toLowerCase();
+if (require.main === module) {
+  runBacktest(targetDate, matchLimit, { asOfMode });
+}
+
+module.exports = { runBacktest };

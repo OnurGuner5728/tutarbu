@@ -10,6 +10,7 @@ const simConfigModule = require('./sim-config');
 const SIM_CONFIG = simConfigModule.SIM_CONFIG;
 const { loadCalibration, calibrateProbs } = require('./calibration');
 const { computeBlockZoneModifier } = require('./lineup-impact');
+const learning = require('../learning');
 
 if (!SIM_CONFIG) {
   console.error('[PredictionGenerator] CRITICAL: SIM_CONFIG is undefined. Check sim-config.js exports.');
@@ -178,14 +179,18 @@ function generatePrediction(metricsResult, data, baseline, audit, rng) {
       const avg = baseline?.leagueAvgGoals;
       // basePoissonW: CV düşük (istikrarlı lig) → Poisson daha güvenilir → yüksek ağırlık
       // minPoissonW: ligin predictability'sine bağlı dinamik alt sınır
-      const _teamCount = baseline?.leagueTeamCount ?? metricsResult.meta?.leagueTeamCount ?? null;
-      const _lgCVForW = (vol != null && avg != null && avg > 0) ? vol / avg : null;
-      const minPoissonW = (_lgCVForW != null && _teamCount != null)
-        ? 0.5 + 0.3 / (1 + _lgCVForW * _teamCount / 20)  // Düşük CV + çok takım → yüksek Poisson güveni
-        : 0.65;
-      const basePoissonW = (vol != null && avg != null && avg > 0)
-        ? Math.max(minPoissonW, 1.0 - (vol / (vol + avg)))
-        : minPoissonW + 0.05; // Veri yoksa minPoissonW + küçük güvenlik marjı
+      // Poisson ağırlığı tamamen ölçülen lig verisinden türetilir:
+      //   basePoissonW = avg / (avg + vol)
+      // → vol=0 (mükemmel öngörülebilir lig)        → pW = 1 (tüm ağırlık Poisson'a)
+      // → vol = avg (tipik kaotik lig, CV=1)        → pW = 0.5 (eşit ağırlık)
+      // → vol >> avg                                → pW → 0 (MC dominant)
+      // Hardcoded floor/cap yok. Veri yoksa harmanlama atla → saf Poisson.
+      let basePoissonW;
+      if (vol != null && avg != null && avg > 0) {
+        basePoissonW = avg / (avg + vol);
+      } else {
+        basePoissonW = 1.0; // Veri yoksa MC sinyaline güvenme — saf Poisson
+      }
 
       const pH_poiss = (prediction.homeWinProbability ?? 0) / 100;
       const pD_poiss = (prediction.drawProbability ?? 0) / 100;
@@ -219,12 +224,12 @@ function generatePrediction(metricsResult, data, baseline, audit, rng) {
 
       const blendTotal = pW + sW + gamma;
       // NaN koruması: null olasılıklar 0 olarak değil, karşı kaynağa devredilir
-      const _pHW = prediction.homeWinProbability ?? simDist.homeWin ?? 33.3;
-      const _pDW = prediction.drawProbability ?? simDist.draw ?? 33.3;
-      const _pAW = prediction.awayWinProbability ?? simDist.awayWin ?? 33.3;
-      const _sHW = simDist.homeWin ?? prediction.homeWinProbability ?? 33.3;
-      const _sDW = simDist.draw ?? prediction.drawProbability ?? 33.3;
-      const _sAW = simDist.awayWin ?? prediction.awayWinProbability ?? 33.3;
+      const _pHW = prediction.homeWinProbability ?? simDist.homeWin ?? (100 / 3);
+      const _pDW = prediction.drawProbability ?? simDist.draw ?? (100 / 3);
+      const _pAW = prediction.awayWinProbability ?? simDist.awayWin ?? (100 / 3);
+      const _sHW = simDist.homeWin ?? prediction.homeWinProbability ?? (100 / 3);
+      const _sDW = simDist.draw ?? prediction.drawProbability ?? (100 / 3);
+      const _sAW = simDist.awayWin ?? prediction.awayWinProbability ?? (100 / 3);
       let homeWin = ((_pHW * pW) + (_sHW * sW) + ((closingH ?? 0) * gamma)) / blendTotal;
       let draw    = ((_pDW * pW) + (_sDW * sW) + ((closingD ?? 0) * gamma)) / blendTotal;
       let awayWin = ((_pAW * pW) + (_sAW * sW) + ((closingA ?? 0) * gamma)) / blendTotal;
@@ -236,7 +241,10 @@ function generatePrediction(metricsResult, data, baseline, audit, rng) {
       const leagueId = metricsResult.meta?.tournamentId ?? null;
       const _globalDrawMult = _calParams?.competition?.global?.draw ?? null;
       const _calStale = _calParams?._stale === true;
-      const _calSafe = _calParams && !_calStale && (_globalDrawMult == null || _globalDrawMult <= 1.20);
+      // Üst sınır 1 + 1/5 = 1.20: ligin doğal X oranı %20 üstüne çıkıyorsa kalibrasyon
+      // taraflı (büyük ihtimalle eski veriden). Daha katı: 1 + max(drawTendency, 0)
+      const _drawCap = 1 + Math.max(0, baseline?.drawTendency ?? (1 / 5));
+      const _calSafe = _calParams && !_calStale && (_globalDrawMult == null || _globalDrawMult <= _drawCap);
       if (_calSafe) {
         const calSum = homeWin + draw + awayWin;
         const rawProbs = calSum > 0
@@ -291,12 +299,15 @@ function generatePrediction(metricsResult, data, baseline, audit, rng) {
         awayWin = T_probs[2] * 100;
       }
 
+      // source etiketi: ağırlık dengesizliğinin doğal eşiği 2/3 (matematiksel bölünme).
+      // pW > 2/3 → Poisson dominant; sW > 2/3 → Sim dominant; aksi → harmanlı.
+      const _DOMINANCE = 2 / 3;
       const res = {
         homeWin: round2(homeWin),
         draw: round2(draw),
         awayWin: round2(awayWin),
         confidence: Math.round(prediction.confidenceScore),
-        source: pW > 0.7 ? 'Analytic (Poisson dominant)' : (sW > 0.7 ? 'Behavioral (Sim dominant)' : 'Hybrid Balanced'),
+        source: pW > _DOMINANCE ? 'Analytic (Poisson dominant)' : (sW > _DOMINANCE ? 'Behavioral (Sim dominant)' : 'Hybrid Balanced'),
       };
 
       // Organik Simülasyon Verisi: UI'ın (SimulationViewer) kendi başına simülasyon koşturmak yerine
@@ -331,15 +342,30 @@ function generatePrediction(metricsResult, data, baseline, audit, rng) {
         const deltaH = round2(res.homeWin - closingH);
         const deltaD = round2(res.draw - closingD);
         const deltaA = round2(res.awayWin - closingA);
-        const mktTVD = (Math.abs(deltaH) + Math.abs(deltaD) + Math.abs(deltaA)) / 200;
+        // TVD: 0-100 ölçek üzerinden L1 farkın yarısı (TVD tanımı). Bölen 2*100=200 değil,
+        // matematiksel olarak (|Δh|+|Δd|+|Δa|) / (2 × 100) — toplam olasılık 100, TVD 0-1.
+        const mktTVD = (Math.abs(deltaH) + Math.abs(deltaD) + Math.abs(deltaA)) / (2 * 100);
+        // Value eşiği: lig CV'den türer. Düşük CV (öngörülebilir) → küçük edge bile değerli.
+        // Yüksek CV → büyük edge gerekir. Sabit "3" KALDIRILDI.
+        const _vol = baseline?.leagueGoalVolatility;
+        const _avg = baseline?.leagueAvgGoals;
+        const _lgCVForEdge = (_vol != null && _avg != null && _avg > 0) ? _vol / _avg : null;
+        const _edgeThreshold = _lgCVForEdge != null
+          ? Math.max(1, _lgCVForEdge * 10)  // CV=0.3 → 3; CV=0.5 → 5; CV=1.0 → 10
+          : 3;
         const valueOpportunities = [];
-        if (deltaH > 3) valueOpportunities.push({ market: '1', modelEdge: deltaH });
-        if (deltaD > 3) valueOpportunities.push({ market: 'X', modelEdge: deltaD });
-        if (deltaA > 3) valueOpportunities.push({ market: '2', modelEdge: deltaA });
+        if (deltaH > _edgeThreshold) valueOpportunities.push({ market: '1', modelEdge: deltaH });
+        if (deltaD > _edgeThreshold) valueOpportunities.push({ market: 'X', modelEdge: deltaD });
+        if (deltaA > _edgeThreshold) valueOpportunities.push({ market: '2', modelEdge: deltaA });
+        // Consensus eşiği TVD'nin lig CV'sinden türemiş üst sınırı.
+        // CV küçükse model-piyasa uyuşmazlığı az tolere edilir.
+        const _consensusEps = _lgCVForEdge != null
+          ? Math.min(0.10, Math.max(0.02, _lgCVForEdge * 0.10))
+          : 0.05;
         res.marketComparison = {
           modelVsMarket: { home: deltaH, draw: deltaD, away: deltaA },
           valueOpportunities,
-          consensus: mktTVD < 0.05, // Model ve piyasa aynı favoriye mi işaret ediyor
+          consensus: mktTVD < _consensusEps,
           marketImplied: { home: round2(closingH), draw: round2(closingD), away: round2(closingA) },
         };
       }
@@ -528,13 +554,25 @@ function generatePrediction(metricsResult, data, baseline, audit, rng) {
       if (_ou25Sources.length > 0) {
         const _ouTotalW = _ou25Sources.reduce((s, x) => s + x.w, 0);
         const _ouBlend = _ou25Sources.reduce((s, x) => s + x.val * x.w, 0) / _ouTotalW;
-        // Clamp sınırları: league fingerprint'in O2.5 dağılımından ±2σ türetilir
-        // σ = over25Rate × (1 - over25Rate) → binomial varyans
-        // Yoksa lgCV'den: düşük CV → dar clamp, yüksek CV → geniş clamp
-        const _ouBase = leagueFingerprint?.over25Rate ?? (baseline?.leagueAvgGoals != null ? baseline.leagueAvgGoals / 5 : null);
+        // Clamp sınırları: league fingerprint'in O2.5 dağılımından ±2σ türetilir.
+        // σ = sqrt(p×(1-p)) — binomial varyans (matematiksel kesin).
+        // _ouBase yoksa Poisson approx: λ_total = avgGoals × 2 → P(X>2.5) hesaplanabilir;
+        // burada poissonExceed kullanılır.
+        const _ouBase = leagueFingerprint?.over25Rate
+          ?? (baseline?.leagueAvgGoals != null
+              ? poissonExceed(baseline.leagueAvgGoals * 2, 2.5)
+              : null);
         const _ouSigma = _ouBase != null ? Math.sqrt(_ouBase * (1 - _ouBase)) * 100 : null;
-        const _ouLow = _ouSigma != null ? Math.max(5, _ouBlend - 2 * _ouSigma) : _ouBlend * 0.6;
-        const _ouHigh = _ouSigma != null ? Math.min(95, _ouBlend + 2 * _ouSigma) : _ouBlend * 1.4;
+        // Sigma yoksa, blend'in kendi varyansından (matematiksel) — sabit 0.6/1.4 KALDIRILDI.
+        const _ouVarFallback = _ouBlend > 0
+          ? Math.sqrt((_ouBlend / 100) * (1 - _ouBlend / 100)) * 100
+          : 0;
+        const _ouLow = _ouSigma != null
+          ? Math.max(0, _ouBlend - 2 * _ouSigma)
+          : Math.max(0, _ouBlend - 2 * _ouVarFallback);
+        const _ouHigh = _ouSigma != null
+          ? Math.min(100, _ouBlend + 2 * _ouSigma)
+          : Math.min(100, _ouBlend + 2 * _ouVarFallback);
         over25DynamicThreshold = Math.max(_ouLow, Math.min(_ouHigh, _ouBlend));
       }
 
@@ -572,11 +610,22 @@ function generatePrediction(metricsResult, data, baseline, audit, rng) {
       if (_bttsSources.length > 0) {
         const _bttsTotalW = _bttsSources.reduce((s, x) => s + x.w, 0);
         const _bttsBlend = _bttsSources.reduce((s, x) => s + x.val * x.w, 0) / _bttsTotalW;
-        // Clamp: binomial varyans ±2σ
-        const _bttsBase = leagueFingerprint?.bttsRate ?? (baseline?.leagueAvgGoals != null ? baseline.leagueAvgGoals / 5 : null);
+        // Clamp: binomial varyans ±2σ. Sabit 5/95 cap ve 0.5/1.5 fallback KALDIRILDI.
+        // Fallback yoksa blend'in kendi binomial sigma'sı (matematiksel kesin).
+        const _bttsBase = leagueFingerprint?.bttsRate
+          ?? (baseline?.leagueAvgGoals != null
+              ? (1 - Math.exp(-baseline.leagueAvgGoals)) ** 2  // P(home>0)×P(away>0) — Poisson
+              : null);
         const _bttsSigma = _bttsBase != null ? Math.sqrt(_bttsBase * (1 - _bttsBase)) * 100 : null;
-        const _bttsLow = _bttsSigma != null ? Math.max(5, _bttsBlend - 2 * _bttsSigma) : _bttsBlend * 0.5;
-        const _bttsHigh = _bttsSigma != null ? Math.min(95, _bttsBlend + 2 * _bttsSigma) : _bttsBlend * 1.5;
+        const _bttsVarFallback = _bttsBlend > 0
+          ? Math.sqrt((_bttsBlend / 100) * (1 - _bttsBlend / 100)) * 100
+          : 0;
+        const _bttsLow = _bttsSigma != null
+          ? Math.max(0, _bttsBlend - 2 * _bttsSigma)
+          : Math.max(0, _bttsBlend - 2 * _bttsVarFallback);
+        const _bttsHigh = _bttsSigma != null
+          ? Math.min(100, _bttsBlend + 2 * _bttsSigma)
+          : Math.min(100, _bttsBlend + 2 * _bttsVarFallback);
         bttsDynamicThreshold = Math.max(_bttsLow, Math.min(_bttsHigh, _bttsBlend));
       }
 
@@ -1113,6 +1162,100 @@ function generatePrediction(metricsResult, data, baseline, audit, rng) {
         }
       }
     }
+  }
+
+  // ── Learning Layer: Tarihsel kondisyon-benzerliği residual'ı ────────────────
+  // Tahmin bozucu DEĞİL — sadece ek kaynak ve snapshot kaydı.
+  // Hata olursa raporda işaret bırakır, ana akış etkilenmez.
+  try {
+    const _eventObj = data.event?.event || {};
+    const _kickoffTs = _eventObj?.startTimestamp ?? null;
+    const _matchId = _eventObj?.id ?? data.eventId ?? null;
+    const _tournamentId = _eventObj?.tournament?.uniqueTournament?.id ?? null;
+    const _seasonId = _eventObj?.season?.id ?? null;
+
+    const _poissonRes = report.poissonResult || {};
+    const _learned = learning.computeLearnedAdjustment({
+      metricsResult,
+      baseline,
+      poissonResult: {
+        lambdaHome: _poissonRes.lambdaHome,
+        lambdaAway: _poissonRes.lambdaAway,
+      },
+      kickoffTs: _kickoffTs,
+      matchId: _matchId,
+      tournamentId: _tournamentId,
+    });
+
+    report.learning = {
+      modelVersion: _learned.modelVersion,
+      poolSize: _learned.poolSize,
+      confidence: _learned.confidence,
+      effectiveN: _learned.effectiveN,
+      bandwidth: _learned.bandwidth,
+      leagueBonus: _learned.leagueBonus,
+      halfLifeDays: _learned.halfLifeDays,
+      adjustment: _learned.adjustment,
+      applied: _learned.applied,
+      reason: _learned.reason,
+      fingerprint: _learned.fingerprint?.vector || null,
+      fingerprintDimsAvailable: _learned.fingerprint?.dimsAvailable || 0,
+      // İlk N debug case (UI'da "neye göre öğrendi" gösterimi için)
+      topCases: (_learned.debugTopCases || []).slice(0, 6),
+    };
+
+    // Snapshot kaydı (predictions + fingerprint)
+    if (_matchId != null) {
+      // asOfTs: kickoff'tan ÖNCE bir an. kickoff null değilse ondan 1sn önce.
+      // Backtest as-of modunda data-fetcher tarafından kickoff_ts geçerliyse korunur.
+      const _asOfTs = _kickoffTs != null
+        ? Math.max(0, _kickoffTs - 1)
+        : Math.floor(Date.now() / 1000);
+
+      const _result = report.result || {};
+      const _predictedScore = report.score?.predicted || null;
+
+      learning.persistPrediction({
+        matchId: _matchId,
+        kickoffTs: _kickoffTs,
+        asOfTs: _asOfTs,
+        tournamentId: _tournamentId,
+        seasonId: _seasonId,
+        homeTeamId: data.homeTeamId ?? _eventObj?.homeTeam?.id ?? null,
+        awayTeamId: data.awayTeamId ?? _eventObj?.awayTeam?.id ?? null,
+        managerHomeId: _eventObj?.homeTeam?.manager?.id ?? null,
+        managerAwayId: _eventObj?.awayTeam?.manager?.id ?? null,
+        refereeId: _eventObj?.referee?.id ?? null,
+        lambdaHome: _poissonRes.lambdaHome ?? null,
+        lambdaAway: _poissonRes.lambdaAway ?? null,
+        rho: report.metadata?.dixonColesRho ?? null,
+        probHome: _result.homeWin ?? null,
+        probDraw: _result.draw ?? null,
+        probAway: _result.awayWin ?? null,
+        probO25: report.goals?.over25 ?? null,
+        probBTTS: report.goals?.btts ?? null,
+        predictedScore: _predictedScore,
+        // Hafif metrik matrisi (tüm metrik tree'yi yazmıyoruz — sadece composite)
+        metricMatrix: {
+          home: home.compositeScores,
+          away: away.compositeScores,
+          shared: { contextual: shared.contextual, h2h: shared.h2h, referee: shared.referee },
+        },
+        baseline: {
+          leagueAvgGoals: baseline.leagueAvgGoals ?? null,
+          leagueGoalVolatility: baseline.leagueGoalVolatility ?? null,
+          homeRestDays: baseline.homeRestDays ?? null,
+          awayRestDays: baseline.awayRestDays ?? null,
+          homeAdvantage: metricsResult.dynamicHomeAdvantage ?? null,
+        },
+        contextual: shared.contextual || null,
+        learnedAdj: report.learning,
+        fingerprint: _learned.fingerprint,
+      });
+    }
+  } catch (e) {
+    console.warn('[Learning] hook hatası (akış etkilenmedi):', e?.message || e);
+    report.learning = { enabled: false, error: e?.message || String(e) };
   }
 
   return report;

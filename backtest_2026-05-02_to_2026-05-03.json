@@ -1,0 +1,1092 @@
+{
+  "date": "2026-05-02",
+  "endDate": "2026-05-03",
+  "total": 10,
+  "finishedTotal": 10,
+  "upcomingTotal": 0,
+  "tournamentFilter": "all",
+  "accuracy1X2": 50,
+  "accuracyOU25": 40,
+  "accuracyBTTS": 50,
+  "accuracyScore": 0,
+  "avgBrierScore": 0.6611,
+  "avgLogLoss": 1.1476,
+  "htAccuracy1X2": 70,
+  "htAccuracyScore": 60,
+  "htTotal": 10,
+  "htftAccuracy": 50,
+  "htftTotal": 10,
+  "high": {
+    "count": 8,
+    "accuracy1X2": 50,
+    "accuracyOU25": 37.5,
+    "accuracyBTTS": 37.5,
+    "accuracyScore": 0,
+    "avgBrier": 0.642
+  },
+  "medium": null,
+  "low": {
+    "count": 2,
+    "accuracy1X2": 50,
+    "accuracyOU25": 50,
+    "accuracyBTTS": 100,
+    "accuracyScore": 0,
+    "avgBrier": 0.7375
+  },
+  "poissonAccuracy1X2": 50,
+  "simulationAccuracy1X2": 40,
+  "drawDetection": {
+    "actual": 4,
+    "predicted": 0,
+    "recallRate": 0,
+    "precisionRate": null
+  },
+  "valueBets": {
+    "count": 3,
+    "accuracy1X2": 0
+  },
+  "byTournament": [
+    {
+      "tournamentId": 17,
+      "name": "Premier League",
+      "total": 5,
+      "accuracy1X2": 60,
+      "accuracyOU25": 40,
+      "accuracyBTTS": 40,
+      "accuracyScore": 0,
+      "avgBrier": 0.5122
+    },
+    {
+      "tournamentId": 23,
+      "name": "Serie A",
+      "total": 5,
+      "accuracy1X2": 40,
+      "accuracyOU25": 40,
+      "accuracyBTTS": 60,
+      "accuracyScore": 0,
+      "avgBrier": 0.81
+    }
+  ],
+  "results": [
+    {
+      "matchId": 14023940,
+      "matchStatus": "finished",
+      "match": "Leeds United vs Burnley",
+      "homeTeam": "Leeds United",
+      "awayTeam": "Burnley",
+      "tournament": "Premier League",
+      "tournamentId": 17,
+      "matchDate": "2026-05-01",
+      "matchTime": "19:00",
+      "actual": "3-1",
+      "actualResult": "1",
+      "actualOU25": "Over",
+      "actualBTTS": "Yes",
+      "predicted": "2-0",
+      "predictedResult": "1",
+      "predictedOU25": "Over",
+      "predictedBTTS": "No",
+      "simTopScore": "4-0",
+      "probHome": 61.61,
+      "probDraw": 10.83,
+      "probAway": 27.55,
+      "probOU25": 69.2,
+      "probBTTS": 17.6,
+      "actualHT": "1-0",
+      "actualHTResult": "1",
+      "predictedHT": "1-0",
+      "predictedHTResult": "1",
+      "simHTTopScore": "1-0",
+      "htHomeWinProb": 86.24,
+      "htDrawProb": 11.96,
+      "htAwayWinProb": 1.8,
+      "simHTHomeWin": 79.5,
+      "simHTDraw": 19.6,
+      "simHTAwayWin": 0.9,
+      "htft": {
+        "top1": "1/1",
+        "top3": [
+          {
+            "result": "1/1",
+            "prob": 78.5
+          },
+          {
+            "result": "X/1",
+            "prob": 15.9
+          },
+          {
+            "result": "X/X",
+            "prob": 3.5
+          }
+        ],
+        "probs": {
+          "1/1": 78.5,
+          "1/X": 1,
+          "1/2": 0,
+          "X/1": 15.9,
+          "X/X": 3.5,
+          "X/2": 0.2,
+          "2/1": 0.4,
+          "2/X": 0.2,
+          "2/2": 0.3
+        }
+      },
+      "actualHTFT": "1/1",
+      "hitHTFT": true,
+      "hit1X2": true,
+      "hitOU25": true,
+      "hitBTTS": false,
+      "hitScore": false,
+      "hitHTResult": true,
+      "hitHTScore": true,
+      "brierScore": 0.235,
+      "logLoss": 0.4843,
+      "confidenceTier": "HIGH",
+      "maxProbability": 94.8,
+      "isHighConfidence": true,
+      "poisson": {
+        "predicted": "1",
+        "homeWin": 60.28,
+        "draw": 10.73,
+        "awayWin": 28.99,
+        "topScore": "2-0",
+        "hit": true,
+        "lambdaHome": 2.31,
+        "lambdaAway": 0.82
+      },
+      "simulation": {
+        "predicted": "1",
+        "homeWin": 94.8,
+        "draw": 4.7,
+        "awayWin": 0.5,
+        "hit": true
+      },
+      "restDays": {
+        "home": 5,
+        "away": 9
+      },
+      "isValueBet": false,
+      "modelEdge": -9.8,
+      "marketHome": 71.46,
+      "marketAway": 9.59
+    },
+    {
+      "matchId": 14023945,
+      "matchStatus": "finished",
+      "match": "Brentford vs West Ham United",
+      "homeTeam": "Brentford",
+      "awayTeam": "West Ham United",
+      "tournament": "Premier League",
+      "tournamentId": 17,
+      "matchDate": "2026-05-02",
+      "matchTime": "14:00",
+      "actual": "3-0",
+      "actualResult": "1",
+      "actualOU25": "Over",
+      "actualBTTS": "No",
+      "predicted": "2-1",
+      "predictedResult": "1",
+      "predictedOU25": "Under",
+      "predictedBTTS": "No",
+      "simTopScore": "0-0",
+      "probHome": 50.13,
+      "probDraw": 15.46,
+      "probAway": 34.42,
+      "probOU25": 17.6,
+      "probBTTS": 27.2,
+      "actualHT": "1-0",
+      "actualHTResult": "1",
+      "predictedHT": "0-0",
+      "predictedHTResult": "X",
+      "simHTTopScore": "0-0",
+      "htHomeWinProb": 45.68,
+      "htDrawProb": 44.21,
+      "htAwayWinProb": 10.03,
+      "simHTHomeWin": 19,
+      "simHTDraw": 62.8,
+      "simHTAwayWin": 18.2,
+      "htft": {
+        "top1": "X/X",
+        "top3": [
+          {
+            "result": "X/X",
+            "prob": 30.4
+          },
+          {
+            "result": "X/1",
+            "prob": 16.2
+          },
+          {
+            "result": "X/2",
+            "prob": 16.2
+          }
+        ],
+        "probs": {
+          "1/1": 14,
+          "1/X": 4.1,
+          "1/2": 0.9,
+          "X/1": 16.2,
+          "X/X": 30.4,
+          "X/2": 16.2,
+          "2/1": 0.7,
+          "2/X": 3.2,
+          "2/2": 14.3
+        }
+      },
+      "actualHTFT": "1/1",
+      "hitHTFT": false,
+      "hit1X2": true,
+      "hitOU25": false,
+      "hitBTTS": true,
+      "hitScore": false,
+      "hitHTResult": false,
+      "hitHTScore": false,
+      "brierScore": 0.3911,
+      "logLoss": 0.6906,
+      "confidenceTier": "LOW",
+      "maxProbability": 37.7,
+      "isHighConfidence": false,
+      "poisson": {
+        "predicted": "1",
+        "homeWin": 51.57,
+        "draw": 13.96,
+        "awayWin": 34.47,
+        "topScore": "2-1",
+        "hit": true,
+        "lambdaHome": 1.89,
+        "lambdaAway": 1.1
+      },
+      "simulation": {
+        "predicted": "X",
+        "homeWin": 30.9,
+        "draw": 37.7,
+        "awayWin": 31.4,
+        "hit": false
+      },
+      "restDays": {
+        "home": 5,
+        "away": 7
+      },
+      "isValueBet": false,
+      "modelEdge": -2.4,
+      "marketHome": 52.53,
+      "marketAway": 24.08
+    },
+    {
+      "matchId": 14023949,
+      "matchStatus": "finished",
+      "match": "Newcastle United vs Brighton & Hove Albion",
+      "homeTeam": "Newcastle United",
+      "awayTeam": "Brighton & Hove Albion",
+      "tournament": "Premier League",
+      "tournamentId": 17,
+      "matchDate": "2026-05-02",
+      "matchTime": "14:00",
+      "actual": "3-1",
+      "actualResult": "1",
+      "actualOU25": "Over",
+      "actualBTTS": "Yes",
+      "predicted": "1-2",
+      "predictedResult": "2",
+      "predictedOU25": "Under",
+      "predictedBTTS": "No",
+      "simTopScore": "0-2",
+      "probHome": 39.1,
+      "probDraw": 14.3,
+      "probAway": 46.6,
+      "probOU25": 60.2,
+      "probBTTS": 51.7,
+      "actualHT": "2-0",
+      "actualHTResult": "1",
+      "predictedHT": "0-1",
+      "predictedHTResult": "2",
+      "simHTTopScore": "0-1",
+      "htHomeWinProb": 31.5,
+      "htDrawProb": 25.1,
+      "htAwayWinProb": 43.41,
+      "simHTHomeWin": 14.2,
+      "simHTDraw": 35,
+      "simHTAwayWin": 50.8,
+      "htft": {
+        "top1": "2/2",
+        "top3": [
+          {
+            "result": "2/2",
+            "prob": 47
+          },
+          {
+            "result": "X/2",
+            "prob": 17.5
+          },
+          {
+            "result": "X/X",
+            "prob": 11.7
+          }
+        ],
+        "probs": {
+          "1/1": 8,
+          "1/X": 3.3,
+          "1/2": 2.9,
+          "X/1": 5.8,
+          "X/X": 11.7,
+          "X/2": 17.5,
+          "2/1": 1,
+          "2/X": 2.8,
+          "2/2": 47
+        }
+      },
+      "actualHTFT": "1/1",
+      "hitHTFT": false,
+      "hit1X2": false,
+      "hitOU25": false,
+      "hitBTTS": false,
+      "hitScore": false,
+      "hitHTResult": false,
+      "hitHTScore": false,
+      "brierScore": 0.6085,
+      "logLoss": 0.939,
+      "confidenceTier": "HIGH",
+      "maxProbability": 67.4,
+      "isHighConfidence": true,
+      "poisson": {
+        "predicted": "2",
+        "homeWin": 40.39,
+        "draw": 13.64,
+        "awayWin": 45.97,
+        "topScore": "1-1",
+        "hit": false,
+        "lambdaHome": 1.58,
+        "lambdaAway": 1.91
+      },
+      "simulation": {
+        "predicted": "2",
+        "homeWin": 14.8,
+        "draw": 17.8,
+        "awayWin": 67.4,
+        "hit": false
+      },
+      "restDays": {
+        "home": 7,
+        "away": 11
+      },
+      "isValueBet": true,
+      "modelEdge": 6.7,
+      "marketHome": 35.17,
+      "marketAway": 39.91
+    },
+    {
+      "matchId": 14023951,
+      "matchStatus": "finished",
+      "match": "Wolverhampton vs Sunderland",
+      "homeTeam": "Wolverhampton",
+      "awayTeam": "Sunderland",
+      "tournament": "Premier League",
+      "tournamentId": 17,
+      "matchDate": "2026-05-02",
+      "matchTime": "14:00",
+      "actual": "1-1",
+      "actualResult": "X",
+      "actualOU25": "Under",
+      "actualBTTS": "Yes",
+      "predicted": "1-0",
+      "predictedResult": "1",
+      "predictedOU25": "Under",
+      "predictedBTTS": "No",
+      "simTopScore": "0-2",
+      "probHome": 41.52,
+      "probDraw": 16.33,
+      "probAway": 42.16,
+      "probOU25": 47.4,
+      "probBTTS": 30.2,
+      "actualHT": "0-1",
+      "actualHTResult": "2",
+      "predictedHT": "0-1",
+      "predictedHTResult": "2",
+      "simHTTopScore": "0-0",
+      "htHomeWinProb": 16.59,
+      "htDrawProb": 53.93,
+      "htAwayWinProb": 29.46,
+      "simHTHomeWin": 6.1,
+      "simHTDraw": 37.6,
+      "simHTAwayWin": 56.3,
+      "htft": {
+        "top1": "2/2",
+        "top3": [
+          {
+            "result": "2/2",
+            "prob": 53.2
+          },
+          {
+            "result": "X/2",
+            "prob": 21.8
+          },
+          {
+            "result": "X/X",
+            "prob": 13
+          }
+        ],
+        "probs": {
+          "1/1": 3.5,
+          "1/X": 1.2,
+          "1/2": 1.4,
+          "X/1": 2.8,
+          "X/X": 13,
+          "X/2": 21.8,
+          "2/1": 0.5,
+          "2/X": 2.6,
+          "2/2": 53.2
+        }
+      },
+      "actualHTFT": "2/X",
+      "hitHTFT": false,
+      "hit1X2": false,
+      "hitOU25": true,
+      "hitBTTS": false,
+      "hitScore": false,
+      "hitHTResult": true,
+      "hitHTScore": true,
+      "brierScore": 1.0502,
+      "logLoss": 1.8122,
+      "confidenceTier": "HIGH",
+      "maxProbability": 76.4,
+      "isHighConfidence": true,
+      "poisson": {
+        "predicted": "1",
+        "homeWin": 44.32,
+        "draw": 15.82,
+        "awayWin": 39.86,
+        "topScore": "1-1",
+        "hit": false,
+        "lambdaHome": 1.42,
+        "lambdaAway": 1.15
+      },
+      "simulation": {
+        "predicted": "2",
+        "homeWin": 6.8,
+        "draw": 16.8,
+        "awayWin": 76.4,
+        "hit": false
+      },
+      "restDays": {
+        "home": 7,
+        "away": 8
+      },
+      "isValueBet": true,
+      "modelEdge": 17.5,
+      "marketHome": 24.03,
+      "marketAway": 49.64
+    },
+    {
+      "matchId": 14023931,
+      "matchStatus": "finished",
+      "match": "Arsenal vs Fulham",
+      "homeTeam": "Arsenal",
+      "awayTeam": "Fulham",
+      "tournament": "Premier League",
+      "tournamentId": 17,
+      "matchDate": "2026-05-02",
+      "matchTime": "16:30",
+      "actual": "3-0",
+      "actualResult": "1",
+      "actualOU25": "Over",
+      "actualBTTS": "No",
+      "predicted": "2-0",
+      "predictedResult": "1",
+      "predictedOU25": "Under",
+      "predictedBTTS": "No",
+      "simTopScore": "1-0",
+      "probHome": 58,
+      "probDraw": 13.34,
+      "probAway": 28.66,
+      "probOU25": 38.9,
+      "probBTTS": 23.6,
+      "actualHT": "3-0",
+      "actualHTResult": "1",
+      "predictedHT": "1-0",
+      "predictedHTResult": "1",
+      "simHTTopScore": "1-0",
+      "htHomeWinProb": 81.73,
+      "htDrawProb": 15.87,
+      "htAwayWinProb": 2.3,
+      "simHTHomeWin": 74.8,
+      "simHTDraw": 23.1,
+      "simHTAwayWin": 2.1,
+      "htft": {
+        "top1": "1/1",
+        "top3": [
+          {
+            "result": "1/1",
+            "prob": 70.5
+          },
+          {
+            "result": "X/X",
+            "prob": 12.4
+          },
+          {
+            "result": "X/1",
+            "prob": 8.9
+          }
+        ],
+        "probs": {
+          "1/1": 70.5,
+          "1/X": 4,
+          "1/2": 0.3,
+          "X/1": 8.9,
+          "X/X": 12.4,
+          "X/2": 1.8,
+          "2/1": 0.2,
+          "2/X": 1,
+          "2/2": 0.9
+        }
+      },
+      "actualHTFT": "1/1",
+      "hitHTFT": true,
+      "hit1X2": true,
+      "hitOU25": false,
+      "hitBTTS": true,
+      "hitScore": false,
+      "hitHTResult": true,
+      "hitHTScore": false,
+      "brierScore": 0.2763,
+      "logLoss": 0.5447,
+      "confidenceTier": "HIGH",
+      "maxProbability": 79.6,
+      "isHighConfidence": true,
+      "poisson": {
+        "predicted": "1",
+        "homeWin": 57.72,
+        "draw": 12.62,
+        "awayWin": 29.66,
+        "topScore": "2-0",
+        "hit": true,
+        "lambdaHome": 1.97,
+        "lambdaAway": 0.77
+      },
+      "simulation": {
+        "predicted": "1",
+        "homeWin": 79.6,
+        "draw": 17.4,
+        "awayWin": 3,
+        "hit": true
+      },
+      "restDays": {
+        "home": 3,
+        "away": 7
+      },
+      "isValueBet": false,
+      "modelEdge": -9.9,
+      "marketHome": 67.88,
+      "marketAway": 12.04
+    },
+    {
+      "matchId": 13980097,
+      "matchStatus": "finished",
+      "match": "Pisa vs Lecce",
+      "homeTeam": "Pisa",
+      "awayTeam": "Lecce",
+      "tournament": "Serie A",
+      "tournamentId": 23,
+      "matchDate": "2026-05-01",
+      "matchTime": "18:45",
+      "actual": "1-2",
+      "actualResult": "2",
+      "actualOU25": "Over",
+      "actualBTTS": "Yes",
+      "predicted": "0-1",
+      "predictedResult": "2",
+      "predictedOU25": "Under",
+      "predictedBTTS": "No",
+      "simTopScore": "0-0",
+      "probHome": 37.53,
+      "probDraw": 18.69,
+      "probAway": 43.78,
+      "probOU25": 6.4,
+      "probBTTS": 12.3,
+      "actualHT": "0-0",
+      "actualHTResult": "X",
+      "predictedHT": "0-0",
+      "predictedHTResult": "X",
+      "simHTTopScore": "0-0",
+      "htHomeWinProb": 15.29,
+      "htDrawProb": 84.7,
+      "htAwayWinProb": 0,
+      "simHTHomeWin": 4.4,
+      "simHTDraw": 72.6,
+      "simHTAwayWin": 23,
+      "htft": {
+        "top1": "X/X",
+        "top3": [
+          {
+            "result": "X/X",
+            "prob": 45.7
+          },
+          {
+            "result": "2/2",
+            "prob": 20.3
+          },
+          {
+            "result": "X/2",
+            "prob": 14.9
+          }
+        ],
+        "probs": {
+          "1/1": 2.9,
+          "1/X": 1.2,
+          "1/2": 0.3,
+          "X/1": 12,
+          "X/X": 45.7,
+          "X/2": 14.9,
+          "2/1": 0.2,
+          "2/X": 2.5,
+          "2/2": 20.3
+        }
+      },
+      "actualHTFT": "X/2",
+      "hitHTFT": false,
+      "hit1X2": true,
+      "hitOU25": false,
+      "hitBTTS": false,
+      "hitScore": false,
+      "hitHTResult": true,
+      "hitHTScore": true,
+      "brierScore": 0.4919,
+      "logLoss": 0.826,
+      "confidenceTier": "HIGH",
+      "maxProbability": 49.4,
+      "isHighConfidence": true,
+      "poisson": {
+        "predicted": "2",
+        "homeWin": 39.74,
+        "draw": 15.18,
+        "awayWin": 45.07,
+        "topScore": "0-0",
+        "hit": true,
+        "lambdaHome": 0.83,
+        "lambdaAway": 1.15
+      },
+      "simulation": {
+        "predicted": "X",
+        "homeWin": 15.1,
+        "draw": 49.4,
+        "awayWin": 35.5,
+        "hit": false
+      },
+      "restDays": {
+        "home": 6,
+        "away": 6
+      },
+      "isValueBet": false,
+      "modelEdge": 2.8,
+      "marketHome": 27.21,
+      "marketAway": 40.95
+    },
+    {
+      "matchId": 13980095,
+      "matchStatus": "finished",
+      "match": "Udinese vs Torino",
+      "homeTeam": "Udinese",
+      "awayTeam": "Torino",
+      "tournament": "Serie A",
+      "tournamentId": 23,
+      "matchDate": "2026-05-02",
+      "matchTime": "13:00",
+      "actual": "2-0",
+      "actualResult": "1",
+      "actualOU25": "Under",
+      "actualBTTS": "No",
+      "predicted": "1-0",
+      "predictedResult": "1",
+      "predictedOU25": "Over",
+      "predictedBTTS": "Yes",
+      "simTopScore": "2-1",
+      "probHome": 51.84,
+      "probDraw": 12.28,
+      "probAway": 35.88,
+      "probOU25": 77,
+      "probBTTS": 68.7,
+      "actualHT": "1-0",
+      "actualHTResult": "1",
+      "predictedHT": "1-0",
+      "predictedHTResult": "1",
+      "simHTTopScore": "1-0",
+      "htHomeWinProb": 71.31,
+      "htDrawProb": 24.29,
+      "htAwayWinProb": 4.32,
+      "simHTHomeWin": 52.9,
+      "simHTDraw": 29.2,
+      "simHTAwayWin": 17.9,
+      "htft": {
+        "top1": "1/1",
+        "top3": [
+          {
+            "result": "1/1",
+            "prob": 46.2
+          },
+          {
+            "result": "X/1",
+            "prob": 16.8
+          },
+          {
+            "result": "2/2",
+            "prob": 8.8
+          }
+        ],
+        "probs": {
+          "1/1": 46.2,
+          "1/X": 5.4,
+          "1/2": 1.3,
+          "X/1": 16.8,
+          "X/X": 6.9,
+          "X/2": 5.5,
+          "2/1": 4.2,
+          "2/X": 4.9,
+          "2/2": 8.8
+        }
+      },
+      "actualHTFT": "1/1",
+      "hitHTFT": true,
+      "hit1X2": true,
+      "hitOU25": false,
+      "hitBTTS": false,
+      "hitScore": false,
+      "hitHTResult": true,
+      "hitHTScore": true,
+      "brierScore": 0.3758,
+      "logLoss": 0.657,
+      "confidenceTier": "HIGH",
+      "maxProbability": 67.2,
+      "isHighConfidence": true,
+      "poisson": {
+        "predicted": "1",
+        "homeWin": 51.83,
+        "draw": 11.28,
+        "awayWin": 36.89,
+        "topScore": "1-0",
+        "hit": true,
+        "lambdaHome": 1.86,
+        "lambdaAway": 0.92
+      },
+      "simulation": {
+        "predicted": "1",
+        "homeWin": 67.2,
+        "draw": 17.2,
+        "awayWin": 15.6,
+        "hit": true
+      },
+      "restDays": {
+        "home": 5,
+        "away": 6
+      },
+      "isValueBet": false,
+      "modelEdge": 3.3,
+      "marketHome": 48.58,
+      "marketAway": 23.01
+    },
+    {
+      "matchId": 13980081,
+      "matchStatus": "finished",
+      "match": "Como vs SSC Napoli",
+      "homeTeam": "Como",
+      "awayTeam": "SSC Napoli",
+      "tournament": "Serie A",
+      "tournamentId": 23,
+      "matchDate": "2026-05-02",
+      "matchTime": "16:00",
+      "actual": "0-0",
+      "actualResult": "X",
+      "actualOU25": "Under",
+      "actualBTTS": "No",
+      "predicted": "1-0",
+      "predictedResult": "1",
+      "predictedOU25": "Over",
+      "predictedBTTS": "No",
+      "simTopScore": "2-0",
+      "probHome": 51.81,
+      "probDraw": 12.69,
+      "probAway": 35.49,
+      "probOU25": 63.7,
+      "probBTTS": 40.5,
+      "actualHT": "0-0",
+      "actualHTResult": "X",
+      "predictedHT": "1-0",
+      "predictedHTResult": "1",
+      "simHTTopScore": "1-0",
+      "htHomeWinProb": 67.3,
+      "htDrawProb": 19.67,
+      "htAwayWinProb": 13.03,
+      "simHTHomeWin": 66.7,
+      "simHTDraw": 27.5,
+      "simHTAwayWin": 5.8,
+      "htft": {
+        "top1": "1/1",
+        "top3": [
+          {
+            "result": "1/1",
+            "prob": 62.2
+          },
+          {
+            "result": "X/1",
+            "prob": 16.8
+          },
+          {
+            "result": "X/X",
+            "prob": 7.5
+          }
+        ],
+        "probs": {
+          "1/1": 62.2,
+          "1/X": 3.5,
+          "1/2": 1,
+          "X/1": 16.8,
+          "X/X": 7.5,
+          "X/2": 3.2,
+          "2/1": 1.9,
+          "2/X": 1.5,
+          "2/2": 2.4
+        }
+      },
+      "actualHTFT": "X/X",
+      "hitHTFT": false,
+      "hit1X2": false,
+      "hitOU25": false,
+      "hitBTTS": true,
+      "hitScore": false,
+      "hitHTResult": false,
+      "hitHTScore": false,
+      "brierScore": 1.1567,
+      "logLoss": 2.0644,
+      "confidenceTier": "HIGH",
+      "maxProbability": 80.9,
+      "isHighConfidence": true,
+      "poisson": {
+        "predicted": "1",
+        "homeWin": 50.25,
+        "draw": 11.96,
+        "awayWin": 37.79,
+        "topScore": "1-0",
+        "hit": false,
+        "lambdaHome": 2.07,
+        "lambdaAway": 1.3
+      },
+      "simulation": {
+        "predicted": "1",
+        "homeWin": 80.9,
+        "draw": 12.5,
+        "awayWin": 6.6,
+        "hit": false
+      },
+      "restDays": {
+        "home": 6,
+        "away": 8
+      },
+      "isValueBet": true,
+      "modelEdge": 8.6,
+      "marketHome": 43.21,
+      "marketAway": 27.03
+    },
+    {
+      "matchId": 13980083,
+      "matchStatus": "finished",
+      "match": "Atalanta vs Genoa",
+      "homeTeam": "Atalanta",
+      "awayTeam": "Genoa",
+      "tournament": "Serie A",
+      "tournamentId": 23,
+      "matchDate": "2026-05-02",
+      "matchTime": "18:45",
+      "actual": "0-0",
+      "actualResult": "X",
+      "actualOU25": "Under",
+      "actualBTTS": "No",
+      "predicted": "1-0",
+      "predictedResult": "1",
+      "predictedOU25": "Under",
+      "predictedBTTS": "No",
+      "simTopScore": "0-0",
+      "probHome": 47.06,
+      "probDraw": 15.16,
+      "probAway": 37.77,
+      "probOU25": 34.9,
+      "probBTTS": 45.4,
+      "actualHT": "0-0",
+      "actualHTResult": "X",
+      "predictedHT": "0-0",
+      "predictedHTResult": "X",
+      "simHTTopScore": "0-0",
+      "htHomeWinProb": 47.34,
+      "htDrawProb": 35.87,
+      "htAwayWinProb": 16.75,
+      "simHTHomeWin": 29.5,
+      "simHTDraw": 59.5,
+      "simHTAwayWin": 11,
+      "htft": {
+        "top1": "X/X",
+        "top3": [
+          {
+            "result": "X/X",
+            "prob": 23.4
+          },
+          {
+            "result": "X/2",
+            "prob": 18.1
+          },
+          {
+            "result": "1/1",
+            "prob": 18
+          }
+        ],
+        "probs": {
+          "1/1": 18,
+          "1/X": 7.4,
+          "1/2": 4.1,
+          "X/1": 18,
+          "X/X": 23.4,
+          "X/2": 18.1,
+          "2/1": 1.1,
+          "2/X": 3,
+          "2/2": 6.9
+        }
+      },
+      "actualHTFT": "X/X",
+      "hitHTFT": true,
+      "hit1X2": false,
+      "hitOU25": true,
+      "hitBTTS": true,
+      "hitScore": false,
+      "hitHTResult": true,
+      "hitHTScore": true,
+      "brierScore": 1.0839,
+      "logLoss": 1.8865,
+      "confidenceTier": "LOW",
+      "maxProbability": 37.1,
+      "isHighConfidence": false,
+      "poisson": {
+        "predicted": "1",
+        "homeWin": 48.23,
+        "draw": 13.47,
+        "awayWin": 38.3,
+        "topScore": "1-1",
+        "hit": false,
+        "lambdaHome": 1.62,
+        "lambdaAway": 1.13
+      },
+      "simulation": {
+        "predicted": "1",
+        "homeWin": 37.1,
+        "draw": 33.8,
+        "awayWin": 29.1,
+        "hit": false
+      },
+      "restDays": {
+        "home": 5,
+        "away": 6
+      },
+      "isValueBet": false,
+      "modelEdge": -18.3,
+      "marketHome": 65.31,
+      "marketAway": 14.09
+    },
+    {
+      "matchId": 13980082,
+      "matchStatus": "finished",
+      "match": "Bologna vs Cagliari",
+      "homeTeam": "Bologna",
+      "awayTeam": "Cagliari",
+      "tournament": "Serie A",
+      "tournamentId": 23,
+      "matchDate": "2026-05-03",
+      "matchTime": "10:30",
+      "actual": "0-0",
+      "actualResult": "X",
+      "actualOU25": "Under",
+      "actualBTTS": "No",
+      "predicted": "1-0",
+      "predictedResult": "1",
+      "predictedOU25": "Under",
+      "predictedBTTS": "No",
+      "simTopScore": "0-0",
+      "probHome": 41.16,
+      "probDraw": 20.78,
+      "probAway": 38.07,
+      "probOU25": 2.1,
+      "probBTTS": 6.7,
+      "actualHT": "0-0",
+      "actualHTResult": "X",
+      "predictedHT": "0-0",
+      "predictedHTResult": "X",
+      "simHTTopScore": "0-0",
+      "htHomeWinProb": 12.43,
+      "htDrawProb": 45.72,
+      "htAwayWinProb": 41.84,
+      "simHTHomeWin": 3.3,
+      "simHTDraw": 81.6,
+      "simHTAwayWin": 15.1,
+      "htft": {
+        "top1": "X/X",
+        "top3": [
+          {
+            "result": "X/X",
+            "prob": 62.3
+          },
+          {
+            "result": "X/1",
+            "prob": 15.7
+          },
+          {
+            "result": "2/2",
+            "prob": 12
+          }
+        ],
+        "probs": {
+          "1/1": 3,
+          "1/X": 0.2,
+          "1/2": 0.1,
+          "X/1": 15.7,
+          "X/X": 62.3,
+          "X/2": 3.6,
+          "2/1": 0.4,
+          "2/X": 2.7,
+          "2/2": 12
+        }
+      },
+      "actualHTFT": "X/X",
+      "hitHTFT": true,
+      "hit1X2": false,
+      "hitOU25": true,
+      "hitBTTS": true,
+      "hitScore": false,
+      "hitHTResult": true,
+      "hitHTScore": true,
+      "brierScore": 0.9419,
+      "logLoss": 1.5712,
+      "confidenceTier": "HIGH",
+      "maxProbability": 65.2,
+      "isHighConfidence": true,
+      "poisson": {
+        "predicted": "1",
+        "homeWin": 44.82,
+        "draw": 13.61,
+        "awayWin": 41.57,
+        "topScore": "1-1",
+        "hit": false,
+        "lambdaHome": 1.3,
+        "lambdaAway": 1.16
+      },
+      "simulation": {
+        "predicted": "X",
+        "homeWin": 19.1,
+        "draw": 65.2,
+        "awayWin": 15.7,
+        "hit": true
+      },
+      "restDays": {
+        "home": 8,
+        "away": 6
+      },
+      "isValueBet": false,
+      "modelEdge": -1.7,
+      "marketHome": 42.9,
+      "marketAway": 26.67
+    }
+  ]
+}

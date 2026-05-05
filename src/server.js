@@ -3,6 +3,8 @@ const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
 const { fetchAllMatchData, fetchPlayerStatsForPlayers, enrichPlayers } = require('./services/data-fetcher');
+const { applyAsOfFilter } = require('./services/as-of-filter');
+const learning = require('./learning');
 const { generatePrediction } = require('./engine/prediction-generator');
 const { METRIC_METADATA } = require('./engine/metric-metadata');
 const { computeAlpha, computeQualityFactors } = require('./engine/quality-factors');
@@ -648,8 +650,11 @@ app.get('/api/match-debug/:eventId', async (req, res) => {
 // Gerçek server pipeline: fetchAllMatchData → metrics → baseline → generatePrediction
 // SSE stream: her maç anlık gönderilir
 const TOP_TOURNAMENT_IDS_BT = new Set([17, 8, 23, 35, 34, 7, 679, 52, 325, 37, 132, 23651]);
-const MAX_BACKTEST_DAYS_RANGE = 60;
+// 10000 maçlık run desteği için 365 gün — tüm sezonu kapsasın.
+const MAX_BACKTEST_DAYS_RANGE = 365;
 const BACKTEST_INTER_DELAY_MS = 4000;
+// Her N maçta bir browser page'i yenile → memory leak ve Cloudflare cookie tazeleme.
+const BROWSER_REFRESH_EVERY = 500;
 
 function buildTournamentFilter(tournamentParam) {
   if (tournamentParam === 'top') return (id) => TOP_TOURNAMENT_IDS_BT.has(id);
@@ -663,7 +668,7 @@ app.get('/api/backtest', async (req, res) => {
   const date = req.query.date || new Date(Date.now() - 86400000).toISOString().split('T')[0];
   const endDate = req.query.endDate || date;
   const rawLimit = parseInt(req.query.limit, 10);
-  const matchLimit = (!isNaN(rawLimit) && rawLimit >= 1) ? Math.min(rawLimit, 9999) : 10;
+  const matchLimit = (!isNaN(rawLimit) && rawLimit >= 1) ? Math.min(rawLimit, 50000) : 10;
   const tournamentFilter = req.query.tournament || 'top';
   const includeUnplayed = req.query.includeUnplayed === 'true';
   const minConfidence = parseFloat(req.query.minConfidence) || 0;
@@ -779,6 +784,20 @@ app.get('/api/backtest', async (req, res) => {
 
       try {
         const cachedData = await fetchAllMatchData(match.id);
+
+        // ── As-of disiplini: oynanmış maç ise kickoff_ts öncesi veriyle sınırla ──
+        // includeUnplayed=false (default) → bu mod zaten oynanmış maçları seçiyor.
+        // Maç sonrası gelen team_last_events / h2h / referee history sızmasın.
+        if (isFinished && match.startTimestamp) {
+          applyAsOfFilter(cachedData, { cutoffTs: match.startTimestamp - 1 });
+          const m = cachedData._asOfMeta;
+          if (m) {
+            const kept = m.filtered.reduce((s, f) => s + f.kept, 0);
+            const total = m.filtered.reduce((s, f) => s + f.total, 0);
+            progress(`  ⏱ as-of ${m.cutoffISO} | ${kept}/${total} event kalan | leaked: ${m.leakedFields.length}`);
+          }
+        }
+
         const { data, metrics, baseline } = prepareMatchContext({
           cachedData, forBacktest: true, logPrefix: 'BACKTEST'
         });
@@ -906,6 +925,25 @@ app.get('/api/backtest', async (req, res) => {
           logLoss = -(oH * Math.log(pH_n + eps) + oD * Math.log(pD_n + eps) + oA * Math.log(pA_n + eps));
           totalBrier += brierScore;
           totalLogLoss += logLoss;
+
+          // ── Learning Layer: outcome + residual kaydı ─────────────────────────
+          // generatePrediction zaten learning.persistPrediction çağırdı (prediction-generator hook)
+          // Şimdi gerçek skoru kaydedip residual otomatik hesaplansın.
+          try {
+            learning.persistOutcome({
+              matchId: match.id,
+              kickoffTs: match.startTimestamp ?? null,
+              tournamentId: match.tournament?.uniqueTournament?.id ?? null,
+              homeTeamId: match.homeTeam?.id ?? null,
+              awayTeamId: match.awayTeam?.id ?? null,
+              homeScore: realHS,
+              awayScore: realAS,
+              htHome: realHTHS,
+              htAway: realHTAS,
+            });
+          } catch (e) {
+            console.warn('[Learning] outcome kaydı başarısız:', e?.message || e);
+          }
         }
 
         // ── Motor karşılaştırması ──
@@ -1082,6 +1120,17 @@ app.get('/api/backtest', async (req, res) => {
 
     const fname = endDate !== date ? `backtest_${date}_to_${endDate}.json` : `backtest_${date}.json`;
     fs.writeFileSync(path.join(__dirname, '..', fname), JSON.stringify(summary, null, 2), 'utf-8');
+
+    // ── Learning: toplu reconcile + stats ────────────────────────────────────
+    try {
+      const rec = learning.reconcileResiduals();
+      const lstats = learning.getStats();
+      summary.learning = { reconciled: rec.updated, ...lstats };
+      progress(`📚 learning store: predictions=${lstats.predictions} outcomes=${lstats.outcomes} residuals=${lstats.residuals} fingerprints=${lstats.fingerprints}` + (rec.updated > 0 ? ` (+${rec.updated} reconciled)` : ''));
+    } catch (e) {
+      console.warn('[Learning] reconcile başarısız:', e?.message || e);
+    }
+
     send('summary', summary);
 
   } catch (err) {

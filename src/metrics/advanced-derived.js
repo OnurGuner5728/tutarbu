@@ -252,16 +252,22 @@ function calculateAdvancedMetrics(allMetrics) {
     leagueAvgGoals != null && leagueAvgGoals > 0 &&
     _leagueXGAvg != null && _leagueXGAvg > 0
   ) ? leagueAvgGoals / _leagueXGAvg : null;
-  // Dinamik sınırlar: CV yüksekse (volatil lig) xG→actual fark daha geniş olabilir
+  // Dinamik sınırlar: CV'den türer. Üst/alt sabit cap KALDIRILDI — xG/actual oranı
+  // ligin gerçek volatilitesine göre 0.30-3.00 arası dalgalanabilir.
+  // _cvEarly yoksa hesaplama atlanır (null ratio → düzeltme uygulanmaz).
   const _cvEarly = (vol != null && leagueAvgGoals > 0) ? vol / leagueAvgGoals : null;
-  const _xgLowerBound = Math.max(0.70, 1.0 - (_cvEarly ?? 0.5) * 0.60);
-  const _xgUpperBound = Math.min(1.70, 1.0 + (_cvEarly ?? 0.5) * 0.80);
+  // CV=0.3 → bounds [0.7, 1.3]; CV=0.5 → [0.5, 1.5]; CV=1.0 → [0, 2]
+  const _xgLowerBound = _cvEarly != null ? Math.max(0, 1.0 - _cvEarly * 2) : null;
+  const _xgUpperBound = _cvEarly != null ? 1.0 + _cvEarly * 2 : null;
   let xGCorrectionFactor = null;
   let _xgCorrectionSkipReason = null;
   if (_xGToActualRatio == null) {
     _xgCorrectionSkipReason = 'no xG or league avg data';
+  } else if (_xgLowerBound == null || _xgUpperBound == null) {
+    // CV verisi yok → düzeltme atlanır
+    _xgCorrectionSkipReason = 'no league CV for bounds';
   } else if (_xGToActualRatio < _xgLowerBound || _xGToActualRatio > _xgUpperBound) {
-    _xgCorrectionSkipReason = `ratio ${_xGToActualRatio.toFixed(3)} out of bounds [${_xgLowerBound.toFixed(2)}, ${_xgUpperBound.toFixed(2)}]`;
+    _xgCorrectionSkipReason = `ratio ${_xGToActualRatio.toFixed(3)} out of CV-derived bounds [${_xgLowerBound.toFixed(2)}, ${_xgUpperBound.toFixed(2)}]`;
     console.warn(`[AdvancedDerived] xGCorrectionFactor skipped: ${_xgCorrectionSkipReason}`);
   } else {
     xGCorrectionFactor = _xGToActualRatio;
@@ -387,10 +393,15 @@ function calculateAdvancedMetrics(allMetrics) {
   })();
   // Lambda tavanı: max(μ + 3σ, μ × 1.5) — backtest kanıtı: μ+2σ çok sıkıydı
   // (Poisson ort. 1.41, gerçek 2.65). %99.7 güven aralığı + minimum 1.5× lig ortalaması.
-  const _lambdaCeilMult = allMetrics.normMaxRatio ?? 1.5;
-  const dynamicLambdaMax = (leagueAvgGoals != null && _volForMax != null)
+  // normMaxRatio yoksa CV'den türet (vol/avg ile lig en güçlü oranı yaklaşığı).
+  // Statik 1.5 fallback kaldırıldı — veri yoksa SIM_CONFIG matematiksel sınırına düşer.
+  const _lambdaCeilMult = allMetrics.normMaxRatio
+    ?? (_volForMax != null && leagueAvgGoals > 0 ? 1 + _volForMax / leagueAvgGoals : null);
+  const dynamicLambdaMax = (leagueAvgGoals != null && _volForMax != null && _lambdaCeilMult != null)
     ? Math.max(leagueAvgGoals + _volForMax * 3, leagueAvgGoals * _lambdaCeilMult)
-    : SIM_CONFIG.LIMITS.LAMBDA.MAX;
+    : (leagueAvgGoals != null && _volForMax != null
+        ? leagueAvgGoals + _volForMax * 3
+        : SIM_CONFIG.LIMITS.LAMBDA.MAX);
 
   // Hırs Hassasiyeti (URGENCY_SENS): veri yoksa sıfır → urgency etkisi lambda'ya yansımaz
   // 0.5 ölçeği → volatiliteye bağlı: volatil lig, aciliyet etkisi daha belirgin
@@ -424,8 +435,13 @@ function calculateAdvancedMetrics(allMetrics) {
   // dampFactor güçlü favori maçlarında (City vs Burnley) avantajın %23'ünü siliyordu.
   // Bayesian regresyon zaten profileN küçükse düşük ağırlık vererek yapılıyor.
 
-  const _lambdaFloorMult = allMetrics.normMinRatio ?? 0.35;
-  const dynamicLambdaMin = (leagueAvgGoals != null && leagueAvgGoals > 0)
+  // normMinRatio yoksa CV'den türet (1 - vol/avg ≈ ligin en zayıf takımının oranı).
+  // Statik 0.35 fallback kaldırıldı — veriden türetilemiyorsa SIM_CONFIG matematiksel min.
+  const _lambdaFloorMult = allMetrics.normMinRatio
+    ?? (_volForMax != null && leagueAvgGoals > 0
+        ? Math.max(0, 1 - _volForMax / leagueAvgGoals)
+        : null);
+  const dynamicLambdaMin = (leagueAvgGoals != null && leagueAvgGoals > 0 && _lambdaFloorMult != null)
     ? Math.max(SIM_CONFIG.LIMITS.LAMBDA.MIN, leagueAvgGoals * _lambdaFloorMult)
     : SIM_CONFIG.LIMITS.LAMBDA.MIN;
   let lambda_home = (dcBase_home != null)
@@ -453,9 +469,11 @@ function calculateAdvancedMetrics(allMetrics) {
   // xGOverPerf = gerçek gol ort. / xG ort. → >1 beklentiden fazla gol atıyor (clinical)
   // Kaynak: homeXGScored (xG), homeAttack.M001 veya homeScoreProfile.avgScored (gerçek)
   // Hassasiyet = _cv × (1 - normMinRatio) — standings'ten, sıfır statik
+  // _xgSens: CV ve normMinRatio'dan türer. Statik 0.35 fallback KALDIRILDI —
+  // veriler eksikse null → modülasyon uygulanmaz.
   const _xgSens = (_cv != null && allMetrics.normMinRatio != null)
     ? _cv * (1.0 - allMetrics.normMinRatio)
-    : (_cv != null ? _cv * 0.35 : null);
+    : (_cv != null ? _cv : null);  // Veri yoksa CV tek başına (yumuşak)
 
   const _homeActualGoals = homeAttack?.M001 ?? homeScoreProfile?.avgScored ?? null;
   const _awayActualGoals = awayAttack?.M001 ?? awayScoreProfile?.avgScored ?? null;
@@ -482,7 +500,8 @@ function calculateAdvancedMetrics(allMetrics) {
 
   if (_refGPM != null && leagueAvgGoals != null && leagueAvgGoals > 0 && _refSens != null) {
     const refRatio = _refGPM / (leagueAvgGoals * 2); // maç başı toplam gol normalize
-    const refMod = clamp(1.0 + (refRatio - 1.0) * _refSens, 1.0 - _refSens * 0.5, 1.0 + _refSens * 0.5);
+    // Etki sınırları doğrudan _refSens'ten — sabit 0.5 katsayısı kaldırıldı.
+    const refMod = clamp(1.0 + (refRatio - 1.0) * _refSens, 1.0 - _refSens, 1.0 + _refSens);
     if (lambda_home != null) lambda_home = clamp(lambda_home * refMod, dynamicLambdaMin, dynamicLambdaMax);
     if (lambda_away != null) lambda_away = clamp(lambda_away * refMod, dynamicLambdaMin, dynamicLambdaMax);
   }
@@ -493,23 +512,28 @@ function calculateAdvancedMetrics(allMetrics) {
   // Referans: leagueFingerprint'ten lig geneli cleanSheet oranı
   const _lgCSR = leagueFingerprint?.leagueCleanSheetRate ?? leagueFingerprint?.cleanSheetRate ?? null;
 
-  if (_lgCSR != null && _cv != null) {
-    // Ev savunması: homeCSR / lgCSR → >1 güçlü savunma
+  if (_lgCSR != null && _cv != null && _lgCSR > 0) {
+    // Sabit 0.5 ve 0.3 katsayıları KALDIRILDI. Etki büyüklüğü tamamen CV'den türer:
+    //   damping = (1 - SR) * CV * (defRatio - 1)
+    //   floor   = max(0, 1 - CV)  (CV=1 → tam silinebilir; CV=0 → hiç dokunma)
+    const _floor = Math.max(0, 1 - _cv);
+
+    // Ev savunması: homeCSR / lgCSR → >1 güçlü savunma → away gol üretimini baskıla
     const _hCSR = homeScoreProfile?.cleanSheetRate ?? null;
-    const _aSR  = awayScoreProfile?.scoringRate ?? null; // dep gol atma oranı (0-1)
+    const _aSR  = awayScoreProfile?.scoringRate ?? null;
     if (_hCSR != null && _aSR != null && lambda_away != null) {
-      const defRatio = _hCSR / Math.max(_lgCSR, 0.01); // normalize
-      const defAtkMod_away = clamp(1.0 - (1.0 - _aSR) * _cv * Math.max(0, defRatio - 1.0) * 0.5,
-        1.0 - _cv * 0.3, 1.0);
+      const defRatio = _hCSR / _lgCSR;
+      const defAtkMod_away = clamp(1.0 - (1.0 - _aSR) * _cv * Math.max(0, defRatio - 1.0),
+        _floor, 1.0);
       lambda_away = clamp(lambda_away * defAtkMod_away, dynamicLambdaMin, dynamicLambdaMax);
     }
     // Deplasman savunması: awayCSR → ev gol üretimini baskıla
     const _aCSR = awayScoreProfile?.cleanSheetRate ?? null;
     const _hSR  = homeScoreProfile?.scoringRate ?? null;
     if (_aCSR != null && _hSR != null && lambda_home != null) {
-      const defRatio = _aCSR / Math.max(_lgCSR, 0.01);
-      const defAtkMod_home = clamp(1.0 - (1.0 - _hSR) * _cv * Math.max(0, defRatio - 1.0) * 0.5,
-        1.0 - _cv * 0.3, 1.0);
+      const defRatio = _aCSR / _lgCSR;
+      const defAtkMod_home = clamp(1.0 - (1.0 - _hSR) * _cv * Math.max(0, defRatio - 1.0),
+        _floor, 1.0);
       lambda_home = clamp(lambda_home * defAtkMod_home, dynamicLambdaMin, dynamicLambdaMax);
     }
   }
@@ -555,21 +579,30 @@ function calculateAdvancedMetrics(allMetrics) {
       referenceReliability = 0.35; // standings veri her zaman mevcut ama tek referans olarak zayıf
     }
 
-    // 2. Kalibrasyon oranı ve ölçekleme faktörü
+    // 2. Kalibrasyon oranı ve ölçekleme faktörü — SİMETRİK + TAM REFERANSA YAKLAŞIM
     if (referenceTotalGoals != null && referenceTotalGoals > 0 && referenceReliability > 0) {
       const calibrationRatio = referenceTotalGoals / lambdaSum;
 
-      // Yalnızca Poisson eksik kaldığında düzelt (ratio > 1.10 = gerçek goller Poisson'dan %10+ fazla)
-      // ratio < 1.0 = Poisson zaten yüksek tahmin yapıyor → müdahale etme
-      if (calibrationRatio > 1.10) {
-        // scalingFactor: reliability ne kadar yüksekse referansa o kadar yaklaş
-        // exponent = reliability × 0.5 → [0, 0.5] aralığı → factor [1, ratio^0.5]
-        const exponent = referenceReliability * 0.5;
+      // Simetrik tetikleme: hem Poisson eksik (ratio > eşik) hem fazla (ratio < 1/eşik) için.
+      // Eşik: lig CV'sinden türer. Düşük CV (öngörülebilir lig) → küçük tolerans → hızlı düzelt.
+      // Yüksek CV (volatil) → geniş tolerans → fazla müdahale etme.
+      // _cv yoksa simetrik sabit eşik %5 (matematiksel yakınlık).
+      const _tol = (_cv != null && _cv > 0) ? Math.min(0.20, _cv * 0.5) : 0.05;
+      const _trigger = (calibrationRatio > 1 + _tol) || (calibrationRatio < 1 - _tol);
+
+      if (_trigger) {
+        // exponent = reliability — TAMAMEN data-driven, sabit 0.5 katsayısı kaldırıldı.
+        // reliability=1 → tam referansa yaklaş; reliability=0.3 → daha yumuşak.
+        const exponent = Math.max(0, Math.min(1, referenceReliability));
         let scalingFactor = Math.pow(calibrationRatio, exponent);
 
-        // Güvenlik tavan: normMaxRatio'ya bağlı dinamik üst sınır (ligin en güçlü takımına göre)
-        const _bCap = Math.min((allMetrics.normMaxRatio ?? 2.0) * 0.70, 1.50);
-        scalingFactor = Math.min(scalingFactor, _bCap);
+        // Güvenlik tavanları: normMaxRatio + normMinRatio'dan dinamik (sabit 1.50/0.70 kaldırıldı).
+        // Üst: ligin en güçlü takımının lig ortalamasına oranı (zaten ölçülmüş veri).
+        // Alt: ligin en zayıf takımının oranı (simetrik).
+        const _maxScale = allMetrics.normMaxRatio != null ? allMetrics.normMaxRatio : null;
+        const _minScale = allMetrics.normMinRatio != null ? allMetrics.normMinRatio : null;
+        if (_maxScale != null) scalingFactor = Math.min(scalingFactor, _maxScale);
+        if (_minScale != null) scalingFactor = Math.max(scalingFactor, _minScale);
 
         // Ev/deplasman oranı korunarak orantısal ölçekleme
         const ratio_ha = lambdaSum > 0 ? lambda_home / lambdaSum : 0.5;
@@ -754,17 +787,25 @@ function calculateAdvancedMetrics(allMetrics) {
     let lambda_final_away = M167_away;
     let shrinkageApplied = { home: false, away: false };
 
+    // Shrinkage ağırlığı profil örneklem büyüklüğünden türer (sabit 0.7/0.3 kaldırıldı):
+    //   wProfile = n / (n + sqrt(n + 1))  — Bayesian shrinkage
+    //   wOriginal = 1 - wProfile
+    // n=5 → ~0.66 profil; n=20 → ~0.81 profil; n=50 → ~0.88 profil.
     if (homeScoreProfile && homeScoreProfile.stdScored > 0.01 && homeScoreProfile.n >= 5) {
       const deviation = Math.abs(M167_home - homeScoreProfile.avgScored) / homeScoreProfile.stdScored;
       if (deviation > 2.5) {
-        lambda_final_home = 0.7 * M167_home + 0.3 * homeScoreProfile.avgScored;
+        const n = homeScoreProfile.n;
+        const wProfile = n / (n + Math.sqrt(n + 1));
+        lambda_final_home = (1 - wProfile) * M167_home + wProfile * homeScoreProfile.avgScored;
         shrinkageApplied.home = true;
       }
     }
     if (awayScoreProfile && awayScoreProfile.stdScored > 0.01 && awayScoreProfile.n >= 5) {
       const deviation = Math.abs(M167_away - awayScoreProfile.avgScored) / awayScoreProfile.stdScored;
       if (deviation > 2.5) {
-        lambda_final_away = 0.7 * M167_away + 0.3 * awayScoreProfile.avgScored;
+        const n = awayScoreProfile.n;
+        const wProfile = n / (n + Math.sqrt(n + 1));
+        lambda_final_away = (1 - wProfile) * M167_away + wProfile * awayScoreProfile.avgScored;
         shrinkageApplied.away = true;
       }
     }

@@ -573,7 +573,8 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
   const _lgCV_sim = (baseline?.leagueGoalVolatility != null && baseline?.leagueAvgGoals > 0)
     ? baseline.leagueGoalVolatility / baseline.leagueAvgGoals : null;
   if (_lgCV_sim != null) {
-    const _xs = _lgCV_sim * 0.5;
+    // _xs hassasiyet: CV doğrudan (sabit 0.5 katsayısı KALDIRILDI).
+    const _xs = _lgCV_sim;
     if (hProb.xGOverPerformance != null && hProb.goalConvRate != null)
       hProb.goalConvRate *= clamp(1.0 + (hProb.xGOverPerformance - 1.0) * _xs, 1.0 - _xs, 1.0 + _xs);
     if (aProb.xGOverPerformance != null && aProb.goalConvRate != null)
@@ -582,19 +583,26 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
     // Yön: Yüksek clean sheet → güçlü savunma → KENDİ kalecisinin işi hafifler (daha az kurtarış gerekir).
     // Clean sheet etkisi: takımın KENDİ GK save rate'ini güçlendirir (savunma GK'yı korur).
     const _refCSR = baseline?.leagueCleanSheetRate ?? null;
+    // GK ratio sınırları: lig CV'sinden türer. Sabit 0.85/1.15 kaldırıldı.
+    // Düşük CV (öngörülebilir lig) → dar ratio aralığı; yüksek CV → geniş.
+    const _gkRatioSpan = (_lgCV_sim != null && _lgCV_sim > 0) ? _lgCV_sim : 0.15;
     if (_refCSR != null && _refCSR > 0.01) {
       if (hProb.cleanSheetRate != null && hProb.gkSaveRate != null)
-        hProb.gkSaveRate = Math.min(0.95, hProb.gkSaveRate * clamp(hProb.cleanSheetRate / _refCSR, 0.85, 1.15));
+        hProb.gkSaveRate = Math.min(1, hProb.gkSaveRate * clamp(hProb.cleanSheetRate / _refCSR, 1 - _gkRatioSpan, 1 + _gkRatioSpan));
       if (aProb.cleanSheetRate != null && aProb.gkSaveRate != null)
-        aProb.gkSaveRate = Math.min(0.95, aProb.gkSaveRate * clamp(aProb.cleanSheetRate / _refCSR, 0.85, 1.15));
+        aProb.gkSaveRate = Math.min(1, aProb.gkSaveRate * clamp(aProb.cleanSheetRate / _refCSR, 1 - _gkRatioSpan, 1 + _gkRatioSpan));
     }
-    // GK save rate alt sınır: lig ortalamasının %60'ı (ligden türetilmiş, sabit 0.40 değil)
-    const _gkFloor = baseline.gkSaveRate != null ? baseline.gkSaveRate * 0.6 : 0.40;
-    const _gkCeil = 0.95;
-    if (hProb.savePctAboveExpected != null && hProb.gkSaveRate != null)
-      hProb.gkSaveRate = clamp(hProb.gkSaveRate + hProb.savePctAboveExpected * _lgCV_sim * 0.3, _gkFloor, _gkCeil);
-    if (aProb.savePctAboveExpected != null && aProb.gkSaveRate != null)
-      aProb.gkSaveRate = clamp(aProb.gkSaveRate + aProb.savePctAboveExpected * _lgCV_sim * 0.3, _gkFloor, _gkCeil);
+    // GK save rate alt sınır: lig ortalamasının (1 - CV) oranı (ligden türetilmiş).
+    // Sabit 0.6 ve 0.40 fallback KALDIRILDI. Lig verisi yoksa 0 (fizik üst sınırı).
+    // Üst sınır 1.0 — fizik kuralı (kaleci %100'den fazla kurtaramaz).
+    const _gkCVFloor = (_lgCV_sim != null && _lgCV_sim < 1) ? 1 - _lgCV_sim : 0;
+    const _gkFloor = baseline.gkSaveRate != null ? baseline.gkSaveRate * _gkCVFloor : 0;
+    const _gkCeil = 1;
+    // savePct above expected modifier: lgCV'nin kendisi (sabit 0.3 katsayısı KALDIRILDI).
+    if (hProb.savePctAboveExpected != null && hProb.gkSaveRate != null && _lgCV_sim != null)
+      hProb.gkSaveRate = clamp(hProb.gkSaveRate + hProb.savePctAboveExpected * _lgCV_sim, _gkFloor, _gkCeil);
+    if (aProb.savePctAboveExpected != null && aProb.gkSaveRate != null && _lgCV_sim != null)
+      aProb.gkSaveRate = clamp(aProb.gkSaveRate + aProb.savePctAboveExpected * _lgCV_sim, _gkFloor, _gkCeil);
   }
 
   // ── Bölge-Bazlı Sim Param Ölçeklemesi ────────────────────────────────
@@ -1190,21 +1198,21 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
         : 1.0;
 
       // ── firstHalfGoalRate + lateGoalRate → zaman penceresi şut multiplier ────
-      // Bu metrikler computeProbBases'de hesaplanıyor ama sim loop kullanmıyordu.
-      // firstHalfGoalRate > 0.5 → erken gol baskısı yüksek → 1-45'te şut artar
-      // lateGoalRate > 0.33 (30dk'nın 1/3'ü) → geç baskı → 76-90'da şut artar
-      // Hassasiyet = _lgCV_sim * 0.4 — standings'ten türetilmiş
+      // Hassasiyet doğrudan CV'den (sabit 0.4 ve 0.5 katsayıları KALDIRILDI).
+      // Referans noktaları (0.5 = ilk yarı simetri %50, 0.33 = son 30dk/3 zaman parçası)
+      // matematiksel — futbol fiziği değişmez.
       const _fhR = isHome ? hProb.firstHalfGoalRate : aProb.firstHalfGoalRate;
       const _ltR = isHome ? hProb.lateGoalRate       : aProb.lateGoalRate;
       const _lgCV_loop = (baseline?.leagueGoalVolatility != null && baseline?.leagueAvgGoals > 0)
         ? baseline.leagueGoalVolatility / baseline.leagueAvgGoals : null;
       let timeWindowMult = 1.0;
       if (_lgCV_loop != null) {
-        const _twSens = _lgCV_loop * 0.4;
+        // Hassasiyet = CV² — istatistiksel anlam (variance/mean²); sabit 0.4 yerine.
+        const _twSens = _lgCV_loop * _lgCV_loop;
         if (minute <= 45 && _fhR != null) {
-          timeWindowMult = clamp(1.0 + (_fhR - 0.5) * _twSens, 1.0 - _twSens * 0.5, 1.0 + _twSens);
+          timeWindowMult = clamp(1.0 + (_fhR - 0.5) * _twSens, 1.0 - _twSens, 1.0 + _twSens);
         } else if (minute >= 76 && _ltR != null) {
-          timeWindowMult = clamp(1.0 + (_ltR - 0.33) * _twSens, 1.0 - _twSens * 0.5, 1.0 + _twSens);
+          timeWindowMult = clamp(1.0 + (_ltR - 0.33) * _twSens, 1.0 - _twSens, 1.0 + _twSens);
         }
       }
       const shotProb = clamp(attkProb.shotsPerMin * dampedFlow * goalVelocityCap * timeWindowMult, DYN_LIMITS.PROBABILITY.MIN, DYN_LIMITS.PROBABILITY.MAX);
