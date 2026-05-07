@@ -556,28 +556,31 @@ function calculateAdvancedMetrics(allMetrics) {
   if (lambda_home != null && lambda_away != null) {
     const lambdaSum = lambda_home + lambda_away;
 
-    // 1. Referans toplam gol hesapla
+    // 1. Referans toplam gol hesapla — TAKIM-SPESİFİK ÖNCELİK
+    // KRİTİK: Lig ortalaması bir referans DEĞİL. Bayern 4-0 üretebilen takım
+    // ligin %2.6 ortalamasına çekilirse asimetri ölür. Önceliği TAKIM datasına ver.
+    // Sıralama: takım profili > H2H > leagueFingerprint > standings.
     const _lfRel_B = leagueFingerprint?.reliability ?? 0;
     let referenceTotalGoals = null;
     let referenceReliability = 0;
 
-    if (_lfRel_B > 0.3 && leagueFingerprint.leagueAvgGoals != null && leagueFingerprint.leagueAvgGoals > 0) {
-      // leagueAvgGoals leagueFingerprint'te maç başı toplam gol (home + away, zamansal ağırlıklı)
+    if (homeScoreProfile?.avgScored != null && awayScoreProfile?.avgScored != null
+        && (homeScoreProfile.n ?? 0) >= 3 && (awayScoreProfile.n ?? 0) >= 3) {
+      // İlk öncelik: takımın KENDİ gerçek gol ortalaması (asimetrik takımları korur).
+      referenceTotalGoals = homeScoreProfile.avgScored + awayScoreProfile.avgScored;
+      const minN = Math.min(homeScoreProfile.n, awayScoreProfile.n);
+      referenceReliability = minN / (minN + Math.sqrt(minN + 1));
+    } else if (matchScoreProfile?.avgHomeGoals != null && matchScoreProfile?.avgAwayGoals != null) {
+      // İkinci: H2H — bu iki takımın birbirine karşı geçmişi.
+      referenceTotalGoals = matchScoreProfile.avgHomeGoals + matchScoreProfile.avgAwayGoals;
+      const _n = matchScoreProfile.n || 0;
+      referenceReliability = _n / (_n + Math.sqrt(_n + 1));
+    } else if (_lfRel_B > 0.3 && leagueFingerprint.leagueAvgGoals != null && leagueFingerprint.leagueAvgGoals > 0) {
+      // Üçüncü: leagueFingerprint — sadece takım profili yoksa.
       referenceTotalGoals = leagueFingerprint.leagueAvgGoals;
       referenceReliability = _lfRel_B;
-    } else if (homeScoreProfile?.avgScored != null && awayScoreProfile?.avgScored != null) {
-      // Her iki takımın kendi gerçek ortalama golleri (kendi perspektifinden)
-      referenceTotalGoals = homeScoreProfile.avgScored + awayScoreProfile.avgScored;
-      const minN = Math.min(homeScoreProfile.n || 0, awayScoreProfile.n || 0);
-      referenceReliability = minN / (minN + Math.sqrt(minN + 1)); // Bayesian shrinkage
-    } else if (matchScoreProfile?.avgHomeGoals != null && matchScoreProfile?.avgAwayGoals != null) {
-      referenceTotalGoals = matchScoreProfile.avgHomeGoals + matchScoreProfile.avgAwayGoals;
-      referenceReliability = (matchScoreProfile.n || 0) / ((matchScoreProfile.n || 0) + 3);
     } else if (leagueAvgGoals != null && leagueAvgGoals > 0) {
-      // Standings: her takım için goals/match → × 2 = maç başı toplam.
-      // Reliability standings sample size'ından türetilir (statik 0.35 kaldırıldı):
-      //   wReliability = nTeams × matchesPerTeam / (n + sqrt(n+1))
-      // Tipik 20 takım × 30 maç = 600 örnek → reliability ≈ 0.96.
+      // Son çare: standings lig ortalaması (asimetri kaybolur, dikkat).
       const _stN = (allMetrics.leagueTeamCount ?? 0) * 30;
       referenceTotalGoals = leagueAvgGoals * 2;
       referenceReliability = _stN > 0 ? _stN / (_stN + Math.sqrt(_stN + 1)) : 0;
@@ -595,12 +598,12 @@ function calculateAdvancedMetrics(allMetrics) {
       const _trigger = (calibrationRatio > 1 + _tol) || (calibrationRatio < 1 - _tol);
 
       if (_trigger) {
-        // FULL CALIBRATION — referenceTotalGoals zaten ölçülen lig gerçeği.
-        // Önceki "exponent = reliability" yumuşak düzeltmesi, %30 sistematik bias'ı
-        // kapatamıyordu (backtest: lambdaSum 1.84 vs gerçek 2.64). Reliability sadece
-        // TRIGGER için kullanılır (zaten _trigger'da değerlendirildi); calibration
-        // tetiklenince hedef referansa TAM yaklaşılır.
-        let scalingFactor = calibrationRatio;
+        // Soft calibration: scalingFactor = ratio^reliability.
+        // Reliability=1 (takımın çok maçı var) → tama yakın düzeltme.
+        // Reliability=0.5 → yarım yola düzeltme. Bu, asimetrik takımları
+        // (lider/dip) lig ortalamasına çekmemek için kritik.
+        const exponent = Math.max(0, Math.min(1, referenceReliability));
+        let scalingFactor = Math.pow(calibrationRatio, exponent);
 
         // Güvenlik tavanları: normMaxRatio + normMinRatio'dan dinamik (sabit 1.50/0.70 kaldırıldı).
         // Üst: ligin en güçlü takımının lig ortalamasına oranı (zaten ölçülmüş veri).
