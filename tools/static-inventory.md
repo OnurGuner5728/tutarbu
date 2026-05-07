@@ -1,7 +1,7 @@
 # Statik Sabit Envanteri (Otomatik)
 
 Tarama kökü: `src/engine, src/metrics, src/services`  
-Toplam şüpheli literal: **1001**  
+Toplam şüpheli literal: **927**  
 Etkilenen dosya: **33**  
 
 > Bu rapor heuristic'tir. `MATH_OK` listesindeki literal'ler (0,1,2,0.5,100,90,60,45,30,15 vs.) dahil edilmez.
@@ -16,39 +16,39 @@ Etkilenen dosya: **33**
 | Literal | Geçiş Sayısı |
 |---|---|
 | `3` | 132 |
-| `5` | 77 |
+| `5` | 79 |
 | `4` | 75 |
 | `50` | 66 |
 | `10` | 56 |
-| `20` | 43 |
+| `20` | 42 |
+| `-1.0` | 40 |
 | `11` | 27 |
-| `1000` | 24 |
+| `1000` | 23 |
 | `0.01` | 22 |
-| `0.3` | 19 |
 | `2.5` | 18 |
 | `3600` | 18 |
-| `1.5` | 16 |
 | `0.50` | 14 |
 | `25` | 13 |
-| `0.1` | 13 |
+| `1.5` | 12 |
+| `8` | 11 |
 | `95` | 11 |
-| `-0.5` | 10 |
 | `75` | 10 |
-| `2.0` | 10 |
-| `8` | 10 |
 | `6` | 10 |
 | `7` | 9 |
-| `0.8` | 9 |
-| `40` | 9 |
-| `80` | 8 |
-| `0.2` | 8 |
-| `0.05` | 8 |
-| `-1.0` | 7 |
-| `0.25` | 7 |
+| `0.1` | 8 |
+| `40` | 8 |
+| `9` | 7 |
+| `80` | 6 |
+| `0.05` | 6 |
+| `86400` | 5 |
+| `0.3` | 5 |
+| `2.0` | 5 |
+| `0.15` | 5 |
+| `0.001` | 4 |
 
 ## Dosya Bazlı Detay
 
-### `src\engine\prediction-generator.js` — 108 şüpheli literal
+### `src\engine\prediction-generator.js` — 101 şüpheli literal
 
 | Satır | Değer | Bağlam | Tasnif (manuel) |
 |---|---|---|---|
@@ -67,158 +67,71 @@ Etkilenen dosya: **33**
 | 230 | `3` | `const _sHW = simDist.homeWin ?? prediction.homeWinProbability ?? (100 / 3);` |  |
 | 231 | `3` | `const _sDW = simDist.draw ?? prediction.drawProbability ?? (100 / 3);` |  |
 | 232 | `3` | `const _sAW = simDist.awayWin ?? prediction.awayWinProbability ?? (100 / 3);` |  |
-| 246 | `5` | `const _drawCap = 1 + Math.max(0, baseline?.drawTendency ?? (1 / 5));` |  |
-| 252 | `3` | `: [1 / 3, 1 / 3, 1 / 3];` |  |
-| 252 | `3` | `: [1 / 3, 1 / 3, 1 / 3];` |  |
-| 252 | `3` | `: [1 / 3, 1 / 3, 1 / 3];` |  |
-| 271 | `40` | `? 1.0 + compIndex / (compIndex + 40)  // compIndex=3→1.07, compIndex=5→1.11, compIndex=10→1.20` |  |
-| 272 | `0.3` | `: (lgCV != null ? 1.0 + lgCV * 0.3 : 1.10);` |  |
-| 272 | `1.10` | `: (lgCV != null ? 1.0 + lgCV * 0.3 : 1.10);` |  |
-| 275 | `16` | `? compIndex / (compIndex * compIndex + 16)  // compIndex=3→0.12, compIndex=5→0.12, compIndex=10→0.09` |  |
-| 276 | `0.25` | `: 0.25;` |  |
-| 279 | `0.10` | `temperature += (cvVal / compIndex) * 0.10;` |  |
-| 288 | `1.001` | `if (s_sum > 0 && temperature > 1.001) { // T≈1.0 ise atlat—gereksiz hesap yapma` |  |
-| 304 | `3` | `const _DOMINANCE = 2 / 3;` |  |
-| 354 | `10` | `? Math.max(1, _lgCVForEdge * 10)  // CV=0.3 → 3; CV=0.5 → 5; CV=1.0 → 10` |  |
-| 355 | `3` | `: 3;` |  |
-| 363 | `0.10` | `? Math.min(0.10, Math.max(0.02, _lgCVForEdge * 0.10))` |  |
-| 363 | `0.02` | `? Math.min(0.10, Math.max(0.02, _lgCVForEdge * 0.10))` |  |
-| 363 | `0.10` | `? Math.min(0.10, Math.max(0.02, _lgCVForEdge * 0.10))` |  |
-| 364 | `0.05` | `: 0.05;` |  |
-| 395 | `3` | `? (100 / 3) + (_lgDrawRate * 100) // ligin beraberlik oranı arttıkça eşik artar` |  |
-| 396 | `3` | `: (cv != null ? (100 / 3) + cv * (100 / 3) : 50); // cv varsa ondan, yoksa %50` |  |
-| 396 | `3` | `: (cv != null ? (100 / 3) + cv * (100 / 3) : 50); // cv varsa ondan, yoksa %50` |  |
-| 396 | `50` | `: (cv != null ? (100 / 3) + cv * (100 / 3) : 50); // cv varsa ondan, yoksa %50` |  |
-| 402 | `3` | `? (100 / 3) * (1 + 1 / _compIdx) // compIndex=3 → 44.4, compIndex=5 → 40` |  |
-| 403 | `3` | `: (_lgDrawRate != null ? (100 / 3) + (_lgDrawRate * 200) : (100 / 3) * 2); // drawRate=0.25 → 83.3` |  |
-| 403 | `200` | `: (_lgDrawRate != null ? (100 / 3) + (_lgDrawRate * 200) : (100 / 3) * 2); // drawRate=0.25 → 83.3` |  |
-| 403 | `3` | `: (_lgDrawRate != null ? (100 / 3) + (_lgDrawRate * 200) : (100 / 3) * 2); // drawRate=0.25 → 83.3` |  |
-| 429 | `5` | `.slice(0, 5)` |  |
-| 522 | `2.5` | `.filter(([score]) => { const [h, a] = score.split('-').map(Number); return h + a > 2.5; })` |  |
-| 538 | `0.2` | `if (_lfOver25 != null && _lfRel_ou > 0.2) {` |  |
-| 539 | `20` | `_ou25Sources.push({ val: _lfOver25 * 100, w: _lfRel_ou * 20 });` |  |
-| 541 | `3` | `if (homeScoreProfile?.over25Rate != null && (homeScoreProfile.n \|\| 0) >= 3) {` |  |
-| 544 | `3` | `if (awayScoreProfile?.over25Rate != null && (awayScoreProfile.n \|\| 0) >= 3) {` |  |
-| 563 | `2.5` | `? poissonExceed(baseline.leagueAvgGoals * 2, 2.5)` |  |
-| 589 | `0.2` | `if (_lfBTTS != null && _lfRel_ou > 0.2) {` |  |
-| 590 | `20` | `_bttsSources.push({ val: _lfBTTS * 100, w: _lfRel_ou * 20 });` |  |
-| 592 | `3` | `if (homeScoreProfile?.bttsRate != null && (homeScoreProfile.n \|\| 0) >= 3) {` |  |
-| 595 | `3` | `if (awayScoreProfile?.bttsRate != null && (awayScoreProfile.n \|\| 0) >= 3) {` |  |
-| 605 | `3` | `if (_teamN >= 3) _bttsSources.push({ val: _bttsTeamSignal, w: _teamN * 0.5 });` |  |
-| 698 | `50` | `if (total <= 0) return { homeScoresFirst: 50, awayScoresFirst: 50 };` |  |
-| 698 | `50` | `if (total <= 0) return { homeScoresFirst: 50, awayScoresFirst: 50 };` |  |
-| 988 | `1000` | `startTimestamp: e.startTimestamp ? new Date(e.startTimestamp * 1000).toISOString() : '',` |  |
-| 1007 | `1000` | `startTimestamp: e.startTimestamp ? new Date(e.startTimestamp * 1000).toISOString() : '',` |  |
-| 1013 | `1000` | `startTimestamp: e.startTimestamp ? new Date(e.startTimestamp * 1000).toISOString() : '',` |  |
-| 1038 | `0.05` | `const _seEdge = Math.sqrt(0.05 / Math.max(lgData.n, 1)); // standard error` |  |
-| 1039 | `1.5` | `if (lgData.edge > 1.5 * _seEdge && lgData.n >= 5) {` |  |
-| 1039 | `5` | `if (lgData.edge > 1.5 * _seEdge && lgData.n >= 5) {` |  |
-| 1041 | `50` | `const penalty = Math.min(50, Math.round(lgData.edge * 500));` |  |
-| 1041 | `500` | `const penalty = Math.min(50, Math.round(lgData.edge * 500));` |  |
-| 1042 | `10` | `report.result.confidence = Math.max(10, report.result.confidence - penalty);` |  |
-| 1046 | `-1.5` | `} else if (lgData.edge < -1.5 * _seEdge && lgData.n >= 5) {` |  |
-| 1046 | `5` | `} else if (lgData.edge < -1.5 * _seEdge && lgData.n >= 5) {` |  |
-| 1048 | `25` | `const boost = Math.min(25, Math.round(Math.abs(lgData.edge) * 300));` |  |
-| 1048 | `300` | `const boost = Math.min(25, Math.round(Math.abs(lgData.edge) * 300));` |  |
-| 1050 | `95` | `report.result.confidence = Math.min(SIM_CONFIG?.UI_THRESHOLDS?.MAX_UI_PROB \|\| 95, report.result.co` |  |
-| 1065 | `0.50` | `if (tData.accBTTS > 0.50 && tData.n >= 2 && report.goals.btts > 50) {` |  |
-| 1065 | `50` | `if (tData.accBTTS > 0.50 && tData.n >= 2 && report.goals.btts > 50) {` |  |
-| 1066 | `0.50` | `const m = 1.0 + (tData.accBTTS - 0.50);` |  |
-| 1068 | `0.80` | `if (tData.accBTTS >= 0.80) edgeMeta.premiumBTTS = true;` |  |
-| 1070 | `0.50` | `} else if (tData.accBTTS < 0.50 && tData.n >= 2 && report.goals.btts > 50) {` |  |
-| 1070 | `50` | `} else if (tData.accBTTS < 0.50 && tData.n >= 2 && report.goals.btts > 50) {` |  |
-| 1071 | `0.50` | `const m = 0.50 + tData.accBTTS;` |  |
-| 1077 | `0.1` | `if (tData.xgRatio && Math.abs(tData.xgRatio - 1.0) > 0.1 && tData.n >= 2) {` |  |
-| 1090 | `20` | `report.goals.btts = Math.max(20, Math.min(SIM_CONFIG?.UI_THRESHOLDS?.MAX_UI_PROB \|\| 95, report.goa` |  |
-| 1090 | `95` | `report.goals.btts = Math.max(20, Math.min(SIM_CONFIG?.UI_THRESHOLDS?.MAX_UI_PROB \|\| 95, report.goa` |  |
-| 1098 | `20` | `report.goals.over25 = Math.max(20, Math.min(SIM_CONFIG?.UI_THRESHOLDS?.MAX_UI_PROB \|\| 95, report.g` |  |
-
-_(+28 kayıt kısaltıldı)_
-
-### `src\engine\match-simulator.js` — 101 şüpheli literal
-
-| Satır | Değer | Bağlam | Tasnif (manuel) |
-|---|---|---|---|
-| 27 | `3` | `{ id: 'M011', weight: 3, sign: 1 }, { id: 'M012', weight: 2, sign: 1 },` |  |
-| 32 | `3` | `{ id: 'M015', weight: 3, sign: 1 }, { id: 'M017', weight: 2, sign: 1 },` |  |
-| 33 | `3` | `{ id: 'M021', weight: 3, sign: 1 }, { id: 'M070', weight: 3, sign: 1 },` |  |
-| 33 | `3` | `{ id: 'M021', weight: 3, sign: 1 }, { id: 'M070', weight: 3, sign: 1 },` |  |
-| 37 | `3` | `{ id: 'M013', weight: 3, sign: 1 }, { id: 'M014', weight: 3, sign: 1 },` |  |
-| 37 | `3` | `{ id: 'M013', weight: 3, sign: 1 }, { id: 'M014', weight: 3, sign: 1 },` |  |
-| 54 | `3` | `{ id: 'M026', weight: 3, sign: -1 }, { id: 'M028', weight: 3, sign: 1 },` |  |
-| 54 | `3` | `{ id: 'M026', weight: 3, sign: -1 }, { id: 'M028', weight: 3, sign: 1 },` |  |
-| 62 | `3` | `{ id: 'M096', weight: 3, sign: 1 }, { id: 'M098', weight: 3, sign: 1 },` |  |
-| 62 | `3` | `{ id: 'M096', weight: 3, sign: 1 }, { id: 'M098', weight: 3, sign: 1 },` |  |
-| 72 | `4` | `{ id: 'M064', weight: 4, sign: 1 }, { id: 'M165', weight: 3, sign: 1 },` |  |
-| 72 | `3` | `{ id: 'M064', weight: 4, sign: 1 }, { id: 'M165', weight: 3, sign: 1 },` |  |
-| 77 | `4` | `{ id: 'M065', weight: 4, sign: 1 }, { id: 'M043', weight: 2, sign: 1 },` |  |
-| 81 | `3` | `{ id: 'M042', weight: 3, sign: 1 }, { id: 'M041', weight: 2, sign: 1 },` |  |
-| 86 | `3` | `{ id: 'M040', weight: 3, sign: -1 }` |  |
-| 89 | `3` | `{ id: 'M146', weight: 3, sign: 1 }, { id: 'M149', weight: 2, sign: 1 },` |  |
-| 96 | `3` | `{ id: 'M046', weight: 3, sign: 1 }, { id: 'M049', weight: 2, sign: 1 },` |  |
-| 100 | `3` | `{ id: 'M047', weight: 3, sign: 1 }, { id: 'M048', weight: 2, sign: 1 },` |  |
-| 104 | `3` | `{ id: 'M062', weight: 3, sign: 1 }, { id: 'M031', weight: 2, sign: -1 },` |  |
-| 112 | `3` | `{ id: 'M139', weight: 2, sign: 1 }, { id: 'M140', weight: 3, sign: 1 }` |  |
-| 115 | `3` | `{ id: 'M141', weight: 3, sign: 1 }, { id: 'M170', weight: 3, sign: 1 }` |  |
-| 115 | `3` | `{ id: 'M141', weight: 3, sign: 1 }, { id: 'M170', weight: 3, sign: 1 }` |  |
-| 118 | `4` | `{ id: 'M171', weight: 4, sign: 1 },` |  |
-| 119 | `3` | `{ id: 'M172', weight: 3, sign: 1 },` |  |
-| 126 | `3` | `{ id: 'M025', weight: 3, sign: 1 }, { id: 'M150', weight: 3, sign: 1 },` |  |
-| 126 | `3` | `{ id: 'M025', weight: 3, sign: 1 }, { id: 'M150', weight: 3, sign: 1 },` |  |
-| 139 | `3` | `{ id: 'M119', weight: 2, sign: 1 }, { id: 'M122', weight: 3, sign: 1 }` |  |
-| 142 | `3` | `{ id: 'M111', weight: 2, sign: 1 }, { id: 'M118b', weight: 3, sign: 1 },` |  |
-| 444 | `2.0` | `if (sign === -1) normalized = 2.0 - normalized;` |  |
-| 483 | `11` | `if (count >= 11) break;` |  |
-| 493 | `11` | `if (count >= 11) break;` |  |
-| 501 | `1000` | `const EPS = (baseline?.leagueAvgGoals \|\| 1) / 1000;` |  |
-| 585 | `0.01` | `if (_refCSR != null && _refCSR > 0.01) {` |  |
-| 587 | `0.95` | `hProb.gkSaveRate = Math.min(0.95, hProb.gkSaveRate * clamp(hProb.cleanSheetRate / _refCSR, 0.85, 1.1` |  |
-| 587 | `0.85` | `hProb.gkSaveRate = Math.min(0.95, hProb.gkSaveRate * clamp(hProb.cleanSheetRate / _refCSR, 0.85, 1.1` |  |
-| 587 | `1.15` | `hProb.gkSaveRate = Math.min(0.95, hProb.gkSaveRate * clamp(hProb.cleanSheetRate / _refCSR, 0.85, 1.1` |  |
-| 589 | `0.95` | `aProb.gkSaveRate = Math.min(0.95, aProb.gkSaveRate * clamp(aProb.cleanSheetRate / _refCSR, 0.85, 1.1` |  |
-| 589 | `0.85` | `aProb.gkSaveRate = Math.min(0.95, aProb.gkSaveRate * clamp(aProb.cleanSheetRate / _refCSR, 0.85, 1.1` |  |
-| 589 | `1.15` | `aProb.gkSaveRate = Math.min(0.95, aProb.gkSaveRate * clamp(aProb.cleanSheetRate / _refCSR, 0.85, 1.1` |  |
-| 592 | `0.6` | `const _gkFloor = baseline.gkSaveRate != null ? baseline.gkSaveRate * 0.6 : 0.40;` |  |
-| 592 | `0.40` | `const _gkFloor = baseline.gkSaveRate != null ? baseline.gkSaveRate * 0.6 : 0.40;` |  |
-| 593 | `0.95` | `const _gkCeil = 0.95;` |  |
-| 595 | `0.3` | `hProb.gkSaveRate = clamp(hProb.gkSaveRate + hProb.savePctAboveExpected * _lgCV_sim * 0.3, _gkFloor, ` |  |
-| 597 | `0.3` | `aProb.gkSaveRate = clamp(aProb.gkSaveRate + aProb.savePctAboveExpected * _lgCV_sim * 0.3, _gkFloor, ` |  |
-| 729 | `0.01` | `const _s = v => (isFinite(v) && v > 0.01) ? v : 0.01;` |  |
-| 729 | `0.01` | `const _s = v => (isFinite(v) && v > 0.01) ? v : 0.01;` |  |
-| 743 | `1000` | `const _sdEPS = (baseline.leagueAvgGoals \|\| 1) / 1000;` |  |
-| 750 | `2.0` | `: (DYN_LIMITS?.POWER?.MAX != null ? DYN_LIMITS.POWER.MAX + (1.0 - (DYN_LIMITS?.POWER?.MIN ?? 1.0)) :` |  |
-| 862 | `1000` | `const _sddEPS = (baseline.leagueAvgGoals \|\| 1) / 1000;` |  |
-| 934 | `20` | `const _fatTeamN = leagueTeamCount ?? 20; // null koruması — bölücüde kullanılıyor` |  |
-| 967 | `20` | `const earlyPhaseRatio = minute / (earlyBase \|\| 20);` |  |
-| 971 | `75` | `const latePhaseAmplifier = Math.max(1.0, Math.pow(minute / (lateBase \|\| 75), urgencyExcess + 1.0))` |  |
-| 1014 | `4` | `: _pRange / (4 * _mRange))` |  |
-| 1026 | `22` | `?? (_earlyFraction != null && _earlyFraction > 0 ? Math.round(_matchMins * _earlyFraction) : Math.ro` |  |
-| 1027 | `5` | `const lateBase = dynamicTimeWindows?.LATE_GAME_START ?? Math.round(_matchMins * 5 / 6); // ~75 for 9` |  |
-| 1027 | `6` | `const lateBase = dynamicTimeWindows?.LATE_GAME_START ?? Math.round(_matchMins * 5 / 6); // ~75 for 9` |  |
-| 1047 | `95` | `for (let minute = 1; minute <= 95; minute++) {` |  |
-| 1054 | `46` | `if (minute === 46) {` |  |
-| 1092 | `3` | `const _minSigma = _lgPace * 3;` |  |
-| 1101 | `4` | `+ _hSigma * (state.home.territory - 0.5) * 4` |  |
-| 1102 | `3` | `+ _hSigma * state.home.tacticalStance * 3` |  |
-| 1105 | `4` | `+ _aSigma * (state.away.territory - 0.5) * 4` |  |
-| 1106 | `3` | `+ _aSigma * state.away.tacticalStance * 3` |  |
-| 1111 | `50` | `const _normalizedBase = _rawPossSum > 0 ? (_hMatchPoss / _rawPossSum) * 100 : 50;` |  |
-| 1125 | `2.0` | `? baseline.normMaxRatio + (1.0 - baseline.normMinRatio) : 2.0;` |  |
-| 1132 | `95` | `const timeRatio = (minute - homeUrgencyStart) / (95 - homeUrgencyStart);` |  |
-| 1136 | `95` | `const timeRatio = (minute - awayUrgencyStart) / (95 - awayUrgencyStart);` |  |
-| 1144 | `95` | `const timeRatio = (minute - homeUrgencyStart) / (95 - homeUrgencyStart);` |  |
-| 1153 | `95` | `const timeRatio = (minute - awayUrgencyStart) / (95 - awayUrgencyStart);` |  |
-| 1186 | `3` | `const _velCapThreshold = Math.max(3, Math.ceil((baseline.leagueAvgGoals ?? 2.5) * 2));` |  |
-| 1186 | `2.5` | `const _velCapThreshold = Math.max(3, Math.ceil((baseline.leagueAvgGoals ?? 2.5) * 2));` |  |
-| 1189 | `2.5` | `? 1.0 / (1.0 + _velExcess / Math.max(baseline.leagueAvgGoals ?? 2.5, 1))` |  |
-| 1203 | `0.4` | `const _twSens = _lgCV_loop * 0.4;` |  |
-| 1206 | `76` | `} else if (minute >= 76 && _ltR != null) {` |  |
-| 1207 | `0.33` | `timeWindowMult = clamp(1.0 + (_ltR - 0.33) * _twSens, 1.0 - _twSens * 0.5, 1.0 + _twSens);` |  |
-| 1235 | `0.99` | `const rawGkAdj = (defGKSave != null && _baseGKSave != null && _baseGKSave < 0.99)` |  |
-| 1236 | `0.01` | `? (1 - defGKSave) / Math.max(1 - _baseGKSave, 0.01)` |  |
-| 1238 | `0.01` | `const gkAdj = Math.sqrt(Math.max(rawGkAdj, 0.01));` |  |
-| 1254 | `0.1` | `0.1 // minimum 0.1 gol/maç — sıfıra bölme koruması` |  |
-| 1261 | `0.1` | `0.1` |  |
+| 260 | `3` | `: [1 / 3, 1 / 3, 1 / 3];` |  |
+| 260 | `3` | `: [1 / 3, 1 / 3, 1 / 3];` |  |
+| 260 | `3` | `: [1 / 3, 1 / 3, 1 / 3];` |  |
+| 312 | `0.05` | `if (_ldT != null && _ldT > 0 && Math.abs(_ldT - 1) > 0.05) {` |  |
+| 325 | `3` | `const _DOMINANCE = 2 / 3;` |  |
+| 375 | `10` | `? Math.max(1, _lgCVForEdge * 10)  // CV=0.3 → 3; CV=0.5 → 5; CV=1.0 → 10` |  |
+| 376 | `3` | `: 3;` |  |
+| 384 | `0.10` | `? Math.min(0.10, Math.max(0.02, _lgCVForEdge * 0.10))` |  |
+| 384 | `0.02` | `? Math.min(0.10, Math.max(0.02, _lgCVForEdge * 0.10))` |  |
+| 384 | `0.10` | `? Math.min(0.10, Math.max(0.02, _lgCVForEdge * 0.10))` |  |
+| 385 | `0.05` | `: 0.05;` |  |
+| 416 | `3` | `? (100 / 3) + (_lgDrawRate * 100) // ligin beraberlik oranı arttıkça eşik artar` |  |
+| 417 | `3` | `: (cv != null ? (100 / 3) + cv * (100 / 3) : 50); // cv varsa ondan, yoksa %50` |  |
+| 417 | `3` | `: (cv != null ? (100 / 3) + cv * (100 / 3) : 50); // cv varsa ondan, yoksa %50` |  |
+| 417 | `50` | `: (cv != null ? (100 / 3) + cv * (100 / 3) : 50); // cv varsa ondan, yoksa %50` |  |
+| 423 | `3` | `? (100 / 3) * (1 + 1 / _compIdx) // compIndex=3 → 44.4, compIndex=5 → 40` |  |
+| 424 | `3` | `: (_lgDrawRate != null ? (100 / 3) + (_lgDrawRate * 200) : (100 / 3) * 2); // drawRate=0.25 → 83.3` |  |
+| 424 | `200` | `: (_lgDrawRate != null ? (100 / 3) + (_lgDrawRate * 200) : (100 / 3) * 2); // drawRate=0.25 → 83.3` |  |
+| 424 | `3` | `: (_lgDrawRate != null ? (100 / 3) + (_lgDrawRate * 200) : (100 / 3) * 2); // drawRate=0.25 → 83.3` |  |
+| 450 | `5` | `.slice(0, 5)` |  |
+| 543 | `2.5` | `.filter(([score]) => { const [h, a] = score.split('-').map(Number); return h + a > 2.5; })` |  |
+| 559 | `0.2` | `if (_lfOver25 != null && _lfRel_ou > 0.2) {` |  |
+| 560 | `20` | `_ou25Sources.push({ val: _lfOver25 * 100, w: _lfRel_ou * 20 });` |  |
+| 562 | `3` | `if (homeScoreProfile?.over25Rate != null && (homeScoreProfile.n \|\| 0) >= 3) {` |  |
+| 565 | `3` | `if (awayScoreProfile?.over25Rate != null && (awayScoreProfile.n \|\| 0) >= 3) {` |  |
+| 584 | `2.5` | `? poissonExceed(baseline.leagueAvgGoals * 2, 2.5)` |  |
+| 610 | `0.2` | `if (_lfBTTS != null && _lfRel_ou > 0.2) {` |  |
+| 611 | `20` | `_bttsSources.push({ val: _lfBTTS * 100, w: _lfRel_ou * 20 });` |  |
+| 613 | `3` | `if (homeScoreProfile?.bttsRate != null && (homeScoreProfile.n \|\| 0) >= 3) {` |  |
+| 616 | `3` | `if (awayScoreProfile?.bttsRate != null && (awayScoreProfile.n \|\| 0) >= 3) {` |  |
+| 626 | `3` | `if (_teamN >= 3) _bttsSources.push({ val: _bttsTeamSignal, w: _teamN * 0.5 });` |  |
+| 719 | `50` | `if (total <= 0) return { homeScoresFirst: 50, awayScoresFirst: 50 };` |  |
+| 719 | `50` | `if (total <= 0) return { homeScoresFirst: 50, awayScoresFirst: 50 };` |  |
+| 1009 | `1000` | `startTimestamp: e.startTimestamp ? new Date(e.startTimestamp * 1000).toISOString() : '',` |  |
+| 1028 | `1000` | `startTimestamp: e.startTimestamp ? new Date(e.startTimestamp * 1000).toISOString() : '',` |  |
+| 1034 | `1000` | `startTimestamp: e.startTimestamp ? new Date(e.startTimestamp * 1000).toISOString() : '',` |  |
+| 1059 | `0.05` | `const _seEdge = Math.sqrt(0.05 / Math.max(lgData.n, 1)); // standard error` |  |
+| 1060 | `1.5` | `if (lgData.edge > 1.5 * _seEdge && lgData.n >= 5) {` |  |
+| 1060 | `5` | `if (lgData.edge > 1.5 * _seEdge && lgData.n >= 5) {` |  |
+| 1062 | `50` | `const penalty = Math.min(50, Math.round(lgData.edge * 500));` |  |
+| 1062 | `500` | `const penalty = Math.min(50, Math.round(lgData.edge * 500));` |  |
+| 1063 | `10` | `report.result.confidence = Math.max(10, report.result.confidence - penalty);` |  |
+| 1067 | `-1.5` | `} else if (lgData.edge < -1.5 * _seEdge && lgData.n >= 5) {` |  |
+| 1067 | `5` | `} else if (lgData.edge < -1.5 * _seEdge && lgData.n >= 5) {` |  |
+| 1069 | `25` | `const boost = Math.min(25, Math.round(Math.abs(lgData.edge) * 300));` |  |
+| 1069 | `300` | `const boost = Math.min(25, Math.round(Math.abs(lgData.edge) * 300));` |  |
+| 1071 | `95` | `report.result.confidence = Math.min(SIM_CONFIG?.UI_THRESHOLDS?.MAX_UI_PROB \|\| 95, report.result.co` |  |
+| 1086 | `0.50` | `if (tData.accBTTS > 0.50 && tData.n >= 2 && report.goals.btts > 50) {` |  |
+| 1086 | `50` | `if (tData.accBTTS > 0.50 && tData.n >= 2 && report.goals.btts > 50) {` |  |
+| 1087 | `0.50` | `const m = 1.0 + (tData.accBTTS - 0.50);` |  |
+| 1089 | `0.80` | `if (tData.accBTTS >= 0.80) edgeMeta.premiumBTTS = true;` |  |
+| 1091 | `0.50` | `} else if (tData.accBTTS < 0.50 && tData.n >= 2 && report.goals.btts > 50) {` |  |
+| 1091 | `50` | `} else if (tData.accBTTS < 0.50 && tData.n >= 2 && report.goals.btts > 50) {` |  |
+| 1092 | `0.50` | `const m = 0.50 + tData.accBTTS;` |  |
+| 1098 | `0.1` | `if (tData.xgRatio && Math.abs(tData.xgRatio - 1.0) > 0.1 && tData.n >= 2) {` |  |
+| 1111 | `20` | `report.goals.btts = Math.max(20, Math.min(SIM_CONFIG?.UI_THRESHOLDS?.MAX_UI_PROB \|\| 95, report.goa` |  |
+| 1111 | `95` | `report.goals.btts = Math.max(20, Math.min(SIM_CONFIG?.UI_THRESHOLDS?.MAX_UI_PROB \|\| 95, report.goa` |  |
+| 1119 | `20` | `report.goals.over25 = Math.max(20, Math.min(SIM_CONFIG?.UI_THRESHOLDS?.MAX_UI_PROB \|\| 95, report.g` |  |
+| 1119 | `95` | `report.goals.over25 = Math.max(20, Math.min(SIM_CONFIG?.UI_THRESHOLDS?.MAX_UI_PROB \|\| 95, report.g` |  |
+| 1225 | `6` | `topCases: (_learned.debugTopCases \|\| []).slice(0, 6),` |  |
+| 1234 | `1000` | `: Math.floor(Date.now() / 1000);` |  |
+| 1338 | `7` | `const MAX_GOALS = 7;` |  |
+| 1356 | `1e-8` | `if (prob > 1e-8) {` |  |
+| 1372 | `0.999` | `if (totalProb > 0 && totalProb < 0.999) {` |  |
+| 1390 | `5` | `const topHTScores = sortedHT.slice(0, 5).map(([k, v]) => ({ score: k, prob: round2(v * 100) }));` |  |
 
 _(+21 kayıt kısaltıldı)_
 
@@ -309,92 +222,92 @@ _(+21 kayıt kısaltıldı)_
 
 _(+10 kayıt kısaltıldı)_
 
-### `src\engine\league-averages.js` — 82 şüpheli literal
+### `src\engine\match-simulator.js` — 89 şüpheli literal
 
 | Satır | Değer | Bağlam | Tasnif (manuel) |
 |---|---|---|---|
-| 31 | `4` | `const hasStandings = standingsRows.length >= 4;` |  |
-| 54 | `4` | `if (rows.length < 4) return null;` |  |
-| 99 | `999` | `let firstGoalMinute = 999;` |  |
-| 115 | `3` | `else if (min <= 60) goalsByPeriod[3]++;` |  |
-| 116 | `75` | `else if (min <= 75) goalsByPeriod[4]++;` |  |
-| 116 | `4` | `else if (min <= 75) goalsByPeriod[4]++;` |  |
-| 117 | `5` | `else goalsByPeriod[5]++;` |  |
-| 203 | `20` | `if (x > 20 \|\| (shot.draw?.start?.y != null && shot.draw.start.y > 20)) {` |  |
-| 203 | `20` | `if (x > 20 \|\| (shot.draw?.start?.y != null && shot.draw.start.y > 20)) {` |  |
-| 257 | `10` | `if (totalGoalIncidents >= 10) {` |  |
-| 261 | `3` | `set('M008', (goalsByPeriod[3] / totalGoalIncidents) * 100, 'incidents 46-60dk');` |  |
-| 262 | `4` | `set('M009', (goalsByPeriod[4] / totalGoalIncidents) * 100, 'incidents 61-75dk');` |  |
-| 263 | `5` | `set('M010', (goalsByPeriod[5] / totalGoalIncidents) * 100, 'incidents 76-90dk');` |  |
-| 267 | `5` | `if (htLeadTotal >= 5) {` |  |
-| 271 | `5` | `if (htDrawTotal >= 5) {` |  |
-| 348 | `10` | `} else if (leagueGoalsPerGame != null && totalGoalIncidents > 10 && penGoalCount > 0) {` |  |
-| 377 | `10` | `if (totalGoalIncidents > 10 && cornerGoalCount > 0) {` |  |
-| 390 | `5` | `if (cShots >= 5) {` |  |
-| 445 | `10` | `if (totalGoalIncidents >= 10) {` |  |
-| 545 | `3` | `const formPct = (ppg / 3) * 100;` |  |
-| 607 | `5` | `if (finished.length < 5) return null;` |  |
-| 608 | `5` | `const last5 = finished.slice(0, 5);` |  |
-| 609 | `5` | `const prev5 = finished.slice(5, 10);` |  |
-| 609 | `10` | `const prev5 = finished.slice(5, 10);` |  |
-| 629 | `4` | `if (!rows \|\| rows.length < 4) return null;` |  |
-| 648 | `4` | `if (!rows \|\| rows.length < 4) return null;` |  |
-| 700 | `5` | `if (firstGoalMatches >= 5) {` |  |
-| 705 | `5` | `if (totalMatchesWithGoals >= 5) {` |  |
-| 710 | `5` | `if (totalMatchesWithGoals >= 5) {` |  |
-| 719 | `5` | `if (starterRatings.length >= 5) {` |  |
-| 724 | `3` | `if (subRatings.length >= 3) {` |  |
-| 827 | `7` | `const refBench = homeBenchCount > 0 ? homeBenchCount : awayBenchCount > 0 ? awayBenchCount : 7;` |  |
-| 828 | `11` | `const homeMatchdaySz = 11 + (homeBenchCount > 0 ? homeBenchCount : refBench);` |  |
-| 829 | `11` | `const awayMatchdaySz = 11 + (awayBenchCount > 0 ? awayBenchCount : refBench);` |  |
-| 886 | `20` | `const refSquadSize = Math.max(20, Math.max(homeSquadSize, awaySquadSize));` |  |
-| 1019 | `10` | `if (count > 0) return ((rAvg / count) - seasonRating) * 10;` |  |
-| 1030 | `10` | `const allEvents = [...homeLastEvents.slice(0, 10), ...awayLastEvents.slice(0, 10)];` |  |
-| 1030 | `10` | `const allEvents = [...homeLastEvents.slice(0, 10), ...awayLastEvents.slice(0, 10)];` |  |
-| 1059 | `0.1` | `if (shot.xg != null && shot.xg < 0.1) luckyGoals++;` |  |
-| 1096 | `0.35` | `const sotPG = avgs.M014 ?? avgs.M013 * (avgs.M011 != null ? avgs.M011 / 100 : 0.35);` |  |
-| 1143 | `3` | `gkAttrSum += (attrs.attacking + attrs.defending + attrs.technical) / 3;` |  |
-| 1183 | `10` | `set('M108', Math.min(100, Math.max(0, avgGkR * 10)), 'recentDetails GK rating×10');` |  |
-| 1203 | `3` | `if (avgs.M109 != null && avgs.M110 != null) set('M117', avgs.M109 + avgs.M110 * 3, 'derived M109+M11` |  |
-| 1217 | `2.5` | `if (hs + as > 2.5) h2hO25++;` |  |
-| 1229 | `10` | `set('M122', avgGD * 10 + 50, 'h2h avg goals × 10 + 50');` |  |
-| 1229 | `50` | `set('M122', avgGD * 10 + 50, 'h2h avg goals × 10 + 50');` |  |
-| 1267 | `4` | `if (homeStandingsRows.length >= 4) {` |  |
-| 1277 | `4` | `if (awayStandingsRows.length >= 4) {` |  |
-| 1303 | `10` | `const competitiveness = ptsStdVal != null && ptsStdVal > 0 ? Math.min(1, 10 / ptsStdVal) : null;` |  |
-| 1338 | `0.25` | `const normalizedGdSpread = gdStd != null ? gdStd / nTeams : 0.25;` |  |
-| 1359 | `1.2` | `const competitivenessIndex = clamp(1.2 - (spreadRatio * 0.4), 0.5, 1.5);` |  |
-| 1359 | `0.4` | `const competitivenessIndex = clamp(1.2 - (spreadRatio * 0.4), 0.5, 1.5);` |  |
-| 1359 | `1.5` | `const competitivenessIndex = clamp(1.2 - (spreadRatio * 0.4), 0.5, 1.5);` |  |
-| 1369 | `0.8` | `const homeBiasRatio = clamp(homePts / awayPts, 0.8, 2.0); // Tipik: 1.2 - 1.4` |  |
-| 1369 | `2.0` | `const homeBiasRatio = clamp(homePts / awayPts, 0.8, 2.0); // Tipik: 1.2 - 1.4` |  |
-| 1383 | `0.25` | `const drawTendency = clamp(drawRatio / 0.25, 0.5, 1.5);` |  |
-| 1383 | `1.5` | `const drawTendency = clamp(drawRatio / 0.25, 0.5, 1.5);` |  |
-| 1425 | `5` | `for (const ev of events.slice(0, 5)) {` |  |
-| 1428 | `3` | `if (isHome ? hs > as : as > hs) totalPts += 3;` |  |
-| 1435 | `3` | `if (matchCount146 > 0) set('M146', (totalPts / (matchCount146 * 3)) * 100, 'lastEvents points ratio%` |  |
-| 1440 | `10` | `for (const m of allRecentMatches.slice(0, 10)) {` |  |
-| 1446 | `2.5` | `if (cnt > 0) set('M147', (totalG / cnt / (leagueGoalsPerGame \|\| 2.5)) * 50, 'recent goals ratio × ` |  |
-| 1446 | `50` | `if (cnt > 0) set('M147', (totalG / cnt / (leagueGoalsPerGame \|\| 2.5)) * 50, 'recent goals ratio × ` |  |
-| 1487 | `50` | `set('M150', avgPoss ?? 50, avgPoss ? 'seasonStats possession' : 'NEUTRAL_SYMMETRY: possession is inh` |  |
-| 1491 | `50` | `set('M151', 50, 'NEUTRAL_SYMMETRY: H2H başlangıç dengesizlik = 0');` |  |
-| 1514 | `5` | `const contribRatio = (goalTotal >= 5) ? contribTotal / goalTotal : null;` |  |
-| 1531 | `50` | `const compositeBase = (leagueGoalsPerGame / leagueGoalsPerGame) * 50; // = 50, ama veri bazlı: avg/a` |  |
-| 1540 | `50` | `set('M168', (leagueGoalsPerGame / leagueGoalsPerGame) * 50, 'derived league avg ratio × 50');` |  |
-| 1555 | `4` | `if (homeStandingsRows.length >= 4 && awayStandingsRows.length >= 4) {` |  |
-| 1555 | `4` | `if (homeStandingsRows.length >= 4 && awayStandingsRows.length >= 4) {` |  |
-| 1569 | `75` | `{ end: 60, pct: avgs.M008 }, { end: 75, pct: avgs.M009 }, { end: 90, pct: avgs.M010 },` |  |
-| 1571 | `20` | `let earlyEnd = 20, criticalMoment = 60, lateStart = 75;` |  |
-| 1571 | `75` | `let earlyEnd = 20, criticalMoment = 60, lateStart = 75;` |  |
-| 1574 | `25` | `if (cumPct >= 25 && earlyEnd === 20) earlyEnd = band.end;` |  |
-| 1574 | `20` | `if (cumPct >= 25 && earlyEnd === 20) earlyEnd = band.end;` |  |
-| 1575 | `50` | `if (cumPct >= 50 && criticalMoment === 60) criticalMoment = band.end;` |  |
-| 1576 | `75` | `if (cumPct >= 75 && lateStart === 75) lateStart = band.end;` |  |
-| 1576 | `75` | `if (cumPct >= 75 && lateStart === 75) lateStart = band.end;` |  |
-| 1593 | `8` | `if (standingsRows.length >= 8) {` |  |
-| 1640 | `5.0` | `set('M171', 5.0, 'neutral baseline (pedestal)');` |  |
+| 27 | `3` | `{ id: 'M011', weight: 3, sign: 1 }, { id: 'M012', weight: 2, sign: 1 },` |  |
+| 32 | `3` | `{ id: 'M015', weight: 3, sign: 1 }, { id: 'M017', weight: 2, sign: 1 },` |  |
+| 33 | `3` | `{ id: 'M021', weight: 3, sign: 1 }, { id: 'M070', weight: 3, sign: 1 },` |  |
+| 33 | `3` | `{ id: 'M021', weight: 3, sign: 1 }, { id: 'M070', weight: 3, sign: 1 },` |  |
+| 37 | `3` | `{ id: 'M013', weight: 3, sign: 1 }, { id: 'M014', weight: 3, sign: 1 },` |  |
+| 37 | `3` | `{ id: 'M013', weight: 3, sign: 1 }, { id: 'M014', weight: 3, sign: 1 },` |  |
+| 54 | `3` | `{ id: 'M026', weight: 3, sign: -1 }, { id: 'M028', weight: 3, sign: 1 },` |  |
+| 54 | `3` | `{ id: 'M026', weight: 3, sign: -1 }, { id: 'M028', weight: 3, sign: 1 },` |  |
+| 62 | `3` | `{ id: 'M096', weight: 3, sign: 1 }, { id: 'M098', weight: 3, sign: 1 },` |  |
+| 62 | `3` | `{ id: 'M096', weight: 3, sign: 1 }, { id: 'M098', weight: 3, sign: 1 },` |  |
+| 72 | `4` | `{ id: 'M064', weight: 4, sign: 1 }, { id: 'M165', weight: 3, sign: 1 },` |  |
+| 72 | `3` | `{ id: 'M064', weight: 4, sign: 1 }, { id: 'M165', weight: 3, sign: 1 },` |  |
+| 77 | `4` | `{ id: 'M065', weight: 4, sign: 1 }, { id: 'M043', weight: 2, sign: 1 },` |  |
+| 81 | `3` | `{ id: 'M042', weight: 3, sign: 1 }, { id: 'M041', weight: 2, sign: 1 },` |  |
+| 86 | `3` | `{ id: 'M040', weight: 3, sign: -1 }` |  |
+| 89 | `3` | `{ id: 'M146', weight: 3, sign: 1 }, { id: 'M149', weight: 2, sign: 1 },` |  |
+| 96 | `3` | `{ id: 'M046', weight: 3, sign: 1 }, { id: 'M049', weight: 2, sign: 1 },` |  |
+| 100 | `3` | `{ id: 'M047', weight: 3, sign: 1 }, { id: 'M048', weight: 2, sign: 1 },` |  |
+| 104 | `3` | `{ id: 'M062', weight: 3, sign: 1 }, { id: 'M031', weight: 2, sign: -1 },` |  |
+| 112 | `3` | `{ id: 'M139', weight: 2, sign: 1 }, { id: 'M140', weight: 3, sign: 1 }` |  |
+| 115 | `3` | `{ id: 'M141', weight: 3, sign: 1 }, { id: 'M170', weight: 3, sign: 1 }` |  |
+| 115 | `3` | `{ id: 'M141', weight: 3, sign: 1 }, { id: 'M170', weight: 3, sign: 1 }` |  |
+| 118 | `4` | `{ id: 'M171', weight: 4, sign: 1 },` |  |
+| 119 | `3` | `{ id: 'M172', weight: 3, sign: 1 },` |  |
+| 126 | `3` | `{ id: 'M025', weight: 3, sign: 1 }, { id: 'M150', weight: 3, sign: 1 },` |  |
+| 126 | `3` | `{ id: 'M025', weight: 3, sign: 1 }, { id: 'M150', weight: 3, sign: 1 },` |  |
+| 139 | `3` | `{ id: 'M119', weight: 2, sign: 1 }, { id: 'M122', weight: 3, sign: 1 }` |  |
+| 142 | `3` | `{ id: 'M111', weight: 2, sign: 1 }, { id: 'M118b', weight: 3, sign: 1 },` |  |
+| 444 | `2.0` | `if (sign === -1) normalized = 2.0 - normalized;` |  |
+| 483 | `11` | `if (count >= 11) break;` |  |
+| 493 | `11` | `if (count >= 11) break;` |  |
+| 501 | `1000` | `const EPS = (baseline?.leagueAvgGoals \|\| 1) / 1000;` |  |
+| 588 | `0.15` | `const _gkRatioSpan = (_lgCV_sim != null && _lgCV_sim > 0) ? _lgCV_sim : 0.15;` |  |
+| 589 | `0.01` | `if (_refCSR != null && _refCSR > 0.01) {` |  |
+| 737 | `0.01` | `const _s = v => (isFinite(v) && v > 0.01) ? v : 0.01;` |  |
+| 737 | `0.01` | `const _s = v => (isFinite(v) && v > 0.01) ? v : 0.01;` |  |
+| 751 | `1000` | `const _sdEPS = (baseline.leagueAvgGoals \|\| 1) / 1000;` |  |
+| 758 | `2.0` | `: (DYN_LIMITS?.POWER?.MAX != null ? DYN_LIMITS.POWER.MAX + (1.0 - (DYN_LIMITS?.POWER?.MIN ?? 1.0)) :` |  |
+| 870 | `1000` | `const _sddEPS = (baseline.leagueAvgGoals \|\| 1) / 1000;` |  |
+| 942 | `20` | `const _fatTeamN = leagueTeamCount ?? 20; // null koruması — bölücüde kullanılıyor` |  |
+| 975 | `20` | `const earlyPhaseRatio = minute / (earlyBase \|\| 20);` |  |
+| 979 | `75` | `const latePhaseAmplifier = Math.max(1.0, Math.pow(minute / (lateBase \|\| 75), urgencyExcess + 1.0))` |  |
+| 1022 | `4` | `: _pRange / (4 * _mRange))` |  |
+| 1034 | `22` | `?? (_earlyFraction != null && _earlyFraction > 0 ? Math.round(_matchMins * _earlyFraction) : Math.ro` |  |
+| 1035 | `5` | `const lateBase = dynamicTimeWindows?.LATE_GAME_START ?? Math.round(_matchMins * 5 / 6); // ~75 for 9` |  |
+| 1035 | `6` | `const lateBase = dynamicTimeWindows?.LATE_GAME_START ?? Math.round(_matchMins * 5 / 6); // ~75 for 9` |  |
+| 1055 | `95` | `for (let minute = 1; minute <= 95; minute++) {` |  |
+| 1062 | `46` | `if (minute === 46) {` |  |
+| 1100 | `3` | `const _minSigma = _lgPace * 3;` |  |
+| 1109 | `4` | `+ _hSigma * (state.home.territory - 0.5) * 4` |  |
+| 1110 | `3` | `+ _hSigma * state.home.tacticalStance * 3` |  |
+| 1113 | `4` | `+ _aSigma * (state.away.territory - 0.5) * 4` |  |
+| 1114 | `3` | `+ _aSigma * state.away.tacticalStance * 3` |  |
+| 1119 | `50` | `const _normalizedBase = _rawPossSum > 0 ? (_hMatchPoss / _rawPossSum) * 100 : 50;` |  |
+| 1133 | `2.0` | `? baseline.normMaxRatio + (1.0 - baseline.normMinRatio) : 2.0;` |  |
+| 1140 | `95` | `const timeRatio = (minute - homeUrgencyStart) / (95 - homeUrgencyStart);` |  |
+| 1144 | `95` | `const timeRatio = (minute - awayUrgencyStart) / (95 - awayUrgencyStart);` |  |
+| 1152 | `95` | `const timeRatio = (minute - homeUrgencyStart) / (95 - homeUrgencyStart);` |  |
+| 1161 | `95` | `const timeRatio = (minute - awayUrgencyStart) / (95 - awayUrgencyStart);` |  |
+| 1194 | `3` | `const _velCapThreshold = Math.max(3, Math.ceil((baseline.leagueAvgGoals ?? 2.5) * 2));` |  |
+| 1194 | `2.5` | `const _velCapThreshold = Math.max(3, Math.ceil((baseline.leagueAvgGoals ?? 2.5) * 2));` |  |
+| 1197 | `2.5` | `? 1.0 / (1.0 + _velExcess / Math.max(baseline.leagueAvgGoals ?? 2.5, 1))` |  |
+| 1214 | `76` | `} else if (minute >= 76 && _ltR != null) {` |  |
+| 1215 | `0.33` | `timeWindowMult = clamp(1.0 + (_ltR - 0.33) * _twSens, 1.0 - _twSens, 1.0 + _twSens);` |  |
+| 1243 | `0.99` | `const rawGkAdj = (defGKSave != null && _baseGKSave != null && _baseGKSave < 0.99)` |  |
+| 1244 | `0.01` | `? (1 - defGKSave) / Math.max(1 - _baseGKSave, 0.01)` |  |
+| 1246 | `0.01` | `const gkAdj = Math.sqrt(Math.max(rawGkAdj, 0.01));` |  |
+| 1262 | `0.1` | `0.1 // minimum 0.1 gol/maç — sıfıra bölme koruması` |  |
+| 1269 | `0.1` | `0.1` |  |
+| 1308 | `0.15` | `const _gkRatio = (baseline.leagueAvgGoals ?? 1) / ((baseline.shotsPerMin ?? 0.15) * 90); // gol/şut ` |  |
+| 1381 | `5` | `const _yMax = _lgYellow * 5;` |  |
+| 1382 | `5` | `const _rMax = _lgRed * 5;` |  |
+| 1450 | `46` | `const comfortOffset = Math.max(0, (1.0 - moraleDeficit - urgencyExcess) * (lateBase - 46));` |  |
+| 1451 | `46` | `const subStartMinute = 46 + comfortOffset;` |  |
+| 1456 | `95` | `const remainingMinutes = Math.max(1, 95 - minute + 1);` |  |
+| 1551 | `3` | `const _fpHSigma = _fpLgScale * 3 + Math.abs(_fpH - _fpLgAvg) * _fpLgScale * 2;` |  |
+| 1552 | `3` | `const _fpASigma = _fpLgScale * 3 + Math.abs(_fpA - _fpLgAvg) * _fpLgScale * 2;` |  |
+| 1554 | `4` | `const _fpHMatch = _fpH + _fpHSigma * (homeUnits.TOPLA_OYNAMA - 1.0) * 4;` |  |
+| 1555 | `4` | `const _fpAMatch = _fpA + _fpASigma * (awayUnits.TOPLA_OYNAMA - 1.0) * 4;` |  |
+| 1558 | `50` | `_fpSum > 0 ? (_fpHMatch / _fpSum) * 100 : 50,` |  |
 
-_(+2 kayıt kısaltıldı)_
+_(+9 kayıt kısaltıldı)_
 
 ### `src\metrics\contextual.js` — 79 şüpheli literal
 
@@ -480,83 +393,83 @@ _(+2 kayıt kısaltıldı)_
 | 915 | `86400` | `totalDays += Math.abs(finished[i].startTimestamp - finished[i + 1].startTimestamp) / 86400;` |  |
 | 999 | `1000` | `time: parseInt(e.timestamp) * 1000, // ms` |  |
 
-### `src\engine\event-impact.js` — 73 şüpheli literal
+### `src\engine\league-averages.js` — 73 şüpheli literal
 
 | Satır | Değer | Bağlam | Tasnif (manuel) |
 |---|---|---|---|
-| 13 | `0.01` | `const _s = v => (isFinite(v) && v > 0.01) ? v : 0.01;` |  |
-| 13 | `0.01` | `const _s = v => (isFinite(v) && v > 0.01) ? v : 0.01;` |  |
-| 35 | `35` | `* Ör: ligde possession 35-70% arasında değişiyorsa spread=0.35 → güçlü etki.` |  |
-| 35 | `70` | `* Ör: ligde possession 35-70% arasında değişiyorsa spread=0.35 → güçlü etki.` |  |
-| 35 | `0.35` | `* Ör: ligde possession 35-70% arasında değişiyorsa spread=0.35 → güçlü etki.` |  |
-| 127 | `4` | `case 'shot_off_target': return lgShots != null ? r(lgShots * 4) : null;` |  |
-| 137 | `3` | `case 'throw_in':        return lgFouls != null ? r(lgFouls * 3) : null;` |  |
-| 139 | `5` | `case 'goal_kick':       return lgShots != null ? r(lgShots * 5) : null;` |  |
-| 225 | `-0.6` | `goal:            { actorMom: +1.0,  reactorMom: -0.6,  actorMorale: +1.0,  reactorMorale: -0.8,  act` |  |
-| 225 | `-0.8` | `goal:            { actorMom: +1.0,  reactorMom: -0.6,  actorMorale: +1.0,  reactorMorale: -0.8,  act` |  |
-| 225 | `-0.5` | `goal:            { actorMom: +1.0,  reactorMom: -0.6,  actorMorale: +1.0,  reactorMorale: -0.8,  act` |  |
-| 225 | `-0.5` | `goal:            { actorMom: +1.0,  reactorMom: -0.6,  actorMorale: +1.0,  reactorMorale: -0.8,  act` |  |
-| 226 | `0.8` | `penalty_scored:  { actorMom: +0.8,  reactorMom: -0.5,  actorMorale: +0.8,  reactorMorale: -0.7,  act` |  |
-| 226 | `-0.5` | `penalty_scored:  { actorMom: +0.8,  reactorMom: -0.5,  actorMorale: +0.8,  reactorMorale: -0.7,  act` |  |
-| 226 | `0.8` | `penalty_scored:  { actorMom: +0.8,  reactorMom: -0.5,  actorMorale: +0.8,  reactorMorale: -0.7,  act` |  |
-| 226 | `-0.7` | `penalty_scored:  { actorMom: +0.8,  reactorMom: -0.5,  actorMorale: +0.8,  reactorMorale: -0.7,  act` |  |
-| 226 | `0.6` | `penalty_scored:  { actorMom: +0.8,  reactorMom: -0.5,  actorMorale: +0.8,  reactorMorale: -0.7,  act` |  |
-| 226 | `-0.3` | `penalty_scored:  { actorMom: +0.8,  reactorMom: -0.5,  actorMorale: +0.8,  reactorMorale: -0.7,  act` |  |
-| 226 | `-0.3` | `penalty_scored:  { actorMom: +0.8,  reactorMom: -0.5,  actorMorale: +0.8,  reactorMorale: -0.7,  act` |  |
-| 227 | `-0.3` | `shot_on_target:  { actorMom: +1.0,  reactorMom: -0.3,  actorMorale: +0.2,  reactorMorale: 0,     act` |  |
-| 227 | `0.2` | `shot_on_target:  { actorMom: +1.0,  reactorMom: -0.3,  actorMorale: +0.2,  reactorMorale: 0,     act` |  |
-| 227 | `0.3` | `shot_on_target:  { actorMom: +1.0,  reactorMom: -0.3,  actorMorale: +0.2,  reactorMorale: 0,     act` |  |
-| 228 | `-0.2` | `shot_blocked:    { actorMom: -0.2,  reactorMom: +1.0,  actorMorale: 0,     reactorMorale: +0.2,  act` |  |
-| 228 | `0.2` | `shot_blocked:    { actorMom: -0.2,  reactorMom: +1.0,  actorMorale: 0,     reactorMorale: +0.2,  act` |  |
-| 228 | `-0.3` | `shot_blocked:    { actorMom: -0.2,  reactorMom: +1.0,  actorMorale: 0,     reactorMorale: +0.2,  act` |  |
-| 228 | `0.3` | `shot_blocked:    { actorMom: -0.2,  reactorMom: +1.0,  actorMorale: 0,     reactorMorale: +0.2,  act` |  |
-| 229 | `-1.0` | `shot_off_target: { actorMom: -1.0,  reactorMom: +0.2,  actorMorale: -0.1,  reactorMorale: 0,     act` |  |
-| 229 | `0.2` | `shot_off_target: { actorMom: -1.0,  reactorMom: +0.2,  actorMorale: -0.1,  reactorMorale: 0,     act` |  |
-| 229 | `-0.1` | `shot_off_target: { actorMom: -1.0,  reactorMom: +0.2,  actorMorale: -0.1,  reactorMorale: 0,     act` |  |
-| 229 | `-0.2` | `shot_off_target: { actorMom: -1.0,  reactorMom: +0.2,  actorMorale: -0.1,  reactorMorale: 0,     act` |  |
-| 229 | `0.1` | `shot_off_target: { actorMom: -1.0,  reactorMom: +0.2,  actorMorale: -0.1,  reactorMorale: 0,     act` |  |
-| 230 | `-0.8` | `big_save:        { actorMom: -0.8,  reactorMom: +1.0,  actorMorale: -0.5,  reactorMorale: +0.7,  act` |  |
-| 230 | `-0.5` | `big_save:        { actorMom: -0.8,  reactorMom: +1.0,  actorMorale: -0.5,  reactorMorale: +0.7,  act` |  |
-| 230 | `0.7` | `big_save:        { actorMom: -0.8,  reactorMom: +1.0,  actorMorale: -0.5,  reactorMorale: +0.7,  act` |  |
-| 230 | `-0.5` | `big_save:        { actorMom: -0.8,  reactorMom: +1.0,  actorMorale: -0.5,  reactorMorale: +0.7,  act` |  |
-| 230 | `0.8` | `big_save:        { actorMom: -0.8,  reactorMom: +1.0,  actorMorale: -0.5,  reactorMorale: +0.7,  act` |  |
-| 230 | `-0.3` | `big_save:        { actorMom: -0.8,  reactorMom: +1.0,  actorMorale: -0.5,  reactorMorale: +0.7,  act` |  |
-| 232 | `0.8` | `free_kick:       { actorMom: +0.8,  reactorMom: 0,     actorMorale: 0,     reactorMorale: 0,     act` |  |
-| 232 | `0.8` | `free_kick:       { actorMom: +0.8,  reactorMom: 0,     actorMorale: 0,     reactorMorale: 0,     act` |  |
-| 232 | `0.3` | `free_kick:       { actorMom: +0.8,  reactorMom: 0,     actorMorale: 0,     reactorMorale: 0,     act` |  |
-| 233 | `-0.3` | `foul:            { actorMom: +0.5,  reactorMom: -0.3,  actorMorale: 0,     reactorMorale: 0,     act` |  |
-| 233 | `-0.5` | `foul:            { actorMom: +0.5,  reactorMom: -0.3,  actorMorale: 0,     reactorMorale: 0,     act` |  |
-| 233 | `-0.2` | `foul:            { actorMom: +0.5,  reactorMom: -0.3,  actorMorale: 0,     reactorMorale: 0,     act` |  |
-| 234 | `-0.2` | `yellow_card:     { actorMom: -0.2,  reactorMom: +0.1,  actorMorale: -1.0,  reactorMorale: +0.1,  act` |  |
-| 234 | `0.1` | `yellow_card:     { actorMom: -0.2,  reactorMom: +0.1,  actorMorale: -1.0,  reactorMorale: +0.1,  act` |  |
-| 234 | `-1.0` | `yellow_card:     { actorMom: -0.2,  reactorMom: +0.1,  actorMorale: -1.0,  reactorMorale: +0.1,  act` |  |
-| 234 | `0.1` | `yellow_card:     { actorMom: -0.2,  reactorMom: +0.1,  actorMorale: -1.0,  reactorMorale: +0.1,  act` |  |
-| 234 | `-0.2` | `yellow_card:     { actorMom: -0.2,  reactorMom: +0.1,  actorMorale: -1.0,  reactorMorale: +0.1,  act` |  |
-| 234 | `-0.5` | `yellow_card:     { actorMom: -0.2,  reactorMom: +0.1,  actorMorale: -1.0,  reactorMorale: +0.1,  act` |  |
-| 235 | `-0.8` | `red_card:        { actorMom: -0.8,  reactorMom: +0.8,  actorMorale: -1.0,  reactorMorale: +0.5,  act` |  |
-| 235 | `0.8` | `red_card:        { actorMom: -0.8,  reactorMom: +0.8,  actorMorale: -1.0,  reactorMorale: +0.5,  act` |  |
-| 235 | `-1.0` | `red_card:        { actorMom: -0.8,  reactorMom: +0.8,  actorMorale: -1.0,  reactorMorale: +0.5,  act` |  |
-| 235 | `-1.0` | `red_card:        { actorMom: -0.8,  reactorMom: +0.8,  actorMorale: -1.0,  reactorMorale: +0.5,  act` |  |
-| 235 | `-1.0` | `red_card:        { actorMom: -0.8,  reactorMom: +0.8,  actorMorale: -1.0,  reactorMorale: +0.5,  act` |  |
-| 236 | `-1.0` | `penalty_missed:  { actorMom: -1.0,  reactorMom: +1.0,  actorMorale: -1.0,  reactorMorale: +0.7,  act` |  |
-| 236 | `-1.0` | `penalty_missed:  { actorMom: -1.0,  reactorMom: +1.0,  actorMorale: -1.0,  reactorMorale: +0.7,  act` |  |
-| 236 | `0.7` | `penalty_missed:  { actorMom: -1.0,  reactorMom: +1.0,  actorMorale: -1.0,  reactorMorale: +0.7,  act` |  |
-| 236 | `-0.5` | `penalty_missed:  { actorMom: -1.0,  reactorMom: +1.0,  actorMorale: -1.0,  reactorMorale: +0.7,  act` |  |
-| 236 | `-0.5` | `penalty_missed:  { actorMom: -1.0,  reactorMom: +1.0,  actorMorale: -1.0,  reactorMorale: +0.7,  act` |  |
-| 236 | `0.3` | `penalty_missed:  { actorMom: -1.0,  reactorMom: +1.0,  actorMorale: -1.0,  reactorMorale: +0.7,  act` |  |
-| 237 | `0.3` | `throw_in:        { actorMom: +0.3,  reactorMom: 0,     actorMorale: 0,     reactorMorale: 0,     act` |  |
-| 237 | `0.3` | `throw_in:        { actorMom: +0.3,  reactorMom: 0,     actorMorale: 0,     reactorMorale: 0,     act` |  |
-| 238 | `-0.5` | `offside:         { actorMom: -0.5,  reactorMom: +0.3,  actorMorale: -0.1,  reactorMorale: 0,     act` |  |
-| 238 | `0.3` | `offside:         { actorMom: -0.5,  reactorMom: +0.3,  actorMorale: -0.1,  reactorMorale: 0,     act` |  |
-| 238 | `-0.1` | `offside:         { actorMom: -0.5,  reactorMom: +0.3,  actorMorale: -0.1,  reactorMorale: 0,     act` |  |
-| 238 | `0.3` | `offside:         { actorMom: -0.5,  reactorMom: +0.3,  actorMorale: -0.1,  reactorMorale: 0,     act` |  |
-| 239 | `0.3` | `goal_kick:       { actorMom: 0,     reactorMom: +0.3,  actorMorale: 0,     reactorMorale: 0,     act` |  |
-| 239 | `-0.2` | `goal_kick:       { actorMom: 0,     reactorMom: +0.3,  actorMorale: 0,     reactorMorale: 0,     act` |  |
-| 239 | `0.2` | `goal_kick:       { actorMom: 0,     reactorMom: +0.3,  actorMorale: 0,     reactorMorale: 0,     act` |  |
-| 240 | `0.3` | `substitution:    { actorMom: 0,     reactorMom: 0,     actorMorale: +0.3,  reactorMorale: 0,     act` |  |
-| 240 | `0.3` | `substitution:    { actorMom: 0,     reactorMom: 0,     actorMorale: +0.3,  reactorMorale: 0,     act` |  |
-| 277 | `0.01` | `const _timeAmp = (Math.abs(_macRatio - 1.0) < 0.01)` |  |
-| 317 | `5` | `as.recentActions = as.recentActions.filter(m => m >= minute - 5);` |  |
+| 31 | `4` | `const hasStandings = standingsRows.length >= 4;` |  |
+| 54 | `4` | `if (rows.length < 4) return null;` |  |
+| 99 | `999` | `let firstGoalMinute = 999;` |  |
+| 115 | `3` | `else if (min <= 60) goalsByPeriod[3]++;` |  |
+| 116 | `75` | `else if (min <= 75) goalsByPeriod[4]++;` |  |
+| 116 | `4` | `else if (min <= 75) goalsByPeriod[4]++;` |  |
+| 117 | `5` | `else goalsByPeriod[5]++;` |  |
+| 203 | `20` | `if (x > 20 \|\| (shot.draw?.start?.y != null && shot.draw.start.y > 20)) {` |  |
+| 203 | `20` | `if (x > 20 \|\| (shot.draw?.start?.y != null && shot.draw.start.y > 20)) {` |  |
+| 257 | `10` | `if (totalGoalIncidents >= 10) {` |  |
+| 261 | `3` | `set('M008', (goalsByPeriod[3] / totalGoalIncidents) * 100, 'incidents 46-60dk');` |  |
+| 262 | `4` | `set('M009', (goalsByPeriod[4] / totalGoalIncidents) * 100, 'incidents 61-75dk');` |  |
+| 263 | `5` | `set('M010', (goalsByPeriod[5] / totalGoalIncidents) * 100, 'incidents 76-90dk');` |  |
+| 267 | `5` | `if (htLeadTotal >= 5) {` |  |
+| 271 | `5` | `if (htDrawTotal >= 5) {` |  |
+| 348 | `10` | `} else if (leagueGoalsPerGame != null && totalGoalIncidents > 10 && penGoalCount > 0) {` |  |
+| 377 | `10` | `if (totalGoalIncidents > 10 && cornerGoalCount > 0) {` |  |
+| 390 | `5` | `if (cShots >= 5) {` |  |
+| 445 | `10` | `if (totalGoalIncidents >= 10) {` |  |
+| 545 | `3` | `const formPct = (ppg / 3) * 100;` |  |
+| 607 | `5` | `if (finished.length < 5) return null;` |  |
+| 608 | `5` | `const last5 = finished.slice(0, 5);` |  |
+| 609 | `5` | `const prev5 = finished.slice(5, 10);` |  |
+| 609 | `10` | `const prev5 = finished.slice(5, 10);` |  |
+| 629 | `4` | `if (!rows \|\| rows.length < 4) return null;` |  |
+| 648 | `4` | `if (!rows \|\| rows.length < 4) return null;` |  |
+| 700 | `5` | `if (firstGoalMatches >= 5) {` |  |
+| 705 | `5` | `if (totalMatchesWithGoals >= 5) {` |  |
+| 710 | `5` | `if (totalMatchesWithGoals >= 5) {` |  |
+| 719 | `5` | `if (starterRatings.length >= 5) {` |  |
+| 724 | `3` | `if (subRatings.length >= 3) {` |  |
+| 827 | `7` | `const refBench = homeBenchCount > 0 ? homeBenchCount : awayBenchCount > 0 ? awayBenchCount : 7;` |  |
+| 828 | `11` | `const homeMatchdaySz = 11 + (homeBenchCount > 0 ? homeBenchCount : refBench);` |  |
+| 829 | `11` | `const awayMatchdaySz = 11 + (awayBenchCount > 0 ? awayBenchCount : refBench);` |  |
+| 886 | `20` | `const refSquadSize = Math.max(20, Math.max(homeSquadSize, awaySquadSize));` |  |
+| 1019 | `10` | `if (count > 0) return ((rAvg / count) - seasonRating) * 10;` |  |
+| 1030 | `10` | `const allEvents = [...homeLastEvents.slice(0, 10), ...awayLastEvents.slice(0, 10)];` |  |
+| 1030 | `10` | `const allEvents = [...homeLastEvents.slice(0, 10), ...awayLastEvents.slice(0, 10)];` |  |
+| 1059 | `0.1` | `if (shot.xg != null && shot.xg < 0.1) luckyGoals++;` |  |
+| 1096 | `0.35` | `const sotPG = avgs.M014 ?? avgs.M013 * (avgs.M011 != null ? avgs.M011 / 100 : 0.35);` |  |
+| 1143 | `3` | `gkAttrSum += (attrs.attacking + attrs.defending + attrs.technical) / 3;` |  |
+| 1183 | `10` | `set('M108', Math.min(100, Math.max(0, avgGkR * 10)), 'recentDetails GK rating×10');` |  |
+| 1203 | `3` | `if (avgs.M109 != null && avgs.M110 != null) set('M117', avgs.M109 + avgs.M110 * 3, 'derived M109+M11` |  |
+| 1217 | `2.5` | `if (hs + as > 2.5) h2hO25++;` |  |
+| 1229 | `10` | `set('M122', avgGD * 10 + 50, 'h2h avg goals × 10 + 50');` |  |
+| 1229 | `50` | `set('M122', avgGD * 10 + 50, 'h2h avg goals × 10 + 50');` |  |
+| 1267 | `4` | `if (homeStandingsRows.length >= 4) {` |  |
+| 1277 | `4` | `if (awayStandingsRows.length >= 4) {` |  |
+| 1303 | `10` | `const competitiveness = ptsStdVal != null && ptsStdVal > 0 ? Math.min(1, 10 / ptsStdVal) : null;` |  |
+| 1399 | `5` | `for (let k = 0; k <= 5; k++) {` |  |
+| 1406 | `0.001` | `const drawTendency = poissonDrawRef > 0.001` |  |
+| 1450 | `5` | `for (const ev of events.slice(0, 5)) {` |  |
+| 1453 | `3` | `if (isHome ? hs > as : as > hs) totalPts += 3;` |  |
+| 1460 | `3` | `if (matchCount146 > 0) set('M146', (totalPts / (matchCount146 * 3)) * 100, 'lastEvents points ratio%` |  |
+| 1465 | `10` | `for (const m of allRecentMatches.slice(0, 10)) {` |  |
+| 1471 | `2.5` | `if (cnt > 0) set('M147', (totalG / cnt / (leagueGoalsPerGame \|\| 2.5)) * 50, 'recent goals ratio × ` |  |
+| 1471 | `50` | `if (cnt > 0) set('M147', (totalG / cnt / (leagueGoalsPerGame \|\| 2.5)) * 50, 'recent goals ratio × ` |  |
+| 1512 | `50` | `set('M150', avgPoss ?? 50, avgPoss ? 'seasonStats possession' : 'NEUTRAL_SYMMETRY: possession is inh` |  |
+| 1516 | `50` | `set('M151', 50, 'NEUTRAL_SYMMETRY: H2H başlangıç dengesizlik = 0');` |  |
+| 1539 | `5` | `const contribRatio = (goalTotal >= 5) ? contribTotal / goalTotal : null;` |  |
+| 1556 | `50` | `const compositeBase = (leagueGoalsPerGame / leagueGoalsPerGame) * 50; // = 50, ama veri bazlı: avg/a` |  |
+| 1565 | `50` | `set('M168', (leagueGoalsPerGame / leagueGoalsPerGame) * 50, 'derived league avg ratio × 50');` |  |
+| 1580 | `4` | `if (homeStandingsRows.length >= 4 && awayStandingsRows.length >= 4) {` |  |
+| 1580 | `4` | `if (homeStandingsRows.length >= 4 && awayStandingsRows.length >= 4) {` |  |
+| 1594 | `75` | `{ end: 60, pct: avgs.M008 }, { end: 75, pct: avgs.M009 }, { end: 90, pct: avgs.M010 },` |  |
+| 1596 | `20` | `let earlyEnd = 20, criticalMoment = 60, lateStart = 75;` |  |
+| 1596 | `75` | `let earlyEnd = 20, criticalMoment = 60, lateStart = 75;` |  |
+| 1599 | `25` | `if (cumPct >= 25 && earlyEnd === 20) earlyEnd = band.end;` |  |
+| 1599 | `20` | `if (cumPct >= 25 && earlyEnd === 20) earlyEnd = band.end;` |  |
+| 1600 | `50` | `if (cumPct >= 50 && criticalMoment === 60) criticalMoment = band.end;` |  |
+| 1601 | `75` | `if (cumPct >= 75 && lateStart === 75) lateStart = band.end;` |  |
+| 1601 | `75` | `if (cumPct >= 75 && lateStart === 75) lateStart = band.end;` |  |
+| 1618 | `8` | `if (standingsRows.length >= 8) {` |  |
 
 ### `src\engine\player-rating-utils.js` — 69 şüpheli literal
 
@@ -632,6 +545,62 @@ _(+2 kayıt kısaltıldı)_
 | 230 | `99` | `return Math.min(99, Math.max(40, Math.round(finalScore)));` |  |
 | 230 | `40` | `return Math.min(99, Math.max(40, Math.round(finalScore)));` |  |
 
+### `src\engine\event-impact.js` — 51 şüpheli literal
+
+| Satır | Değer | Bağlam | Tasnif (manuel) |
+|---|---|---|---|
+| 13 | `0.01` | `const _s = v => (isFinite(v) && v > 0.01) ? v : 0.01;` |  |
+| 13 | `0.01` | `const _s = v => (isFinite(v) && v > 0.01) ? v : 0.01;` |  |
+| 35 | `35` | `* Ör: ligde possession 35-70% arasında değişiyorsa spread=0.35 → güçlü etki.` |  |
+| 35 | `70` | `* Ör: ligde possession 35-70% arasında değişiyorsa spread=0.35 → güçlü etki.` |  |
+| 35 | `0.35` | `* Ör: ligde possession 35-70% arasında değişiyorsa spread=0.35 → güçlü etki.` |  |
+| 127 | `4` | `case 'shot_off_target': return lgShots != null ? r(lgShots * 4) : null;` |  |
+| 137 | `3` | `case 'throw_in':        return lgFouls != null ? r(lgFouls * 3) : null;` |  |
+| 139 | `5` | `case 'goal_kick':       return lgShots != null ? r(lgShots * 5) : null;` |  |
+| 227 | `-1.0` | `goal:            { actorMom: +1.0,  reactorMom: -1.0,  actorMorale: +1.0,  reactorMorale: -1.0,  act` |  |
+| 227 | `-1.0` | `goal:            { actorMom: +1.0,  reactorMom: -1.0,  actorMorale: +1.0,  reactorMorale: -1.0,  act` |  |
+| 227 | `-1.0` | `goal:            { actorMom: +1.0,  reactorMom: -1.0,  actorMorale: +1.0,  reactorMorale: -1.0,  act` |  |
+| 227 | `-1.0` | `goal:            { actorMom: +1.0,  reactorMom: -1.0,  actorMorale: +1.0,  reactorMorale: -1.0,  act` |  |
+| 228 | `-1.0` | `penalty_scored:  { actorMom: +1.0,  reactorMom: -1.0,  actorMorale: +1.0,  reactorMorale: -1.0,  act` |  |
+| 228 | `-1.0` | `penalty_scored:  { actorMom: +1.0,  reactorMom: -1.0,  actorMorale: +1.0,  reactorMorale: -1.0,  act` |  |
+| 228 | `-1.0` | `penalty_scored:  { actorMom: +1.0,  reactorMom: -1.0,  actorMorale: +1.0,  reactorMorale: -1.0,  act` |  |
+| 228 | `-1.0` | `penalty_scored:  { actorMom: +1.0,  reactorMom: -1.0,  actorMorale: +1.0,  reactorMorale: -1.0,  act` |  |
+| 229 | `-1.0` | `shot_on_target:  { actorMom: +1.0,  reactorMom: -1.0,  actorMorale: +1.0,  reactorMorale:  0,    act` |  |
+| 230 | `-1.0` | `shot_blocked:    { actorMom: -1.0,  reactorMom: +1.0,  actorMorale:  0,    reactorMorale: +1.0,  act` |  |
+| 230 | `-1.0` | `shot_blocked:    { actorMom: -1.0,  reactorMom: +1.0,  actorMorale:  0,    reactorMorale: +1.0,  act` |  |
+| 231 | `-1.0` | `shot_off_target: { actorMom: -1.0,  reactorMom: +1.0,  actorMorale: -1.0,  reactorMorale:  0,    act` |  |
+| 231 | `-1.0` | `shot_off_target: { actorMom: -1.0,  reactorMom: +1.0,  actorMorale: -1.0,  reactorMorale:  0,    act` |  |
+| 231 | `-1.0` | `shot_off_target: { actorMom: -1.0,  reactorMom: +1.0,  actorMorale: -1.0,  reactorMorale:  0,    act` |  |
+| 232 | `-1.0` | `big_save:        { actorMom: -1.0,  reactorMom: +1.0,  actorMorale: -1.0,  reactorMorale: +1.0,  act` |  |
+| 232 | `-1.0` | `big_save:        { actorMom: -1.0,  reactorMom: +1.0,  actorMorale: -1.0,  reactorMorale: +1.0,  act` |  |
+| 232 | `-1.0` | `big_save:        { actorMom: -1.0,  reactorMom: +1.0,  actorMorale: -1.0,  reactorMorale: +1.0,  act` |  |
+| 232 | `-1.0` | `big_save:        { actorMom: -1.0,  reactorMom: +1.0,  actorMorale: -1.0,  reactorMorale: +1.0,  act` |  |
+| 235 | `-1.0` | `foul:            { actorMom: +1.0,  reactorMom: -1.0,  actorMorale:  0,    reactorMorale:  0,    act` |  |
+| 235 | `-1.0` | `foul:            { actorMom: +1.0,  reactorMom: -1.0,  actorMorale:  0,    reactorMorale:  0,    act` |  |
+| 235 | `-1.0` | `foul:            { actorMom: +1.0,  reactorMom: -1.0,  actorMorale:  0,    reactorMorale:  0,    act` |  |
+| 236 | `-1.0` | `yellow_card:     { actorMom: -1.0,  reactorMom: +1.0,  actorMorale: -1.0,  reactorMorale: +1.0,  act` |  |
+| 236 | `-1.0` | `yellow_card:     { actorMom: -1.0,  reactorMom: +1.0,  actorMorale: -1.0,  reactorMorale: +1.0,  act` |  |
+| 236 | `-1.0` | `yellow_card:     { actorMom: -1.0,  reactorMom: +1.0,  actorMorale: -1.0,  reactorMorale: +1.0,  act` |  |
+| 236 | `-1.0` | `yellow_card:     { actorMom: -1.0,  reactorMom: +1.0,  actorMorale: -1.0,  reactorMorale: +1.0,  act` |  |
+| 237 | `-1.0` | `red_card:        { actorMom: -1.0,  reactorMom: +1.0,  actorMorale: -1.0,  reactorMorale: +1.0,  act` |  |
+| 237 | `-1.0` | `red_card:        { actorMom: -1.0,  reactorMom: +1.0,  actorMorale: -1.0,  reactorMorale: +1.0,  act` |  |
+| 237 | `-1.0` | `red_card:        { actorMom: -1.0,  reactorMom: +1.0,  actorMorale: -1.0,  reactorMorale: +1.0,  act` |  |
+| 237 | `-1.0` | `red_card:        { actorMom: -1.0,  reactorMom: +1.0,  actorMorale: -1.0,  reactorMorale: +1.0,  act` |  |
+| 238 | `-1.0` | `penalty_missed:  { actorMom: -1.0,  reactorMom: +1.0,  actorMorale: -1.0,  reactorMorale: +1.0,  act` |  |
+| 238 | `-1.0` | `penalty_missed:  { actorMom: -1.0,  reactorMom: +1.0,  actorMorale: -1.0,  reactorMorale: +1.0,  act` |  |
+| 238 | `-1.0` | `penalty_missed:  { actorMom: -1.0,  reactorMom: +1.0,  actorMorale: -1.0,  reactorMorale: +1.0,  act` |  |
+| 238 | `-1.0` | `penalty_missed:  { actorMom: -1.0,  reactorMom: +1.0,  actorMorale: -1.0,  reactorMorale: +1.0,  act` |  |
+| 240 | `-1.0` | `offside:         { actorMom: -1.0,  reactorMom: +1.0,  actorMorale: -1.0,  reactorMorale:  0,    act` |  |
+| 240 | `-1.0` | `offside:         { actorMom: -1.0,  reactorMom: +1.0,  actorMorale: -1.0,  reactorMorale:  0,    act` |  |
+| 241 | `-1.0` | `goal_kick:       { actorMom:  0,    reactorMom: +1.0,  actorMorale:  0,    reactorMorale:  0,    act` |  |
+| 259 | `8` | `* Dönüş değeri: Her olay için 8 boyutlu yön vektörü.` |  |
+| 333 | `-1.0` | `shot_off_target: { actorMom: -1.0,       reactorMom: +_t,        actorMorale: -_t * _t,   reactorMor` |  |
+| 343 | `-1.0` | `yellow_card:     { actorMom: -_t,        reactorMom: +_t * _t,   actorMorale: -1.0,       reactorMor` |  |
+| 345 | `-1.0` | `red_card:        { actorMom: -_m,        reactorMom: +_m,        actorMorale: -1.0,       reactorMor` |  |
+| 347 | `-1.0` | `penalty_missed:  { actorMom: -1.0,       reactorMom: +1.0,       actorMorale: -_m,        reactorMor` |  |
+| 395 | `0.01` | `const _timeAmp = (Math.abs(_macRatio - 1.0) < 0.01)` |  |
+| 435 | `5` | `as.recentActions = as.recentActions.filter(m => m >= minute - 5);` |  |
+
 ### `src\engine\lineup-impact.js` — 42 şüpheli literal
 
 | Satır | Değer | Bağlam | Tasnif (manuel) |
@@ -678,51 +647,6 @@ _(+2 kayıt kısaltıldı)_
 | 579 | `0.25` | `const uw = zones.length > 0 ? 1 / zones.length : 0.25;` |  |
 | 614 | `1.08` | `* @param {object} units - Behavioral unit değerleri { BITIRICILIK: 1.08, GK_REFLEKS: 0.95, ... }` |  |
 | 614 | `0.95` | `* @param {object} units - Behavioral unit değerleri { BITIRICILIK: 1.08, GK_REFLEKS: 0.95, ... }` |  |
-
-### `src\services\weather-service.js` — 40 şüpheli literal
-
-| Satır | Değer | Bağlam | Tasnif (manuel) |
-|---|---|---|---|
-| 4 | `10` | `* API key gerektirmez, rate limit: 10,000 istek/gün.` |  |
-| 19 | `23` | `* @param {number} matchHour - Maç saati (0-23)` |  |
-| 25 | `20` | `const hour = matchHour ?? 20; // varsayılan akşam maçı` |  |
-| 29 | `5000` | `const req = https.get(url, { timeout: 5000 }, (res) => {` |  |
-| 87 | `22` | `if (t >= 15 && t <= 22) {` |  |
-| 90 | `40` | `metrics.M170 = Math.max(40, 100 - (15 - t) * 4); // soğukta düşüş` |  |
-| 90 | `4` | `metrics.M170 = Math.max(40, 100 - (15 - t) * 4); // soğukta düşüş` |  |
-| 92 | `22` | `metrics.M170 = Math.max(30, 100 - (t - 22) * 5); // sıcakta daha hızlı düşüş` |  |
-| 92 | `5` | `metrics.M170 = Math.max(30, 100 - (t - 22) * 5); // sıcakta daha hızlı düşüş` |  |
-| 100 | `0.1` | `if (p <= 0.1) {` |  |
-| 103 | `80` | `metrics.M171 = 80; // hafif yağmur` |  |
-| 104 | `5` | `} else if (p <= 5) {` |  |
-| 107 | `25` | `metrics.M171 = Math.max(25, 60 - (p - 5) * 5); // ağır yağmur` |  |
-| 107 | `5` | `metrics.M171 = Math.max(25, 60 - (p - 5) * 5); // ağır yağmur` |  |
-| 107 | `5` | `metrics.M171 = Math.max(25, 60 - (p - 5) * 5); // ağır yağmur` |  |
-| 118 | `55` | `metrics.M172 = Math.max(55, 100 - (w - 15) * 3);` |  |
-| 118 | `3` | `metrics.M172 = Math.max(55, 100 - (w - 15) * 3);` |  |
-| 120 | `55` | `metrics.M172 = Math.max(30, 55 - (w - 30) * 2);` |  |
-| 128 | `40` | `if (h >= 40 && h <= 60) {` |  |
-| 131 | `50` | `metrics.M173 = Math.max(50, 100 - (h - 60) * 1.5);` |  |
-| 131 | `1.5` | `metrics.M173 = Math.max(50, 100 - (h - 60) * 1.5);` |  |
-| 133 | `40` | `metrics.M173 = Math.max(60, 100 - (40 - h) * 1.5);` |  |
-| 133 | `1.5` | `metrics.M173 = Math.max(60, 100 - (40 - h) * 1.5);` |  |
-| 141 | `3` | `[metrics.M171, 3], // yağış en önemli` |  |
-| 179 | `0.9` | `goalMult = Math.max(0.9, 1.0 - (baseDrop * 0.1 / volAmp));` |  |
-| 179 | `0.1` | `goalMult = Math.max(0.9, 1.0 - (baseDrop * 0.1 / volAmp));` |  |
-| 185 | `0.10` | `errorMult += ((100 - m171) / 100) * (0.10 * volAmp);` |  |
-| 188 | `0.05` | `errorMult += ((100 - m172) / 100) * (0.05 * volAmp);` |  |
-| 195 | `80` | `if (m170 != null && m170 < 80) {` |  |
-| 196 | `80` | `fatigueMult += ((80 - m170) / 100) * 0.1;` |  |
-| 196 | `0.1` | `fatigueMult += ((80 - m170) / 100) * 0.1;` |  |
-| 198 | `70` | `if (m173 != null && m173 < 70) {` |  |
-| 199 | `70` | `fatigueMult += ((70 - m173) / 100) * 0.05;` |  |
-| 199 | `0.05` | `fatigueMult += ((70 - m173) / 100) * 0.05;` |  |
-| 205 | `0.4` | `varianceMult += ((100 - m174) / 100) * 0.4 * volAmp;` |  |
-| 209 | `0.85` | `goalMult: Math.max(0.85, Math.min(1.1, goalMult)),` |  |
-| 209 | `1.1` | `goalMult: Math.max(0.85, Math.min(1.1, goalMult)),` |  |
-| 210 | `1.4` | `errorMult: Math.max(1.0, Math.min(1.4, errorMult)),` |  |
-| 211 | `1.3` | `fatigueMult: Math.max(1.0, Math.min(1.3, fatigueMult)),` |  |
-| 212 | `1.5` | `varianceMult: Math.max(1.0, Math.min(1.5, varianceMult)),` |  |
 
 ### `src\metrics\player-performance.js` — 33 şüpheli literal
 
@@ -857,34 +781,34 @@ _(+2 kayıt kısaltıldı)_
 | 427 | `3` | `const metricRegex = /^M[0-9]{3}[a-z]?$/i;` |  |
 | 444 | `4` | `if (rows.length < 4) return null; // Yeterli veri yok, fallback kullanılmaz` |  |
 
-### `src\engine\sim-config.js` — 24 şüpheli literal
+### `src\services\weather-service.js` — 24 şüpheli literal
 
 | Satır | Değer | Bağlam | Tasnif (manuel) |
 |---|---|---|---|
-| 16 | `2.0` | `POWER:       { MIN: 0.5, MAX: 2.0 },          // 0.5 × 2.0 = 1 (geometrik birim)` |  |
-| 17 | `2.0` | `MOMENTUM:    { MIN: 0.5, MAX: 2.0 },          // 0.5 × 2.0 = 1` |  |
-| 18 | `2.0` | `MORALE:      { MIN: 0.5, MAX: 2.0 },          // 0.5 × 2.0 = 1 (önce 0.4/1.6 asimetrik idi)` |  |
-| 26 | `0.01` | `LAMBDA:      { MIN: 0.01, MAX: 20 },          // Poisson λ > 0; 20 numerik üst tavan` |  |
-| 26 | `20` | `LAMBDA:      { MIN: 0.01, MAX: 20 },          // Poisson λ > 0; 20 numerik üst tavan` |  |
-| 27 | `2.0` | `FORM_MORALE: { MIN: 0.5, MAX: 2.0, SCALE: 1.5 }, // simetrik; SCALE = MAX − MIN` |  |
-| 27 | `1.5` | `FORM_MORALE: { MIN: 0.5, MAX: 2.0, SCALE: 1.5 }, // simetrik; SCALE = MAX − MIN` |  |
-| 48 | `5` | `MAX: 5,` |  |
-| 63 | `0.50` | `POSSESSION_SYMMETRY: 0.50,    // Topla Oynama (%50-%50 simetri)` |  |
-| 64 | `50` | `WIN_PROBABILITY_SYMMETRY: 50, // Kazanma Olasılığı (%50 — bilgi yoksa eşit şans)` |  |
-| 65 | `50` | `SQUAD_DEPTH_MEDIAN: 50,       // Kadro Derinliği (0-100 skalasının ortası)` |  |
-| 72 | `95` | `MAX_UI_PROB: 95,              // Rapor ekranında olasılık tavanı (görsel)` |  |
-| 73 | `0.2` | `HT_RESULT_THRESHOLD: 0.2,     // İlk yarı sonucu eşiği (rapor metni için)` |  |
-| 75 | `80` | `FORM_HIGH: 80,                // Yüksek form eşiği (highlight için)` |  |
-| 77 | `75` | `CONFIDENCE_HIGH: 75,          // Yüksek güven eşiği` |  |
-| 125 | `4` | `? { MIN: Math.max(0, baseline.onTargetRate / 4), MAX: Math.min(1, baseline.onTargetRate * 4) }` |  |
-| 125 | `4` | `? { MIN: Math.max(0, baseline.onTargetRate / 4), MAX: Math.min(1, baseline.onTargetRate * 4) }` |  |
-| 130 | `4` | `? { MIN: Math.max(0, baseline.blockRate / 4), MAX: Math.min(1, baseline.blockRate * 4) }` |  |
-| 130 | `4` | `? { MIN: Math.max(0, baseline.blockRate / 4), MAX: Math.min(1, baseline.blockRate * 4) }` |  |
-| 135 | `4` | `? { MIN: Math.max(0, baseline.cornerPerMin / 4), MAX: Math.min(1, baseline.cornerPerMin * 4) }` |  |
-| 135 | `4` | `? { MIN: Math.max(0, baseline.cornerPerMin / 4), MAX: Math.min(1, baseline.cornerPerMin * 4) }` |  |
-| 140 | `4` | `? { MIN: Math.max(0, baseline.cornerGoalRate / 4), MAX: Math.min(1, baseline.cornerGoalRate * 4) }` |  |
-| 140 | `4` | `? { MIN: Math.max(0, baseline.cornerGoalRate / 4), MAX: Math.min(1, baseline.cornerGoalRate * 4) }` |  |
-| 145 | `5` | `? { YELLOW_MAX: Math.min(1, baseline.yellowPerMin * 90 / 5), RED_MAX: Math.min(1, baseline.redPerMin` |  |
+| 4 | `10` | `* API key gerektirmez, rate limit: 10,000 istek/gün.` |  |
+| 19 | `23` | `* @param {number} matchHour - Maç saati (0-23)` |  |
+| 25 | `20` | `const hour = matchHour ?? 20; // varsayılan akşam maçı` |  |
+| 29 | `5000` | `const req = https.get(url, { timeout: 5000 }, (res) => {` |  |
+| 87 | `22` | `if (t >= 15 && t <= 22) {` |  |
+| 90 | `40` | `metrics.M170 = Math.max(40, 100 - (15 - t) * 4); // soğukta düşüş` |  |
+| 90 | `4` | `metrics.M170 = Math.max(40, 100 - (15 - t) * 4); // soğukta düşüş` |  |
+| 92 | `22` | `metrics.M170 = Math.max(30, 100 - (t - 22) * 5); // sıcakta daha hızlı düşüş` |  |
+| 92 | `5` | `metrics.M170 = Math.max(30, 100 - (t - 22) * 5); // sıcakta daha hızlı düşüş` |  |
+| 100 | `0.1` | `if (p <= 0.1) {` |  |
+| 103 | `80` | `metrics.M171 = 80; // hafif yağmur` |  |
+| 104 | `5` | `} else if (p <= 5) {` |  |
+| 107 | `25` | `metrics.M171 = Math.max(25, 60 - (p - 5) * 5); // ağır yağmur` |  |
+| 107 | `5` | `metrics.M171 = Math.max(25, 60 - (p - 5) * 5); // ağır yağmur` |  |
+| 107 | `5` | `metrics.M171 = Math.max(25, 60 - (p - 5) * 5); // ağır yağmur` |  |
+| 118 | `55` | `metrics.M172 = Math.max(55, 100 - (w - 15) * 3);` |  |
+| 118 | `3` | `metrics.M172 = Math.max(55, 100 - (w - 15) * 3);` |  |
+| 120 | `55` | `metrics.M172 = Math.max(30, 55 - (w - 30) * 2);` |  |
+| 128 | `40` | `if (h >= 40 && h <= 60) {` |  |
+| 131 | `50` | `metrics.M173 = Math.max(50, 100 - (h - 60) * 1.5);` |  |
+| 131 | `1.5` | `metrics.M173 = Math.max(50, 100 - (h - 60) * 1.5);` |  |
+| 133 | `40` | `metrics.M173 = Math.max(60, 100 - (40 - h) * 1.5);` |  |
+| 133 | `1.5` | `metrics.M173 = Math.max(60, 100 - (40 - h) * 1.5);` |  |
+| 141 | `3` | `[metrics.M171, 3], // yağış en önemli` |  |
 
 ### `src\engine\dynamic-baseline.js` — 23 şüpheli literal
 
@@ -1016,6 +940,29 @@ _(+2 kayıt kısaltıldı)_
 | 495 | `109` | `for (let i = 109; i <= 122; i++) m[`M${String(i).padStart(3, '0')}`] = null;` |  |
 | 495 | `122` | `for (let i = 109; i <= 122; i++) m[`M${String(i).padStart(3, '0')}`] = null;` |  |
 
+### `src\engine\sim-config.js` — 18 şüpheli literal
+
+| Satır | Değer | Bağlam | Tasnif (manuel) |
+|---|---|---|---|
+| 26 | `0.01` | `LAMBDA:      { MIN: 0.01, MAX: null },           // Poisson λ > 0; üst sınır veriden` |  |
+| 48 | `5` | `MAX: 5,` |  |
+| 63 | `0.50` | `POSSESSION_SYMMETRY: 0.50,    // Topla Oynama (%50-%50 simetri)` |  |
+| 64 | `50` | `WIN_PROBABILITY_SYMMETRY: 50, // Kazanma Olasılığı (%50 — bilgi yoksa eşit şans)` |  |
+| 65 | `50` | `SQUAD_DEPTH_MEDIAN: 50,       // Kadro Derinliği (0-100 skalasının ortası)` |  |
+| 72 | `95` | `MAX_UI_PROB: 95,              // Rapor ekranında olasılık tavanı (görsel)` |  |
+| 73 | `0.2` | `HT_RESULT_THRESHOLD: 0.2,     // İlk yarı sonucu eşiği (rapor metni için)` |  |
+| 75 | `80` | `FORM_HIGH: 80,                // Yüksek form eşiği (highlight için)` |  |
+| 77 | `75` | `CONFIDENCE_HIGH: 75,          // Yüksek güven eşiği` |  |
+| 125 | `4` | `? { MIN: Math.max(0, baseline.onTargetRate / 4), MAX: Math.min(1, baseline.onTargetRate * 4) }` |  |
+| 125 | `4` | `? { MIN: Math.max(0, baseline.onTargetRate / 4), MAX: Math.min(1, baseline.onTargetRate * 4) }` |  |
+| 130 | `4` | `? { MIN: Math.max(0, baseline.blockRate / 4), MAX: Math.min(1, baseline.blockRate * 4) }` |  |
+| 130 | `4` | `? { MIN: Math.max(0, baseline.blockRate / 4), MAX: Math.min(1, baseline.blockRate * 4) }` |  |
+| 135 | `4` | `? { MIN: Math.max(0, baseline.cornerPerMin / 4), MAX: Math.min(1, baseline.cornerPerMin * 4) }` |  |
+| 135 | `4` | `? { MIN: Math.max(0, baseline.cornerPerMin / 4), MAX: Math.min(1, baseline.cornerPerMin * 4) }` |  |
+| 140 | `4` | `? { MIN: Math.max(0, baseline.cornerGoalRate / 4), MAX: Math.min(1, baseline.cornerGoalRate * 4) }` |  |
+| 140 | `4` | `? { MIN: Math.max(0, baseline.cornerGoalRate / 4), MAX: Math.min(1, baseline.cornerGoalRate * 4) }` |  |
+| 145 | `5` | `? { YELLOW_MAX: Math.min(1, baseline.yellowPerMin * 90 / 5), RED_MAX: Math.min(1, baseline.redPerMin` |  |
+
 ### `src\engine\math-utils.js` — 12 şüpheli literal
 
 | Satır | Değer | Bağlam | Tasnif (manuel) |
@@ -1047,18 +994,6 @@ _(+2 kayıt kısaltıldı)_
 | 267 | `119` | `for (let i = 119; i <= 130; i++) m[`M${String(i).padStart(3, '0')}`] = null;` |  |
 | 267 | `130` | `for (let i = 119; i <= 130; i++) m[`M${String(i).padStart(3, '0')}`] = null;` |  |
 
-### `src\engine\calibration.js` — 7 şüpheli literal
-
-| Satır | Değer | Bağlam | Tasnif (manuel) |
-|---|---|---|---|
-| 46 | `0.01` | `const lr = opts.lr ?? 0.01;` |  |
-| 47 | `1000` | `const epochs = opts.epochs ?? 1000;` |  |
-| 94 | `25` | `* @param {number} [shrinkage=25]` |  |
-| 97 | `25` | `function fitCompetitionCalibration(matches, shrinkage = 25) {` |  |
-| 182 | `3` | `if (b.n < 3) continue;` |  |
-| 329 | `24` | `const MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 gün` |  |
-| 329 | `1000` | `const MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 gün` |  |
-
 ### `src\engine\league-fingerprint.js` — 7 şüpheli literal
 
 | Satır | Değer | Bağlam | Tasnif (manuel) |
@@ -1082,6 +1017,17 @@ _(+2 kayıt kısaltıldı)_
 | 177 | `10` | `const M108 = avgGkRating != null ? Math.min(Math.max(avgGkRating * 10, 0), 100) : null;` |  |
 | 189 | `96` | `for (let i = 96; i <= 108; i++) m[`M${String(i).padStart(3, '0')}`] = null;` |  |
 | 189 | `108` | `for (let i = 96; i <= 108; i++) m[`M${String(i).padStart(3, '0')}`] = null;` |  |
+
+### `src\engine\calibration.js` — 6 şüpheli literal
+
+| Satır | Değer | Bağlam | Tasnif (manuel) |
+|---|---|---|---|
+| 46 | `0.01` | `const lr = opts.lr ?? 0.01;` |  |
+| 47 | `1000` | `const epochs = opts.epochs ?? 1000;` |  |
+| 94 | `25` | `* @param {number} [shrinkage=25]` |  |
+| 97 | `25` | `function fitCompetitionCalibration(matches, shrinkage = 25) {` |  |
+| 182 | `3` | `if (b.n < 3) continue;` |  |
+| 342 | `18` | `if (minN < 18) {` |  |
 
 ### `src\engine\match-context.js` — 6 şüpheli literal
 
@@ -1141,13 +1087,12 @@ _(+2 kayıt kısaltıldı)_
 | 125 | `5` | `if (summary.criticalMissingCount > 5) summary.fallbackThresholdsTriggered++;` |  |
 | 126 | `20` | `if (summary.nullCount > 20) summary.fallbackThresholdsTriggered++;` |  |
 
-### `src\engine\quality-factors.js` — 3 şüpheli literal
+### `src\engine\quality-factors.js` — 2 şüpheli literal
 
 | Satır | Değer | Bağlam | Tasnif (manuel) |
 |---|---|---|---|
-| 81 | `100000` | `const mvMultiplier = mv > 0 ? Math.log10(mv / 100000 + 1) : 1;` |  |
-| 137 | `0.01` | `const geo2 = (a, b) => Math.sqrt(Math.max(a, 0.01) * Math.max(b, 0.01));` |  |
-| 137 | `0.01` | `const geo2 = (a, b) => Math.sqrt(Math.max(a, 0.01) * Math.max(b, 0.01));` |  |
+| 142 | `0.01` | `const geo2 = (a, b) => Math.sqrt(Math.max(a, 0.01) * Math.max(b, 0.01));` |  |
+| 142 | `0.01` | `const geo2 = (a, b) => Math.sqrt(Math.max(a, 0.01) * Math.max(b, 0.01));` |  |
 
 ### `src\engine\metric-value.js` — 1 şüpheli literal
 

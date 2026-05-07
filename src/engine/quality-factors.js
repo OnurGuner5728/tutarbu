@@ -77,10 +77,15 @@ function computePositionMVBreakdown(squadData) {
     const overridePos = (assignedPos !== nativePos) ? assignedPos : null;
     const ratingPower = calculateDynamicRating(entry.player, overridePos); // 40-99 aralığında
     
-    // MV çarpanı: 0M -> 1, 1M -> ~1.04, 10M -> ~2.0, 100M -> ~3.0
-    const mvMultiplier = mv > 0 ? Math.log10(mv / 100000 + 1) : 1;
-    
-    // Blended power: Rating'in karesi, yetenek ve formun baskın olmasını sağlar.
+    // MV çarpanı: log10(mv + 1) — saf matematiksel log scale, statik 100K bölme kaldırıldı.
+    // mv=0 → 0 (veri yok, oyuncu pozisyon gücüne katkı vermez).
+    // mv=1M → ~6.0, mv=10M → ~7.0, mv=100M → ~8.0 (relative scale).
+    // Sadece oranlar önemli (computePair'de share hesabı), absolüt değer değil.
+    const mvMultiplier = mv > 0 ? Math.log10(mv + 1) : 0;
+
+    // Eğer MV yoksa oyuncu pozisyon gücüne katılmaz (blendedPower=0).
+    // Bu, MV verisi olmayan kadrolarda total=0 yapar → computeQualityFactors
+    // PVKD devre dışı bırakır (no fallbacks: veri yoksa nötr 1.0).
     const blendedPower = Math.pow(ratingPower, 2) * mvMultiplier;
 
     breakdown.total += blendedPower;

@@ -164,52 +164,67 @@ function computeWeatherMultipliers(weatherMetrics, leagueVolatility = null) {
     return { goalMult: 1.0, errorMult: 1.0, fatigueMult: 1.0, varianceMult: 1.0 };
   }
 
+  // Lig volatilitesi yoksa multiplier devre dışı (no fallbacks → identity).
+  if (leagueVolatility == null || leagueVolatility <= 0) {
+    return { goalMult: 1.0, errorMult: 1.0, fatigueMult: 1.0, varianceMult: 1.0 };
+  }
+
   const m174 = weatherMetrics.M174;
   const m171 = weatherMetrics.M171; // yağış
   const m172 = weatherMetrics.M172; // rüzgar
+  const m170 = weatherMetrics.M170; // sıcaklık
+  const m173 = weatherMetrics.M173; // nem
 
-  // Base lig volatilitesi. Lig sürprize ne kadar açıksa hava durumu sürprizi (varyansı) o kadar artırır.
-  const volAmp = leagueVolatility != null ? Math.max(1.0, leagueVolatility) : 1.0;
+  // Lig volatilitesi → tek dinamik scale parametresi.
+  // Hava durumu skoru (0-100) ile leagueVolatility çarpılarak çarpan üretilir.
+  // Statik katsayılar (0.10, 0.05, 0.4 vb.) kaldırıldı.
+  const vol = leagueVolatility;
 
-  // goalMult: Kötü hava (M174 düşükse) golü doğrudan çok azaltmak yerine,
-  // lig volatilse düşüş daha az olur (gol ihtimali kalır ama varyans artar).
+  // Sigmoid normalizer: vol/(vol+1) ∈ (0,1) — tek matematiksel ölçü.
+  // Volatil ligde hava etkisi yüksek (sigmoid 1'e yakın), stabil ligde düşük.
+  const volWeight = vol / (vol + 1);
+
+  // (100 - score) / 100 ∈ [0, 1] — skor düşükse etki yüksek.
+  const dev = (s) => s != null ? Math.max(0, (100 - s) / 100) : 0;
+
+  // goalMult: M174 düşükse gol oranı azalır (kötü hava → daha az gol).
+  // Drop oranı: dev(m174) × volWeight. goalMult = 1 - drop.
   let goalMult = 1.0;
   if (m174 != null) {
-    const baseDrop = 1.0 - (m174 / 100);
-    goalMult = Math.max(0.9, 1.0 - (baseDrop * 0.1 / volAmp));
+    goalMult = 1.0 - dev(m174) * volWeight;
   }
 
-  // errorMult: Yağış ve rüzgardan etkilenme (sabit 0.15 yerine volAmp ile ölçeklenir)
+  // errorMult: Yağış ve rüzgar → hata oranı artar.
+  // Geometric mean of dev(m171) ve dev(m172).
   let errorMult = 1.0;
-  if (m171 != null) {
-    errorMult += ((100 - m171) / 100) * (0.10 * volAmp);
-  }
-  if (m172 != null) {
-    errorMult += ((100 - m172) / 100) * (0.05 * volAmp);
+  const _dRain = dev(m171);
+  const _dWind = dev(m172);
+  if (m171 != null || m172 != null) {
+    const _avgDev = (_dRain + _dWind) / ((m171 != null ? 1 : 0) + (m172 != null ? 1 : 0));
+    errorMult = 1.0 + _avgDev * volWeight;
   }
 
-  // fatigueMult: Yorgunluk
+  // fatigueMult: Sıcaklık ve nem → yorgunluk artar.
   let fatigueMult = 1.0;
-  const m170 = weatherMetrics.M170;
-  const m173 = weatherMetrics.M173;
-  if (m170 != null && m170 < 80) {
-    fatigueMult += ((80 - m170) / 100) * 0.1;
-  }
-  if (m173 != null && m173 < 70) {
-    fatigueMult += ((70 - m173) / 100) * 0.05;
+  const _dTemp = dev(m170);
+  const _dHum = dev(m173);
+  if (m170 != null || m173 != null) {
+    const _avgDev = (_dTemp + _dHum) / ((m170 != null ? 1 : 0) + (m173 != null ? 1 : 0));
+    fatigueMult = 1.0 + _avgDev * volWeight;
   }
 
-  // Yeni: Varyans çarpanı (score-profile.js ve prediction-generator.js'de overdispersion için)
+  // varianceMult: Genel hava skoru → varyans (overdispersion).
   let varianceMult = 1.0;
   if (m174 != null) {
-    varianceMult += ((100 - m174) / 100) * 0.4 * volAmp;
+    varianceMult = 1.0 + dev(m174) * volWeight;
   }
 
+  // Matematiksel sınırlar: çarpanlar pozitif (≥ 0). Statik clamp'ler kaldırıldı.
   return {
-    goalMult: Math.max(0.85, Math.min(1.1, goalMult)),
-    errorMult: Math.max(1.0, Math.min(1.4, errorMult)),
-    fatigueMult: Math.max(1.0, Math.min(1.3, fatigueMult)),
-    varianceMult: Math.max(1.0, Math.min(1.5, varianceMult)),
+    goalMult: Math.max(0, goalMult),
+    errorMult: Math.max(1.0, errorMult),
+    fatigueMult: Math.max(1.0, fatigueMult),
+    varianceMult: Math.max(1.0, varianceMult),
   };
 }
 

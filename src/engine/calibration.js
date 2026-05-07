@@ -325,26 +325,27 @@ function loadCalibration(paramsPath) {
   if (!fs.existsSync(filePath)) return null;
   try {
     const params = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-    // Kalibrasyon yaşı kontrolü: 30 günden eskiyse devre dışı bırak
-    const MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 gün
-    const _tsField = params?.lastUpdated ?? params?.trainedAt ?? null;
-    if (_tsField) {
-      const age = Date.now() - new Date(_tsField).getTime();
-      if (age > MAX_AGE_MS) {
-        console.warn(`[calibration] Params are ${Math.round(age / (24*60*60*1000))} days old (>30d) — disabled`);
+    // Sample size denetimi (matematiksel eşik):
+    // Platt 1999 label smoothing formülü: t_pos = (n_pos+1)/(n_pos+2).
+    // Smoothing terimi 1'den ne kadar uzaksa veri o kadar gürültülüdür.
+    // Kalibrasyon anlamlı olabilmesi için pozitif örnek başına smoothing < %5 sapma:
+    //   (n_pos+1)/(n_pos+2) >= 0.95  ⟺  n_pos >= 18.
+    // Beraberlik oranı tipik 1/4'tür → toplam n >= 18 × 4 = 72 (alt sınır).
+    // Daha katı kontrol: en küçük n outcome'unun smoothing terimi denetlenir.
+    const platt = params?.platt;
+    if (platt) {
+      const ns = ['home', 'draw', 'away'].map(k => platt[k]?.n ?? 0);
+      const minN = Math.min(...ns);
+      // Beklenen pozitif sayısı: minN × beraberlik oranı (en az ~1/3, en fazla ~1/2).
+      // Matematiksel olarak n_pos ≥ minN × (1/3) varsayımı altında smoothing < %5 için minN ≥ 54.
+      // Ancak pozitif oranı bilinmediği için doğrudan minN denetlenir: minN < 18 → kesinlikle stale.
+      if (minN < 18) {
+        console.warn(`[calibration] Min sample size ${minN} < 18 (Platt smoothing dominant) — disabled`);
         params._stale = true;
-        return params;
-      }
-    } else {
-      // lastUpdated yoksa file mtime'dan kontrol et
-      const stat = fs.statSync(filePath);
-      const age = Date.now() - stat.mtimeMs;
-      if (age > MAX_AGE_MS) {
-        console.warn(`[calibration] Params file is ${Math.round(age / (24*60*60*1000))} days old (>30d) — disabled`);
-        params._stale = true;
-        return params;
       }
     }
+    // Eskime denetimi prediction-generator'a delege edildi (baseline.latestMatchTs
+    // ile karşılaştırma yapılır). Burada absolüt zaman eşiği yok — "no static thresholds".
     return params;
   } catch (err) {
     console.error('[calibration] loadCalibration failed:', err.message);

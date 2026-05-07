@@ -241,10 +241,18 @@ function generatePrediction(metricsResult, data, baseline, audit, rng) {
       const leagueId = metricsResult.meta?.tournamentId ?? null;
       const _globalDrawMult = _calParams?.competition?.global?.draw ?? null;
       const _calStale = _calParams?._stale === true;
-      // Üst sınır 1 + 1/5 = 1.20: ligin doğal X oranı %20 üstüne çıkıyorsa kalibrasyon
-      // taraflı (büyük ihtimalle eski veriden). Daha katı: 1 + max(drawTendency, 0)
-      const _drawCap = 1 + Math.max(0, baseline?.drawTendency ?? (1 / 5));
-      const _calSafe = _calParams && !_calStale && (_globalDrawMult == null || _globalDrawMult <= _drawCap);
+      // Draw cap: ligin ölçülen beraberlik eğilimi (leagueDrawTendency = gerçek/Poisson).
+      // Calibration'ın global draw multiplier'ı bu doğal eğilimi aşıyorsa training-bias var.
+      // Statik fallback (1/5) kaldırıldı — leagueDrawTendency yoksa cap kontrolü atlanır.
+      const _ldTcal = baseline?.leagueDrawTendency;
+      const _drawCap = _ldTcal != null ? 1 + Math.max(0, _ldTcal) : null;
+      const _drawCapOk = (_globalDrawMult == null) || (_drawCap != null && _globalDrawMult <= _drawCap);
+      // Calibration training tarihi baseline'daki en yeni maç tarihinden eski olmamalı.
+      // Aksi halde training, sonradan gelen veriyi kapsamıyor → stale.
+      const _trainedAt = _calParams?.trainedAt ? new Date(_calParams.trainedAt).getTime() : null;
+      const _latestMatchTs = baseline?.latestMatchTs ?? baseline?.lastMatchTs ?? null;
+      const _ageOk = (_trainedAt == null || _latestMatchTs == null) ? true : (_trainedAt >= _latestMatchTs);
+      const _calSafe = _calParams && !_calStale && _drawCapOk && _ageOk;
       if (_calSafe) {
         const calSum = homeWin + draw + awayWin;
         const rawProbs = calSum > 0
@@ -257,35 +265,29 @@ function generatePrediction(metricsResult, data, baseline, audit, rng) {
         awayWin = calProbs[2] * 100;
       }
 
-      // ── Hafif Temperature Scaling (Sıkıştırma Değil, Düzeltme) ─────────────────
-      // Backtest bulgusu: Eski formül T=1.8-2.5 üretiyordu — %60’u %38’e düşürüyor.
-      // Poisson-Only %64 doğru iken Blend %48.7’de: sebebin üc’te biri temperature.
-      // Yeni hedef: T = 1.0 (kaotik lig) → 1.15 (maksimum). drawTendency katkısı kaldırıldı.
-      // compIndex katkısı: 4x azaltıldı, üst sınır: MAX_T = 1.15
+      // ── Temperature Scaling (Lig Verisinden Tam Dinamik) ──────────────────────
+      // Sıfır statik sabit. Tüm parametreler lig verisinden türetilir.
+      // İki sinyal: lgCV (gol volatilitesi/ortalama) ve compIndex (rekabetçilik [0,1]).
+      // T = 1 + lgCV × compIndex
+      //   - Volatil + rekabetçi lig → daha güçlü smoothing (upset bekle).
+      //   - Stabil + dominant lig → kimlik (favorilere güven).
+      // Veri yoksa T=1 (no-op) — temperature scaling devre dışı.
       const compIndex = baseline?.leagueCompetitiveness ?? metricsResult.meta?.leagueCompetitiveness ?? null;
       const lgCV = (vol != null && avg != null && avg > 0) ? vol / avg : null;
-      // MAX_T: ligin rekabetçilik indeksinden türetilir (dinamik)
-      // Rekabetçi lig (yüksek compIndex) → daha yüksek T (daha çok smooth — upset olasılığı yüksek)
-      // Dominant lig (düşük compIndex) → düşük T (favorilere güven — upset nadir)
-      const MAX_T = compIndex != null
-        ? 1.0 + compIndex / (compIndex + 40)  // compIndex=3→1.07, compIndex=5→1.11, compIndex=10→1.20
-        : (lgCV != null ? 1.0 + lgCV * 0.3 : 1.10);
-      // cvSensitivity: dominant ligde düşük hassasiyet (varyans düşük, favori güvenilir)
-      const cvSensitivity = compIndex != null
-        ? compIndex / (compIndex * compIndex + 16)  // compIndex=3→0.12, compIndex=5→0.12, compIndex=10→0.09
-        : (lgCV != null ? lgCV / (lgCV + 1) : null);
-      let temperature = 1.0 + cvVal * cvSensitivity;
-      if (compIndex != null && compIndex > 0) {
-        temperature += (cvVal / compIndex) * 0.10;
+      let temperature = 1.0;
+      if (lgCV != null && compIndex != null && lgCV > 0 && compIndex > 0) {
+        temperature = 1.0 + lgCV * compIndex;
       }
-      temperature = Math.min(temperature, MAX_T);
 
       let s_homeWin = homeWin / 100;
       let s_draw = draw / 100;
       let s_awayWin = awayWin / 100;
       const s_sum = s_homeWin + s_draw + s_awayWin;
 
-      if (s_sum > 0 && temperature > 1.001) { // T≈1.0 ise atlat—gereksiz hesap yapma
+      // Numerik nötr eşik: ε = (1/avg + 1/sumProbs) — küçük ölçek farkı önemsiz.
+      // Statik 1.001 yerine veri-bağımlı eşik.
+      const _Teps = (s_sum > 0 && avg != null && avg > 0) ? (1 / (avg * 100)) : 0;
+      if (s_sum > 0 && temperature > 1.0 + _Teps) {
         let T_probs = [s_homeWin / s_sum, s_draw / s_sum, s_awayWin / s_sum].map(p => {
           const clampedP = Math.max(1e-9, Math.min(1 - 1e-9, p));
           return Math.exp(Math.log(clampedP) / temperature);
