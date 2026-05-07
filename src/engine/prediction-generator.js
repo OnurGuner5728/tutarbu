@@ -301,22 +301,42 @@ function generatePrediction(metricsResult, data, baseline, audit, rng) {
         awayWin = T_probs[2] * 100;
       }
 
-      // ── Lig Beraberlik Gerçekliği Kalibrasyonu (Bayesian Posterior) ──
-      // leagueDrawTendency = gerçek_beraberlik_oranı / Poisson_beraberlik_referansı.
-      // 1'den uzaklığı, Poisson'un kendi başına yakalayamadığı yapısal beraberlik
-      // eğilimini ölçer (kupa/derbi maçlarında uzayan oyun, defansif lig kültürü vs.).
-      // >1 → lig Poisson'dan fazla beraberlik üretiyor → probDraw boost.
-      // <1 → daha az beraberlik üretiyor → probDraw azalt.
+      // ── Bayesian Draw Prior Shrinkage (Entropy-Weighted) ──
+      // SORUN: Simulation snowball spiral nedeniyle aşırı confident dağılım veriyor
+      // (%96-3-0). Blend sonrası probDraw lig gerçeğinin ÇOK altında kalıyor.
+      // ÇÖZÜM: Lig gözlenen draw oranı (leagueDrawRate) prior olarak kullanılır.
+      // Shrinkage ağırlığı = model entropy'si (modeller belirsizse prior güçlü uygulanır,
+      // model çok kararlıysa prior zayıf etkiler).
+      //
+      //   posterior_draw = (1-w) × model_draw + w × leagueDrawRate
+      //   w = H(model) / log(3)  ∈ [0, 1]
+      //
       // Veri yoksa düzeltme uygulanmaz (no fallbacks).
-      const _ldT = baseline?.leagueDrawTendency;
-      if (_ldT != null && _ldT > 0 && Math.abs(_ldT - 1) > 0.05) {
-        const _newDraw = draw * _ldT;
-        const _total = _newDraw + homeWin + awayWin;
-        if (_total > 0) {
-          const _scale = 100 / _total;
-          draw = _newDraw * _scale;
-          homeWin = homeWin * _scale;
-          awayWin = awayWin * _scale;
+      const _ldRate = baseline?.leagueDrawRate;
+      if (_ldRate != null && _ldRate > 0 && _ldRate < 1) {
+        const _pH = homeWin / 100;
+        const _pD = draw / 100;
+        const _pA = awayWin / 100;
+        const _sum = _pH + _pD + _pA;
+        if (_sum > 0) {
+          const _qH = _pH / _sum, _qD = _pD / _sum, _qA = _pA / _sum;
+          // Shannon entropy (3 sonuç için max = ln(3))
+          const _safe = (p) => p > 1e-9 ? p : 1e-9;
+          const _H = -(_qH * Math.log(_safe(_qH)) + _qD * Math.log(_safe(_qD)) + _qA * Math.log(_safe(_qA)));
+          const _maxH = Math.log(3);
+          const _w = Math.max(0, Math.min(1, _H / _maxH)); // entropy oranı [0,1]
+
+          // Posterior draw probability
+          const _newD = (1 - _w) * _qD + _w * _ldRate;
+          // Diğerleri orijinal oranlarına göre kalan kütleyi paylaşır
+          const _remaining = 1 - _newD;
+          const _hwAwSum = _qH + _qA;
+          const _newH = _hwAwSum > 0 ? _remaining * (_qH / _hwAwSum) : _remaining / 2;
+          const _newA = _hwAwSum > 0 ? _remaining * (_qA / _hwAwSum) : _remaining / 2;
+
+          homeWin = _newH * 100;
+          draw = _newD * 100;
+          awayWin = _newA * 100;
         }
       }
 
