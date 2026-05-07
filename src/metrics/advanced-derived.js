@@ -432,25 +432,58 @@ function calculateAdvancedMetrics(allMetrics) {
     }
     return null; // Gerçekten veri yoksa null — sabit yok
   })();
-  // Lambda tavanı — KARESELLEŞTİRİLDİ ÇÜNKÜ ÖNCEKİ FORMÜL ASİMETRİYİ ÖLDÜRÜYORDU.
+  // Lambda tavanı — TAKIM × TURNUVA SPESİFİK (lig tipikleştirmesi YOK).
   //
-  // Önceki: leagueAvg × normMaxRatio = top takımın TEK BAŞINA maç başı oranı.
-  //   Premier League: 1.32 × 1.89 = 2.49 → Bayern × dip takım için bile lambda
-  //   2.5'te kesiliyor → 4-0, 3-1 gibi skorlar yapısal olarak imkansızlaşıyor.
+  // Mantık: λ_home maksimum = home takımının kendi atış kapasitesi ⊕ rakibin
+  // kendi savunma zafiyeti. İki tarafın 95% güven üst sınırlarının ortalaması.
+  // scoreProfile zaten tournament-filtered (Bayern UCL maçı → UCL maçları).
   //
-  // Yeni: leagueAvg × normMaxRatio² = top atak × top defansif zafiyet.
-  //   Premier League: 1.32 × 1.89² = 4.71 → asimetrik maçlarda lambda açılır.
+  // Hiyerarşi:
+  //   1. Match-spesifik: home/away scoreProfile'dan Bayesian bound (mevcutsa)
+  //   2. Lig fallback: leagueAvg × normMaxRatio² (statistik üst sınır)
+  //   3. Fiziksel fallback: SIM_CONFIG.LIMITS.LAMBDA.MAX
   //
-  // Aynı simetri lambdaMin için de uygulanır (worst takım × en iyi savunma).
-  // Tüm parametreler veriden — statik 1.5/2.0/3.0 katsayısı YOK.
+  // Bayesian bound: avgScored + 2σ = takımın kendi tarihindeki 95% percentile.
+  // Bu takımın bu turnuvadaki "olabilecek en yüksek" gol oranı.
+  const _matchLambdaBound = (homeRoleProfile, awayOpponentProfile, isMax) => {
+    if (!homeRoleProfile || !awayOpponentProfile) return null;
+    const hAvg = homeRoleProfile.avgScored;
+    const hStd = homeRoleProfile.stdScored;
+    const aAvg = awayOpponentProfile.avgConceded;
+    const aStd = awayOpponentProfile.stdConceded;
+    if (hAvg == null || hStd == null || aAvg == null || aStd == null) return null;
+    // Bayesian shrinkage örneklem büyüklüğüne göre: küçük n → güven aralığı geniş
+    // (z-score n bazlı). n=20 → ~2σ, n=5 → ~3σ (Student-t yaklaşımı).
+    const nMin = Math.min(homeRoleProfile.n || 0, awayOpponentProfile.n || 0);
+    if (nMin < 1) return null;
+    const z = nMin >= 20 ? 2 : (nMin >= 10 ? 2.5 : 3);
+    if (isMax) {
+      // Üst sınır: takımın atak %95 + rakibin savunma açıklığı %95, ortalama
+      const hUp = hAvg + z * hStd;
+      const aUp = aAvg + z * aStd;
+      return (hUp + aUp) / 2;
+    } else {
+      // Alt sınır: takımın atak %5 + rakibin savunma sıkılığı %5
+      const hDn = Math.max(0, hAvg - z * hStd);
+      const aDn = Math.max(0, aAvg - z * aStd);
+      return Math.max(SIM_CONFIG.LIMITS.LAMBDA.MIN, (hDn + aDn) / 2);
+    }
+  };
+
   const dynamicLambdaMax = (() => {
-    if (leagueAvgGoals == null || leagueAvgGoals <= 0) return SIM_CONFIG.LIMITS.LAMBDA.MAX;
-    if (allMetrics.normMaxRatio != null) {
-      // Asimetri-açıcı: top × top kombinasyonu (matematiksel max).
+    // 1. Match-spesifik: takım profillerinden Bayesian üst sınır
+    const homeMax = _matchLambdaBound(homeScoreProfile, awayScoreProfile, true);
+    const awayMax = _matchLambdaBound(awayScoreProfile, homeScoreProfile, true);
+    if (homeMax != null && awayMax != null) {
+      // İki takımın max'ının max'ı: hangi takımın daha yüksek lambda potansiyeli
+      // varsa o sınırlar (asimetrik maçta yüksek tarafın lambda'sı clamp'lenmesin)
+      return Math.max(homeMax, awayMax);
+    }
+    // 2. Lig fallback (takım profili yoksa)
+    if (leagueAvgGoals != null && leagueAvgGoals > 0 && allMetrics.normMaxRatio != null) {
       return leagueAvgGoals * allMetrics.normMaxRatio * allMetrics.normMaxRatio;
     }
-    if (_volForMax != null) {
-      // Volatilite fallback: μ + 3σ (99.7% güven aralığı, tek-yönlü).
+    if (leagueAvgGoals != null && _volForMax != null) {
       return leagueAvgGoals + _volForMax * 3;
     }
     return SIM_CONFIG.LIMITS.LAMBDA.MAX;
@@ -488,16 +521,21 @@ function calculateAdvancedMetrics(allMetrics) {
   // dampFactor güçlü favori maçlarında (City vs Burnley) avantajın %23'ünü siliyordu.
   // Bayesian regresyon zaten profileN küçükse düşük ağırlık vererek yapılıyor.
 
-  // Lambda tabanı — KARESELLEŞTİRİLDİ (üst sınırla simetrik).
-  // worst atak × en iyi savunma kombinasyonu = matematiksel min.
-  // Premier League: 1.32 × 0.5² = 0.33 → defansif maçlarda lambda küçülebilir.
+  // Lambda tabanı — TAKIM × TURNUVA SPESİFİK (üst sınırla simetrik).
+  // Match-spesifik: takım atak alt %5 + rakip savunma sıkılığı %5, ortalama.
   const dynamicLambdaMin = (() => {
-    if (leagueAvgGoals == null || leagueAvgGoals <= 0) return SIM_CONFIG.LIMITS.LAMBDA.MIN;
-    if (allMetrics.normMinRatio != null) {
+    const homeMin = _matchLambdaBound(homeScoreProfile, awayScoreProfile, false);
+    const awayMin = _matchLambdaBound(awayScoreProfile, homeScoreProfile, false);
+    if (homeMin != null && awayMin != null) {
+      // İki takımın min'inin min'i: defansif tarafa izin ver
+      return Math.max(SIM_CONFIG.LIMITS.LAMBDA.MIN, Math.min(homeMin, awayMin));
+    }
+    // Lig fallback
+    if (leagueAvgGoals != null && leagueAvgGoals > 0 && allMetrics.normMinRatio != null) {
       return Math.max(SIM_CONFIG.LIMITS.LAMBDA.MIN,
         leagueAvgGoals * allMetrics.normMinRatio * allMetrics.normMinRatio);
     }
-    if (_volForMax != null) {
+    if (leagueAvgGoals != null && _volForMax != null) {
       return Math.max(SIM_CONFIG.LIMITS.LAMBDA.MIN,
         leagueAvgGoals * Math.max(0, 1 - _volForMax / leagueAvgGoals));
     }
