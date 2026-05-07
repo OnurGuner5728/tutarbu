@@ -277,6 +277,10 @@ function calculateAdvancedMetrics(allMetrics) {
   // homeAtkRaw → rakibin (away) yediği gol ortalaması (awayScoreProfile.avgConceded) kullanılır.
   // awayAtkRaw → rakibin (home) yediği gol ortalaması (homeScoreProfile.avgConceded) kullanılır.
   // Ağırlık = profil örneklemi (n) * 0.5: standings/xG kadar güvenmiyor ama yok saymıyoruz.
+  // _blendRate: ağırlıklı ortalama + KAYNAK AGREEMENT (kaynaklar arası tutarlılık).
+  // Kaynaklar (xG, standings, M002, M001, scoreProfile) birbiriyle tutarlıysa
+  // → agreement~1 → modelin "ne kadar emin" olduğu yüksek.
+  // Kaynaklar çelişiyorsa → agreement~0 → asimetri kapatılmalı (güvenli tahmin).
   const _blendRate = (xg, stSpec, m002, m001, nSt, matchCount, profileConceded, profileN) => {
     const sources = [];
     const xgW = Math.min(5, matchCount || 5);
@@ -288,28 +292,42 @@ function calculateAdvancedMetrics(allMetrics) {
     const specW = Math.max(1, Math.floor((matchCount || 20) / 2));
     if (m002 != null) sources.push({ val: m002, w: specW });
     if (m001 != null) sources.push({ val: m001, w: specW });
-    // scoreProfile.avgConceded: rakibin temporal-decay'li gerçek yenilen gol ortalaması.
-    // Ağırlık = örneklem × 0.5 (n=10 maç → 5 puan ağırlık — veri miktarına doğrusal).
     if (profileConceded != null && profileN > 0) {
       sources.push({ val: profileConceded, w: profileN * 0.5 });
     }
-    if (sources.length === 0) return null;
+    if (sources.length === 0) return { rate: null, agreement: 0 };
     const totalW = sources.reduce((s, x) => s + x.w, 0);
-    return sources.reduce((s, x) => s + x.val * x.w, 0) / totalW;
+    const rate = sources.reduce((s, x) => s + x.val * x.w, 0) / totalW;
+    // Source agreement: 1 - CV(kaynaklar) → 1=mükemmel uyum, 0=tam çelişki.
+    // Tek kaynak varsa agreement=0 (validation yok). 2+ kaynakta CV anlamlı.
+    let agreement = 0;
+    if (sources.length >= 2 && rate > 0) {
+      const wMean = rate;
+      const wVar = sources.reduce((s, x) => s + x.w * Math.pow(x.val - wMean, 2), 0) / totalW;
+      const wStd = Math.sqrt(wVar);
+      const cv = wStd / wMean;
+      agreement = Math.max(0, Math.min(1, 1 - cv));
+    }
+    return { rate, agreement };
   };
 
-  // homeAtkRaw: ev sahibi gol atar mı? → rakibin (away) savunma yumuşaklığı eklendi [CROSS-REF ✅]
-  const homeAtkRaw = _blendRate(homeXGScored, homeStGF, homeAttack.M002, homeAttack.M001, homeStMatches, homeMatchCount,
+  const _hAtk = _blendRate(homeXGScored, homeStGF, homeAttack.M002, homeAttack.M001, homeStMatches, homeMatchCount,
     awayScoreProfile?.avgConceded, awayScoreProfile?.n);
-  // awayDefRaw: away savunma zafiyeti → away'in kendi yenilen gol profili [SAME-TEAM ✅]
-  const awayDefRaw = _blendRate(awayXGConceded, awayStGA, awayDefense.M027, awayDefense.M026, awayStMatches, awayMatchCount,
+  const _aDef = _blendRate(awayXGConceded, awayStGA, awayDefense.M027, awayDefense.M026, awayStMatches, awayMatchCount,
     awayScoreProfile?.avgConceded, awayScoreProfile?.n);
-  // awayAtkRaw: deplasman gol atar mı? → rakibin (home) savunma yumuşaklığı eklendi [CROSS-REF ✅]
-  const awayAtkRaw = _blendRate(awayXGScored, awayStGF, awayAttack.M002, awayAttack.M001, awayStMatches, awayMatchCount,
+  const _aAtk = _blendRate(awayXGScored, awayStGF, awayAttack.M002, awayAttack.M001, awayStMatches, awayMatchCount,
     homeScoreProfile?.avgConceded, homeScoreProfile?.n);
-  // homeDefRaw: home savunma zafiyeti → home'un kendi yenilen gol profili [SAME-TEAM ✅]
-  const homeDefRaw = _blendRate(homeXGConceded, homeStGA, homeDefense.M027, homeDefense.M026, homeStMatches, homeMatchCount,
+  const _hDef = _blendRate(homeXGConceded, homeStGA, homeDefense.M027, homeDefense.M026, homeStMatches, homeMatchCount,
     homeScoreProfile?.avgConceded, homeScoreProfile?.n);
+  const homeAtkRaw = _hAtk.rate;
+  const awayDefRaw = _aDef.rate;
+  const awayAtkRaw = _aAtk.rate;
+  const homeDefRaw = _hDef.rate;
+  // Match-spesifik source agreement: her λ için kullanılan iki kaynak ailesinin minimum tutarlılığı.
+  // λ_home Bayern atak + PSG defans kaynaklarından türer → ikisinin de tutarlı olması gerek.
+  // Tek kaynak çelişkili olsa bile asimetri kapatılır (güvenli tahmin).
+  const _agreementHome = Math.min(_hAtk.agreement, _aDef.agreement);
+  const _agreementAway = Math.min(_aAtk.agreement, _hDef.agreement);
 
 
   // ── TopPlayers × MissingPlayers: Beklenen Gol Düşüşü ──────────────────────
@@ -330,29 +348,36 @@ function calculateAdvancedMetrics(allMetrics) {
   const awayAttackRate_source = awayAtkRaw != null ? Math.max(0, awayAtkRaw - _awayGoalDrop) : null;
   const homeDefenseRate_source = homeDefRaw;
 
-  // ── Dixon-Coles + Dinamik Asimetri Açıcı ─────────────────────────────────
-  // Standart Dixon-Coles: λ = α × β × leagueAvg, α=atkR/avg, β=defR/avg.
-  // Sorun: α × β çarpımı [0.5, 1.5]² = [0.25, 2.25] aralığında sıkışıyor.
-  // Bayern (α=1.5) × dip takım (β=1.4): α×β = 2.1 → λ = 2.1×1.32 = 2.77.
-  // Gerçekte 4-0 maçları için λ=4 gerekiyor → asimetri yapısal olarak eziliyor.
+  // ── Dixon-Coles + Match-Spesifik Asimetri Açıcı ──────────────────────────
+  // Standart Dixon-Coles: λ = α × β × leagueAvg.
+  // Açıcı: λ = leagueAvg × (α × β)^k_match.
   //
-  // Açıcı: λ = leagueAvg × (α × β)^k, k = 1 + lgCV.
-  // - Stabil lig (CV→0): k=1 → standart Dixon-Coles.
-  // - Volatil lig (CV>0): k>1 → asimetri açılır (top×weak combinations boost).
-  // - α×β = 1 (dengeli maç): (1)^k = 1, etki yok (ortalama maç değişmez).
-  // - α×β >> 1 veya << 1 (asimetrik maç): exponent büyütür/küçültür.
-  // k tamamen lig verisinden (lgCV = leagueGoalVolatility / leagueAvgGoals).
-  const _kAsymm = (_cv != null && _cv > 0) ? 1 + _cv : 1;
-  const _dcBase = (atkR, defR_opp) => {
+  // k_match = 1 + lgCV × source_agreement
+  //   - lgCV: lig volatilitesi (gol dağılımının CV'si)
+  //   - source_agreement: takım atak/defans kaynaklarının (xG, standings, M001,
+  //     scoreProfile) birbirleriyle ne kadar tutarlı olduğu [0, 1]
+  //
+  // - Kaynaklar tutarlı (Bayern xG=2.1, std=2.0, M001=2.05): agreement~0.95
+  //     → k=1+lgCV×0.95 → asimetri tam açık → 4-0 mümkün
+  // - Kaynaklar çelişkili (xG=2.5, std=1.5, M001=2.0): agreement~0.7
+  //     → k=1+lgCV×0.7 → asimetri yumuşak → güvenli orta tahmin
+  // - Tek kaynak veya yeni takım: agreement=0
+  //     → k=1 → standart Dixon-Coles, asimetri kapalı
+  //
+  // Tüm parametreler veriden (lgCV, agreement). Statik katsayı YOK.
+  // Çift sayım yok: agreement xGOverPerf/cleanSheet modifier'larıyla ÇAKIŞMAZ
+  // çünkü bu modifier'lar lambda'ya çarpan olarak uygulanır, k exponent'i ayrı.
+  const _dcBase = (atkR, defR_opp, agreement) => {
     if (atkR == null || defR_opp == null || leagueAvgGoals == null || leagueAvgGoals <= 0) return null;
     const alpha = atkR / leagueAvgGoals;
     const beta = defR_opp / leagueAvgGoals;
     const ab = alpha * beta;
     if (ab <= 0) return null;
-    return leagueAvgGoals * Math.pow(ab, _kAsymm);
+    const kMatch = (_cv != null && _cv > 0) ? 1 + _cv * agreement : 1;
+    return leagueAvgGoals * Math.pow(ab, kMatch);
   };
-  const dcBase_home = _dcBase(homeAttackRate_source, awayDefenseRate_source);
-  const dcBase_away = _dcBase(awayAttackRate_source, homeDefenseRate_source);
+  const dcBase_home = _dcBase(homeAttackRate_source, awayDefenseRate_source, _agreementHome);
+  const dcBase_away = _dcBase(awayAttackRate_source, homeDefenseRate_source, _agreementAway);
 
   // ── Dinamik Hassasiyet Kalibrasyonu (Physics-based Scaling) ────────────────
   // vol ve den yukarıda tanımlandı (getPower'dan önce gerekli)
