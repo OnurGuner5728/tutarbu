@@ -1,66 +1,27 @@
 {
   "date": "2026-05-06",
-  "endDate": "2026-05-06",
-  "total": 1,
-  "finishedTotal": 1,
-  "upcomingTotal": 0,
-  "tournamentFilter": "top",
-  "accuracy1X2": 100,
-  "accuracyOU25": 0,
-  "accuracyBTTS": 100,
-  "accuracyScore": 100,
-  "avgBrierScore": 0.3602,
-  "avgLogLoss": 0.6624,
-  "htAccuracy1X2": 100,
-  "htAccuracyScore": 100,
-  "htTotal": 1,
-  "htftAccuracy": 100,
-  "htftTotal": 1,
-  "high": {
-    "count": 1,
+  "summary": {
+    "total": 3,
+    "hits1X2": 3,
+    "hitsOU25": 1,
+    "hitsBTTS": 1,
+    "hitsScore": 3,
     "accuracy1X2": 100,
-    "accuracyOU25": 0,
-    "accuracyBTTS": 100,
+    "accuracyOU25": 33.3,
+    "accuracyBTTS": 33.3,
     "accuracyScore": 100,
-    "avgBrier": 0.3602
+    "avgBrierScore": 0.5408,
+    "avgLogLoss": 0.9281,
+    "highConfidenceCount": 2,
+    "highConfidenceAccuracy1X2": 100
   },
-  "medium": null,
-  "low": null,
-  "poissonAccuracy1X2": 100,
-  "simulationAccuracy1X2": 100,
-  "drawDetection": {
-    "actual": 0,
-    "predicted": 0,
-    "recallRate": null,
-    "precisionRate": null
-  },
-  "valueBets": {
-    "count": 0,
-    "accuracy1X2": null
-  },
-  "byTournament": [
-    {
-      "tournamentId": 7,
-      "name": "UEFA Champions League, Knockout stage",
-      "total": 1,
-      "accuracy1X2": 100,
-      "accuracyOU25": 0,
-      "accuracyBTTS": 100,
-      "accuracyScore": 100,
-      "avgBrier": 0.3602
-    }
-  ],
   "results": [
     {
       "matchId": 15632635,
-      "matchStatus": "finished",
       "match": "Arsenal vs Atlético Madrid",
-      "homeTeam": "Arsenal",
-      "awayTeam": "Atlético Madrid",
+      "matchDate": "2026-05-05",
       "tournament": "UEFA Champions League, Knockout stage",
       "tournamentId": 7,
-      "matchDate": "2026-05-05",
-      "matchTime": "19:00",
       "actual": "1-0",
       "actualResult": "1",
       "actualOU25": "Under",
@@ -69,89 +30,563 @@
       "predictedResult": "1",
       "predictedOU25": "Over",
       "predictedBTTS": "No",
-      "simTopScore": "3-0",
-      "probHome": 51.56,
-      "probDraw": 17.81,
-      "probAway": 30.64,
-      "probOU25": 64.6,
-      "probBTTS": 29.5,
-      "actualHT": "1-0",
-      "actualHTResult": "1",
-      "predictedHT": "1-0",
-      "predictedHTResult": "1",
-      "simHTTopScore": "1-0",
-      "htHomeWinProb": 56.67,
-      "htDrawProb": 33.97,
-      "htAwayWinProb": 9.35,
-      "simHTHomeWin": 79.3,
-      "simHTDraw": 20.7,
-      "simHTAwayWin": 0,
-      "htft": {
-        "top1": "1/1",
-        "top3": [
-          {
-            "result": "1/1",
-            "prob": 79.3
-          },
-          {
-            "result": "X/1",
-            "prob": 17
-          },
-          {
-            "result": "X/X",
-            "prob": 3.7
-          }
-        ],
-        "probs": {
-          "1/1": 79.3,
-          "1/X": 0,
-          "1/2": 0,
-          "X/1": 17,
-          "X/X": 3.7,
-          "X/2": 0,
-          "2/1": 0,
-          "2/X": 0,
-          "2/2": 0
-        }
-      },
-      "actualHTFT": "1/1",
-      "hitHTFT": true,
+      "probHome": 53.12,
+      "probDraw": 16.8,
+      "probAway": 30.08,
+      "probOU25": 62.3,
+      "probBTTS": 0.4,
       "hit1X2": true,
       "hitOU25": false,
       "hitBTTS": true,
       "hitScore": true,
-      "hitHTResult": true,
-      "hitHTScore": true,
-      "brierScore": 0.3602,
-      "logLoss": 0.6624,
+      "confidence": 69,
+      "avgGoals": 3.08,
+      "brierScore": 0.3385,
+      "logLoss": 0.6326,
       "confidenceTier": "HIGH",
-      "maxProbability": 96.3,
+      "maxProbability": 96,
       "isHighConfidence": true,
       "poisson": {
+        "homeWin": 59.74,
+        "draw": 9.4,
+        "awayWin": 30.86,
         "predicted": "1",
-        "homeWin": 57.46,
-        "draw": 10.74,
-        "awayWin": 31.8,
-        "topScore": "1-0",
-        "hit": true,
-        "lambdaHome": 2.17,
-        "lambdaAway": 0.55
+        "lambdaHome": 2.24,
+        "lambdaAway": 0.35
       },
       "simulation": {
-        "predicted": "1",
-        "homeWin": 96.3,
-        "draw": 3.7,
+        "homeWin": 96,
+        "draw": 4,
         "awayWin": 0,
-        "hit": true
+        "predicted": "1"
       },
       "restDays": {
-        "home": 3,
-        "away": 3
+        "home": null,
+        "away": null
       },
-      "isValueBet": false,
-      "modelEdge": -9.7,
-      "marketHome": 61.28,
-      "marketAway": 17.8
+      "lambdaAudit": {
+        "diag": {
+          "sources": {
+            "hAtk": {
+              "n": 4,
+              "agreement": 0.7178387787419336,
+              "rate": 1.8680681460938713
+            },
+            "aDef": {
+              "n": 4,
+              "agreement": 0.7363314634289221,
+              "rate": 1.9209422245751415
+            },
+            "aAtk": {
+              "n": 4,
+              "agreement": 0.6051662609091969,
+              "rate": 1.4087050818955702
+            },
+            "hDef": {
+              "n": 4,
+              "agreement": 0.6950390822821978,
+              "rate": 0.5889281406960374
+            }
+          },
+          "agreementHome": 0.7178387787419336,
+          "agreementAway": 0.6051662609091969,
+          "kMatchHome": 1.2683937947748696,
+          "kMatchAway": 1.2262665016785474,
+          "alphaHome": 1.1047302383470943,
+          "betaHome": 1.1359986872230816,
+          "alphaAway": 0.8330740525378321,
+          "betaAway": 0.3482778326908804,
+          "cvLocal": 0.37389146800518336,
+          "leagueAvgGoals": 1.6909722222222223,
+          "dynamicLambdaMin": 0.01,
+          "dynamicLambdaMax": 4.541547372446047,
+          "lambdaHomeMin": 0.01,
+          "lambdaHomeMax": 4.541547372446047,
+          "lambdaAwayMin": 0.01,
+          "lambdaAwayMax": 3.1218447640742157,
+          "clampHomeMinHit": false,
+          "clampHomeMaxHit": false,
+          "clampAwayMinHit": false,
+          "clampAwayMaxHit": false
+        },
+        "trace": [
+          {
+            "stage": "dcBase",
+            "hBefore": null,
+            "hAfter": 2.255503,
+            "aBefore": null,
+            "aAfter": 0.370811,
+            "dLogH": null,
+            "dLogA": null,
+            "meta": {
+              "kMatchHome": 1.2683937947748696,
+              "kMatchAway": 1.2262665016785474,
+              "agreementHome": 0.7178387787419336,
+              "agreementAway": 0.6051662609091969
+            }
+          },
+          {
+            "stage": "behavMod",
+            "hBefore": 2.255503,
+            "hAfter": 2.280667,
+            "aBefore": 0.370811,
+            "aAfter": 0.359257,
+            "dLogH": 0.011095,
+            "dLogA": -0.031655,
+            "meta": {
+              "behavModHome": 1.011156723863543,
+              "behavModAway": 0.9688407455518053,
+              "BEHAV_SENS": 0.23542367719261734
+            }
+          },
+          {
+            "stage": "urgencyMod",
+            "hBefore": 2.280667,
+            "hAfter": 2.280667,
+            "aBefore": 0.359257,
+            "aAfter": 0.359257,
+            "dLogH": 0,
+            "dLogA": 0,
+            "meta": {
+              "lambdaModHome": 1,
+              "lambdaModAway": 1,
+              "URGENCY_SENS": 0.13979482984707106
+            }
+          },
+          {
+            "stage": "initialClamp",
+            "hBefore": 2.280667,
+            "hAfter": 2.280667,
+            "aBefore": 0.359257,
+            "aAfter": 0.359257,
+            "dLogH": 0,
+            "dLogA": 0,
+            "meta": {
+              "lambdaHomeMin": 0.01,
+              "lambdaHomeMax": 4.541547372446047,
+              "lambdaAwayMin": 0.01,
+              "lambdaAwayMax": 3.1218447640742157,
+              "clampHomeMinHit": false,
+              "clampHomeMaxHit": false,
+              "clampAwayMinHit": false,
+              "clampAwayMaxHit": false
+            }
+          },
+          {
+            "stage": "refMod",
+            "hBefore": 2.280667,
+            "hAfter": 2.236548,
+            "aBefore": 0.359257,
+            "aAfter": 0.352307,
+            "dLogH": -0.019534,
+            "dLogA": -0.019534,
+            "meta": {
+              "refMod": 0.980655268164972,
+              "refRatio": 0.9074559229625434,
+              "refSens": 0.2090326302265507,
+              "refGoalsPerMatch": 3.0689655172413794
+            }
+          },
+          {
+            "stage": "finalM167",
+            "hBefore": null,
+            "hAfter": 2.236548,
+            "aBefore": null,
+            "aAfter": 0.352307,
+            "dLogH": null,
+            "dLogA": null,
+            "meta": {}
+          }
+        ]
+      }
+    },
+    {
+      "matchId": 15632634,
+      "match": "FC Bayern München vs Paris Saint-Germain",
+      "matchDate": "2026-05-06",
+      "tournament": "UEFA Champions League, Knockout stage",
+      "tournamentId": 7,
+      "actual": "1-1",
+      "actualResult": "X",
+      "actualOU25": "Under",
+      "actualBTTS": "Yes",
+      "predicted": "1-1",
+      "predictedResult": "X",
+      "predictedOU25": "Under",
+      "predictedBTTS": "No",
+      "probHome": 36.4,
+      "probDraw": 24.75,
+      "probAway": 38.86,
+      "probOU25": 11,
+      "probBTTS": 17.6,
+      "hit1X2": true,
+      "hitOU25": true,
+      "hitBTTS": false,
+      "hitScore": true,
+      "confidence": 19,
+      "avgGoals": 1.14,
+      "brierScore": 0.8498,
+      "logLoss": 1.3963,
+      "confidenceTier": "LOW",
+      "maxProbability": 42.8,
+      "isHighConfidence": false,
+      "poisson": {
+        "homeWin": 45.04,
+        "draw": 10.38,
+        "awayWin": 44.58,
+        "predicted": "1",
+        "lambdaHome": 2.09,
+        "lambdaAway": 2.09
+      },
+      "simulation": {
+        "homeWin": 18.5,
+        "draw": 42.8,
+        "awayWin": 38.7,
+        "predicted": "X"
+      },
+      "restDays": {
+        "home": null,
+        "away": null
+      },
+      "lambdaAudit": {
+        "diag": {
+          "sources": {
+            "hAtk": {
+              "n": 4,
+              "agreement": 0.6514185680830443,
+              "rate": 2.701836838250374
+            },
+            "aDef": {
+              "n": 4,
+              "agreement": 0.7294904815591352,
+              "rate": 0.9845916583371521
+            },
+            "aAtk": {
+              "n": 4,
+              "agreement": 0.7230487576864748,
+              "rate": 2.1834654721994378
+            },
+            "hDef": {
+              "n": 4,
+              "agreement": 0.6947935588130708,
+              "rate": 1.2140000087280083
+            }
+          },
+          "agreementHome": 0.6514185680830443,
+          "agreementAway": 0.6947935588130708,
+          "kMatchHome": 1.243559844706404,
+          "kMatchAway": 1.2597773836651647,
+          "alphaHome": 1.5978008406901596,
+          "betaHome": 0.5822636501049278,
+          "alphaAway": 1.291248574935191,
+          "betaAway": 0.7179301899664607,
+          "cvLocal": 0.37389146800518336,
+          "leagueAvgGoals": 1.6909722222222223,
+          "dynamicLambdaMin": 0.01,
+          "dynamicLambdaMax": 4.597815342836122,
+          "lambdaHomeMin": 0.01,
+          "lambdaHomeMax": 4.4714382544628295,
+          "lambdaAwayMin": 0.01,
+          "lambdaAwayMax": 4.597815342836122,
+          "clampHomeMinHit": false,
+          "clampHomeMaxHit": false,
+          "clampAwayMinHit": false,
+          "clampAwayMaxHit": false
+        },
+        "trace": [
+          {
+            "stage": "dcBase",
+            "hBefore": null,
+            "hAfter": 1.545757,
+            "aBefore": null,
+            "aAfter": 1.537021,
+            "dLogH": null,
+            "dLogA": null,
+            "meta": {
+              "kMatchHome": 1.243559844706404,
+              "kMatchAway": 1.2597773836651647,
+              "agreementHome": 0.6514185680830443,
+              "agreementAway": 0.6947935588130708
+            }
+          },
+          {
+            "stage": "behavMod",
+            "hBefore": 1.545757,
+            "hAfter": 1.554768,
+            "aBefore": 1.537021,
+            "aAfter": 1.55195,
+            "dLogH": 0.005812,
+            "dLogA": 0.009666,
+            "meta": {
+              "behavModHome": 1.0058292828611497,
+              "behavModAway": 1.009712920213635,
+              "BEHAV_SENS": 0.23542367719261734
+            }
+          },
+          {
+            "stage": "urgencyMod",
+            "hBefore": 1.554768,
+            "hAfter": 1.554768,
+            "aBefore": 1.55195,
+            "aAfter": 1.55195,
+            "dLogH": 0,
+            "dLogA": 0,
+            "meta": {
+              "lambdaModHome": 1,
+              "lambdaModAway": 1,
+              "URGENCY_SENS": 0.13979482984707106
+            }
+          },
+          {
+            "stage": "initialClamp",
+            "hBefore": 1.554768,
+            "hAfter": 1.554768,
+            "aBefore": 1.55195,
+            "aAfter": 1.55195,
+            "dLogH": 0,
+            "dLogA": 0,
+            "meta": {
+              "lambdaHomeMin": 0.01,
+              "lambdaHomeMax": 4.4714382544628295,
+              "lambdaAwayMin": 0.01,
+              "lambdaAwayMax": 4.597815342836122,
+              "clampHomeMinHit": false,
+              "clampHomeMaxHit": false,
+              "clampAwayMinHit": false,
+              "clampAwayMaxHit": false
+            }
+          },
+          {
+            "stage": "refMod",
+            "hBefore": 1.554768,
+            "hAfter": 1.527469,
+            "aBefore": 1.55195,
+            "aAfter": 1.5247,
+            "dLogH": -0.017714,
+            "dLogA": -0.017714,
+            "meta": {
+              "refMod": 0.982441756036729,
+              "refRatio": 0.9176520569284146,
+              "refSens": 0.21322018873024537,
+              "refGoalsPerMatch": 3.103448275862069
+            }
+          },
+          {
+            "stage": "referenceScaling",
+            "hBefore": 1.527469,
+            "hAfter": 2.089725,
+            "aBefore": 1.5247,
+            "aAfter": 2.085938,
+            "dLogH": 0.313421,
+            "dLogA": 0.313421,
+            "meta": {
+              "scalingFactor": 1.368096795675708,
+              "calibrationRatio": 1.5528028834606034,
+              "referenceTotalGoals": 4.7394176142751805,
+              "referenceReliability": 0.7122197591896748,
+              "tolerance": 0.18694573400259168,
+              "exponent": 0.7122197591896748
+            }
+          },
+          {
+            "stage": "finalM167",
+            "hBefore": null,
+            "hAfter": 2.089725,
+            "aBefore": null,
+            "aAfter": 2.085938,
+            "dLogH": null,
+            "dLogA": null,
+            "meta": {}
+          }
+        ]
+      }
+    },
+    {
+      "matchId": 16115678,
+      "match": "RKC Waalwijk vs Willem II Tilburg",
+      "matchDate": "2026-05-05",
+      "tournament": "Keuken Kampioen Playoffs",
+      "tournamentId": 37,
+      "actual": "0-1",
+      "actualResult": "2",
+      "actualOU25": "Under",
+      "actualBTTS": "No",
+      "predicted": "0-1",
+      "predictedResult": "2",
+      "predictedOU25": "Over",
+      "predictedBTTS": "Yes",
+      "probHome": 34.38,
+      "probDraw": 18.64,
+      "probAway": 46.98,
+      "probOU25": 97.4,
+      "probBTTS": 67,
+      "hit1X2": true,
+      "hitOU25": false,
+      "hitBTTS": false,
+      "hitScore": true,
+      "confidence": 62,
+      "avgGoals": 6.47,
+      "brierScore": 0.4341,
+      "logLoss": 0.7554,
+      "confidenceTier": "HIGH",
+      "maxProbability": 91.3,
+      "isHighConfidence": true,
+      "poisson": {
+        "homeWin": 36.38,
+        "draw": 10.62,
+        "awayWin": 53,
+        "predicted": "2",
+        "lambdaHome": 0.91,
+        "lambdaAway": 2
+      },
+      "simulation": {
+        "homeWin": 4.6,
+        "draw": 4.1,
+        "awayWin": 91.3,
+        "predicted": "2"
+      },
+      "restDays": {
+        "home": null,
+        "away": null
+      },
+      "lambdaAudit": {
+        "diag": {
+          "sources": {
+            "hAtk": {
+              "n": 4,
+              "agreement": 0.7245773682126999,
+              "rate": 1.9559258321324313
+            },
+            "aDef": {
+              "n": 4,
+              "agreement": 0.7318561580126478,
+              "rate": 0.8513779749191931
+            },
+            "aAtk": {
+              "n": 4,
+              "agreement": 0.7418952721517459,
+              "rate": 1.7834589370120524
+            },
+            "hDef": {
+              "n": 4,
+              "agreement": 0.7275661244420846,
+              "rate": 1.7075475919812557
+            }
+          },
+          "agreementHome": 0.7245773682126999,
+          "agreementAway": 0.7275661244420846,
+          "kMatchHome": 1.2176277363385968,
+          "kMatchAway": 1.2185254130825907,
+          "alphaHome": 1.2339685425063314,
+          "betaHome": 0.5371234540563584,
+          "alphaAway": 1.1251613885201996,
+          "betaAway": 1.0772698937362577,
+          "cvLocal": 0.30035127494447494,
+          "leagueAvgGoals": 1.5850694444444444,
+          "dynamicLambdaMin": 0.01,
+          "dynamicLambdaMax": 5.479526668362493,
+          "lambdaHomeMin": 0.01,
+          "lambdaHomeMax": 5.479526668362493,
+          "lambdaAwayMin": 0.01,
+          "lambdaAwayMax": 3.4123084925974245,
+          "clampHomeMinHit": false,
+          "clampHomeMaxHit": false,
+          "clampAwayMinHit": false,
+          "clampAwayMaxHit": false
+        },
+        "trace": [
+          {
+            "stage": "dcBase",
+            "hBefore": null,
+            "hAfter": 0.960624,
+            "aBefore": null,
+            "aAfter": 2.003748,
+            "dLogH": null,
+            "dLogA": null,
+            "meta": {
+              "kMatchHome": 1.2176277363385968,
+              "kMatchAway": 1.2185254130825907,
+              "agreementHome": 0.7245773682126999,
+              "agreementAway": 0.7275661244420846
+            }
+          },
+          {
+            "stage": "behavMod",
+            "hBefore": 0.960624,
+            "hAfter": 0.912934,
+            "aBefore": 2.003748,
+            "aAfter": 1.955144,
+            "dLogH": -0.050919,
+            "dLogA": -0.024556,
+            "meta": {
+              "behavModHome": 0.9503554277894614,
+              "behavModAway": 0.9757432594868851,
+              "BEHAV_SENS": 0.1615053437929278
+            }
+          },
+          {
+            "stage": "urgencyMod",
+            "hBefore": 0.912934,
+            "hAfter": 0.912934,
+            "aBefore": 1.955144,
+            "aAfter": 1.955144,
+            "dLogH": 0,
+            "dLogA": 0,
+            "meta": {
+              "lambdaModHome": 1,
+              "lambdaModAway": 1,
+              "URGENCY_SENS": 0.23694558077169167
+            }
+          },
+          {
+            "stage": "initialClamp",
+            "hBefore": 0.912934,
+            "hAfter": 0.912934,
+            "aBefore": 1.955144,
+            "aAfter": 1.955144,
+            "dLogH": 0,
+            "dLogA": 0,
+            "meta": {
+              "lambdaHomeMin": 0.01,
+              "lambdaHomeMax": 5.479526668362493,
+              "lambdaAwayMin": 0.01,
+              "lambdaAwayMax": 3.4123084925974245,
+              "clampHomeMinHit": false,
+              "clampHomeMaxHit": false,
+              "clampAwayMinHit": false,
+              "clampAwayMaxHit": false
+            }
+          },
+          {
+            "stage": "xgOverPerf",
+            "hBefore": 0.912934,
+            "hAfter": 0.914813,
+            "aBefore": 1.955144,
+            "aAfter": 1.997539,
+            "dLogH": 0.002056,
+            "dLogA": 0.021453,
+            "meta": {
+              "xgModHome": 1.002326189387713,
+              "xgModAway": 1.02454129804037,
+              "xgOverPerfHome": 1.018957345971564,
+              "xgOverPerfAway": 1.2,
+              "xgSens": 0.1227064902018501,
+              "reliabilityHome": 0.8848219891058494,
+              "reliabilityAway": 0.8848219891058494
+            }
+          },
+          {
+            "stage": "finalM167",
+            "hBefore": null,
+            "hAfter": 0.914813,
+            "aBefore": null,
+            "aAfter": 1.997539,
+            "dLogH": null,
+            "dLogA": null,
+            "meta": {}
+          }
+        ]
+      }
     }
   ]
 }

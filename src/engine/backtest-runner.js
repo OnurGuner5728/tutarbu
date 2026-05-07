@@ -281,6 +281,8 @@ async function runBacktest(date, matchLimit = 10, opts = {}) {
             home: report.metadata?.homeRestDays ?? null,
             away: report.metadata?.awayRestDays ?? null,
           },
+          // Faz 0 — Lambda audit: λ transformation zinciri ve diagnostics
+          lambdaAudit: report.prediction?.lambdaAudit ?? null,
         };
         results.push(resultEntry);
 

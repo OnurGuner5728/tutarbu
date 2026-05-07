@@ -645,7 +645,7 @@ function generatePrediction(metricsResult, data, baseline, audit, rng) {
     })(),
 
     // İlk yarı tahmini (lambda bazlı geliştirilmiş)
-    firstHalf: generateFirstHalfPrediction(home, away, prediction, baseline),
+    firstHalf: generateFirstHalfPrediction(home, away, prediction, baseline, leagueFingerprint),
 
     // Korner tahmini
     corners: generateCornerPrediction(home, away, shared, baseline),
@@ -1287,7 +1287,7 @@ function injectReserves(lineupPlayers, squadPlayers, suppressInjection = false) 
   return [...lineupPlayers, ...reserves];
 }
 
-function generateFirstHalfPrediction(home, away, poissonPrediction, baseline) {
+function generateFirstHalfPrediction(home, away, poissonPrediction, baseline, leagueFingerprint) {
   // ── Koşullu Binom HT Tahmini ──
   // FT Poisson'dan gelen skor dağılımını, takıma özel M003 fraksiyonuyla
   // HT'ye bölüştürür. P(HT=h_ht, a_ht) = Σ P(FT=h_ft, a_ft) × Binom(h_ft, h_ht, htFracH) × Binom(a_ft, a_ht, htFracA)
@@ -1304,14 +1304,22 @@ function generateFirstHalfPrediction(home, away, poissonPrediction, baseline) {
   const homeHTFrac = home.attack.M003 ?? null;  // 0-1 arası
   const awayHTFrac = away.attack.M003 ?? null;
 
-  // Lig ortalaması fallback
+  // Lig ortalaması fallback hiyerarşisi (Faz 1.1):
+  //   1. Takım M003 (kendi)
+  //   2. Lig dynamicAvgs (M005+M006+M007) — saha içi gol dağılımı
+  //   3. leagueFingerprint.htGoalShare — pool'dan period1 ağırlıklı oran
+  //   4. Matematiksel simetri (1/2) — uniform maxent (sabit değil; bilgi yoksa
+  //      tek tarafsız değer)
   const _dynHT = (baseline?.dynamicAvgs?.M005 != null && baseline?.dynamicAvgs?.M006 != null && baseline?.dynamicAvgs?.M007 != null)
     ? (baseline.dynamicAvgs.M005 + baseline.dynamicAvgs.M006 + baseline.dynamicAvgs.M007) / 100
     : null;
+  const _lfHTShare = (leagueFingerprint?.htGoalShare != null
+                     && leagueFingerprint.htGoalShare > 0
+                     && leagueFingerprint.htGoalShare < 1)
+    ? leagueFingerprint.htGoalShare : null;
 
-  // Takıma özel htFrac: her takım kendi fraksiyonunu kullanır
-  const htFracH = homeHTFrac ?? _dynHT ?? (1 / 2); // matematiksel simetri fallback
-  const htFracA = awayHTFrac ?? _dynHT ?? (1 / 2);
+  const htFracH = homeHTFrac ?? _dynHT ?? _lfHTShare ?? (1 / 2);
+  const htFracA = awayHTFrac ?? _dynHT ?? _lfHTShare ?? (1 / 2);
 
   // ── Joint dağılım: P(HT = h_ht-a_ht) ──
   const MAX_GOALS = 7;

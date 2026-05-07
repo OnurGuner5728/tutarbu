@@ -39,6 +39,9 @@ function extractFinishedMatches(events, tournamentId) {
       ts,
       home: e.homeScore.current,
       away: e.awayScore.current,
+      // period1: HT skoru. Bazı maçlarda yok (fallback null).
+      htHome: e?.homeScore?.period1 ?? null,
+      htAway: e?.awayScore?.period1 ?? null,
       tournamentId: e?.tournament?.uniqueTournament?.id,
     });
   }
@@ -113,6 +116,10 @@ function computeLeagueFingerprint(data, nowMs = Date.now()) {
   let draws_w = 0;
   let homeWins_w = 0;
   let awayWins_w = 0;
+  // HT gol payı (Faz 1.1): period1 mevcut maçlarda toplam HT golü / FT golü
+  let htGoals_w = 0;
+  let ftGoals_htAvail_w = 0;
+  let htAvailW = 0;
 
   for (const m of pool) {
     const w = m.w;
@@ -142,6 +149,12 @@ function computeLeagueFingerprint(data, nowMs = Date.now()) {
     if (m.home > m.away) homeWins_w += w;
     else if (m.home < m.away) awayWins_w += w;
     else draws_w += w;
+    // HT pay: yalnızca period1 mevcut maçlardan
+    if (m.htHome != null && m.htAway != null && (m.home + m.away) > 0) {
+      htGoals_w += (m.htHome + m.htAway) * w;
+      ftGoals_htAvail_w += (m.home + m.away) * w;
+      htAvailW += w;
+    }
   }
 
   // Pool toplam maç sayısı: 2× (hem home hem away taraftan sayıldı); marjinal dağılımları buna göre normalize
@@ -187,6 +200,13 @@ function computeLeagueFingerprint(data, nowMs = Date.now()) {
     leagueAvgGoalsPerTeam,
     leagueVarGoalsPerTeam,
     leagueOverdispersion,
+    // Faz 1.1: HT gol payı (period1 mevcut maçlardan ağırlıklı)
+    // λ_HT = λ_FT × htGoalShare. Veri yoksa null → caller matematiksel
+    // simetri (1/2) maxent fallback kullansın.
+    htGoalShare: (htAvailW > 0 && ftGoals_htAvail_w > 0)
+      ? htGoals_w / ftGoals_htAvail_w
+      : null,
+    htGoalShareSampleSize: htAvailW,
     n: pool.length,
     reliability: 0, // aşağıda validation sonrasında set edilir
     validation: {},
