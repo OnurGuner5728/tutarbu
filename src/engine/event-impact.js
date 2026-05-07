@@ -220,32 +220,150 @@ function computeUnitModifier(eventType, actorUnits, reactorUnits) {
 }
 
 // ─── EVENT → STATE DELTA YÖN MATRİSİ ──────────────────────────────────────
-// Sadece YÖNLER (pozitif/negatif). Büyüklük tamamen lgScale × eventCoeff × unitMod ile belirlenir.
-const EVENT_STATE_MATRIX = {
-  goal:            { actorMom: +1.0,  reactorMom: -0.6,  actorMorale: +1.0,  reactorMorale: -0.8,  actorTerr: +1.0,  reactorTerr: -0.5,  actorPress: +1.0,  reactorPress: -0.5 },
-  penalty_scored:  { actorMom: +0.8,  reactorMom: -0.5,  actorMorale: +0.8,  reactorMorale: -0.7,  actorTerr: +0.6,  reactorTerr: -0.3,  actorPress: +0.5,  reactorPress: -0.3 },
-  shot_on_target:  { actorMom: +1.0,  reactorMom: -0.3,  actorMorale: +0.2,  reactorMorale: 0,     actorTerr: +1.0,  reactorTerr: 0,     actorPress: +0.3,  reactorPress: 0 },
-  shot_blocked:    { actorMom: -0.2,  reactorMom: +1.0,  actorMorale: 0,     reactorMorale: +0.2,  actorTerr: -0.3,  reactorTerr: +1.0,  actorPress: 0,     reactorPress: +0.3 },
-  shot_off_target: { actorMom: -1.0,  reactorMom: +0.2,  actorMorale: -0.1,  reactorMorale: 0,     actorTerr: -0.2,  reactorTerr: +0.1,  actorPress: 0,     reactorPress: 0 },
-  big_save:        { actorMom: -0.8,  reactorMom: +1.0,  actorMorale: -0.5,  reactorMorale: +0.7,  actorTerr: -0.5,  reactorTerr: +0.8,  actorPress: -0.3,  reactorPress: +0.5 },
-  corner:          { actorMom: +1.0,  reactorMom: 0,     actorMorale: 0,     reactorMorale: 0,     actorTerr: +1.0,  reactorTerr: 0,     actorPress: +0.5,  reactorPress: 0 },
-  free_kick:       { actorMom: +0.8,  reactorMom: 0,     actorMorale: 0,     reactorMorale: 0,     actorTerr: +0.8,  reactorTerr: 0,     actorPress: +0.3,  reactorPress: 0 },
-  foul:            { actorMom: +0.5,  reactorMom: -0.3,  actorMorale: 0,     reactorMorale: 0,     actorTerr: +0.5,  reactorTerr: -0.5,  actorPress: 0,     reactorPress: -0.2 },
-  yellow_card:     { actorMom: -0.2,  reactorMom: +0.1,  actorMorale: -1.0,  reactorMorale: +0.1,  actorTerr: -0.2,  reactorTerr: 0,     actorPress: -0.5,  reactorPress: 0 },
-  red_card:        { actorMom: -0.8,  reactorMom: +0.8,  actorMorale: -1.0,  reactorMorale: +0.5,  actorTerr: -1.0,  reactorTerr: +0.5,  actorPress: -1.0,  reactorPress: +0.5 },
-  penalty_missed:  { actorMom: -1.0,  reactorMom: +1.0,  actorMorale: -1.0,  reactorMorale: +0.7,  actorTerr: -0.5,  reactorTerr: +0.5,  actorPress: -0.5,  reactorPress: +0.3 },
-  throw_in:        { actorMom: +0.3,  reactorMom: 0,     actorMorale: 0,     reactorMorale: 0,     actorTerr: +0.3,  reactorTerr: 0,     actorPress: 0,     reactorPress: 0 },
-  offside:         { actorMom: -0.5,  reactorMom: +0.3,  actorMorale: -0.1,  reactorMorale: 0,     actorTerr: +0.3,  reactorTerr: 0,     actorPress: 0,     reactorPress: 0 },
-  goal_kick:       { actorMom: 0,     reactorMom: +0.3,  actorMorale: 0,     reactorMorale: 0,     actorTerr: -0.2,  reactorTerr: +0.5,  actorPress: 0,     reactorPress: +0.2 },
-  substitution:    { actorMom: 0,     reactorMom: 0,     actorMorale: +0.3,  reactorMorale: 0,     actorTerr: 0,     reactorTerr: 0,     actorPress: +0.3,  reactorPress: 0 },
+// YAPI ŞABLONU (signs): Futbol fiziğinden gelen yön bilgisi.
+// ORANLAR: Lig verisinden dinamik türetilir (computeEventStateMatrix).
+// Aşağıdaki statik matris YALNIZCA tüm dinamik katmanlar başarısız olduğunda kullanılır (ultima ratio).
+const _STATIC_EVENT_STATE_MATRIX = {
+  goal:            { actorMom: +1.0,  reactorMom: -1.0,  actorMorale: +1.0,  reactorMorale: -1.0,  actorTerr: +1.0,  reactorTerr: -1.0,  actorPress: +1.0,  reactorPress: -1.0 },
+  penalty_scored:  { actorMom: +1.0,  reactorMom: -1.0,  actorMorale: +1.0,  reactorMorale: -1.0,  actorTerr: +1.0,  reactorTerr: -1.0,  actorPress: +1.0,  reactorPress: -1.0 },
+  shot_on_target:  { actorMom: +1.0,  reactorMom: -1.0,  actorMorale: +1.0,  reactorMorale:  0,    actorTerr: +1.0,  reactorTerr:  0,    actorPress: +1.0,  reactorPress:  0 },
+  shot_blocked:    { actorMom: -1.0,  reactorMom: +1.0,  actorMorale:  0,    reactorMorale: +1.0,  actorTerr: -1.0,  reactorTerr: +1.0,  actorPress:  0,    reactorPress: +1.0 },
+  shot_off_target: { actorMom: -1.0,  reactorMom: +1.0,  actorMorale: -1.0,  reactorMorale:  0,    actorTerr: -1.0,  reactorTerr: +1.0,  actorPress:  0,    reactorPress:  0 },
+  big_save:        { actorMom: -1.0,  reactorMom: +1.0,  actorMorale: -1.0,  reactorMorale: +1.0,  actorTerr: -1.0,  reactorTerr: +1.0,  actorPress: -1.0,  reactorPress: +1.0 },
+  corner:          { actorMom: +1.0,  reactorMom:  0,    actorMorale:  0,    reactorMorale:  0,    actorTerr: +1.0,  reactorTerr:  0,    actorPress: +1.0,  reactorPress:  0 },
+  free_kick:       { actorMom: +1.0,  reactorMom:  0,    actorMorale:  0,    reactorMorale:  0,    actorTerr: +1.0,  reactorTerr:  0,    actorPress: +1.0,  reactorPress:  0 },
+  foul:            { actorMom: +1.0,  reactorMom: -1.0,  actorMorale:  0,    reactorMorale:  0,    actorTerr: +1.0,  reactorTerr: -1.0,  actorPress:  0,    reactorPress: -1.0 },
+  yellow_card:     { actorMom: -1.0,  reactorMom: +1.0,  actorMorale: -1.0,  reactorMorale: +1.0,  actorTerr: -1.0,  reactorTerr:  0,    actorPress: -1.0,  reactorPress:  0 },
+  red_card:        { actorMom: -1.0,  reactorMom: +1.0,  actorMorale: -1.0,  reactorMorale: +1.0,  actorTerr: -1.0,  reactorTerr: +1.0,  actorPress: -1.0,  reactorPress: +1.0 },
+  penalty_missed:  { actorMom: -1.0,  reactorMom: +1.0,  actorMorale: -1.0,  reactorMorale: +1.0,  actorTerr: -1.0,  reactorTerr: +1.0,  actorPress: -1.0,  reactorPress: +1.0 },
+  throw_in:        { actorMom: +1.0,  reactorMom:  0,    actorMorale:  0,    reactorMorale:  0,    actorTerr: +1.0,  reactorTerr:  0,    actorPress:  0,    reactorPress:  0 },
+  offside:         { actorMom: -1.0,  reactorMom: +1.0,  actorMorale: -1.0,  reactorMorale:  0,    actorTerr: +1.0,  reactorTerr:  0,    actorPress:  0,    reactorPress:  0 },
+  goal_kick:       { actorMom:  0,    reactorMom: +1.0,  actorMorale:  0,    reactorMorale:  0,    actorTerr: -1.0,  reactorTerr: +1.0,  actorPress:  0,    reactorPress: +1.0 },
+  substitution:    { actorMom:  0,    reactorMom:  0,    actorMorale: +1.0,  reactorMorale:  0,    actorTerr:  0,    reactorTerr:  0,    actorPress: +1.0,  reactorPress:  0 },
 };
+
+// Dışa aktarım uyumluluğu için alias — diğer dosyalar bu isme referans verebilir.
+const EVENT_STATE_MATRIX = _STATIC_EVENT_STATE_MATRIX;
+
+/**
+ * computeEventStateMatrix — Lig verisinden dinamik yön matrisi türetir.
+ *
+ * Üç temel lig özelliğinden olay etkilerinin büyüklüklerini modüle eder:
+ *   1. reactorScale (HT/FT verisi): Reaktör (etkilenen) tarafın kayıp büyüklüğü.
+ *      htLeadContinuation yüksek → reaktör toparlanamıyor → büyük kayıp.
+ *   2. terrMod (possession spread): Territory kayma hassasiyeti.
+ *      Geniş possession yayılımı → daha büyük bölgesel kaymalar.
+ *   3. pressMod (faul yoğunluğu): Pressing kayma hassasiyeti.
+ *      Agresif lig → pressing daha çok etkilenir.
+ *
+ * Dönüş değeri: Her olay için 8 boyutlu yön vektörü.
+ * Veri yoksa _STATIC_EVENT_STATE_MATRIX (simetrik ±1.0) döner.
+ */
+function computeEventStateMatrix(baseline) {
+  if (!baseline) return _STATIC_EVENT_STATE_MATRIX;
+  const lgScale = computeLeagueScale(baseline);
+  if (lgScale == null) return _STATIC_EVENT_STATE_MATRIX;
+
+  // ── 1. Reaktör Kayıp Oranı ─────────────────────────────────────────────
+  // htLeadContinuation: P(devrede önde olan takım maçı kazanır).
+  // Yüksek → reaktör toparlanamıyor → reactorScale büyük (kayıp sert).
+  // Düşük → reaktör sık toparlanıyor → reactorScale küçük (kayıp hafif).
+  // Veri yoksa: lgCV sigmoid'i (volatil lig → daha sert kayıp).
+  const htCont = baseline._htLeadContinuation;
+  const reactorScale = htCont != null
+    ? htCont
+    : lgScale / (1 + lgScale);
+
+  // ── 2. Morale Dayanıklılık Oranı ───────────────────────────────────────
+  // htReversalRate: P(devrede önde olan takım maçı KAYBEDİYOR).
+  // Yüksek reversal → takımlar psikolojik olarak güçlü → morale kaybı düşük.
+  const htRev = baseline._htReversalRate;
+  const moraleResilience = htRev != null
+    ? (1 - htRev)         // %15 reversal → %85 morale hasarı
+    : reactorScale;       // fallback: momentum ile aynı oran
+
+  // ── 3. Territory Modülatörü ────────────────────────────────────────────
+  // Possession spread: ligin en düşük ve en yüksek possession'ı arasındaki fark.
+  // Geniş → bölgesel kaymalar büyük, dar → küçük.
+  // lgScale ile normalize: spread/CV → boyutsuz oran.
+  const pMin = baseline.possessionLimits?.min;
+  const pMax = baseline.possessionLimits?.max;
+  const possSpread = (pMin != null && pMax != null && pMax > pMin) ? (pMax - pMin) / 100 : null;
+  const terrMod = (possSpread != null && lgScale > 0)
+    ? possSpread / (possSpread + lgScale)   // sigmoid: (0,1) — spread dominantsa yakın 1
+    : lgScale / (1 + lgScale);              // fallback: CV sigmoid'i
+
+  // ── 4. Pressing Modülatörü ─────────────────────────────────────────────
+  // Faul yoğunluğu: maç başı faul / (faul + gol) — sigmoid oranı.
+  // Agresif lig (çok faul) → pressing daha çok etkileniyor.
+  const foulPM = baseline.foulRate != null ? baseline.foulRate * 90 : null;
+  const goalPM = baseline.leagueAvgGoals != null ? baseline.leagueAvgGoals * 2 : null;
+  const pressMod = (foulPM != null && goalPM != null && (foulPM + goalPM) > 0)
+    ? foulPM / (foulPM + goalPM)    // sigmoid: (0,1)
+    : terrMod;                       // fallback: territory ile aynı
+
+  // ── 5. Penaltı Etki Modülatörü ─────────────────────────────────────────
+  // Penaltı golü açık oyun golünden daha "beklenen" → daha düşük psikolojik etki.
+  // penConvRate: penaltı dönüşüm oranı. Yüksek → daha az sürpriz → daha az morale etkisi.
+  const penConv = baseline.penConvRate ?? null;
+  const penSurprise = penConv != null
+    ? 1 - penConv                   // %80 dönüşüm → %20 sürpriz
+    : reactorScale;                 // fallback
+
+  // ── Matris Hesaplama ───────────────────────────────────────────────────
+  // İşaret yapısı futbol fiziğinden (gol = +momentum), büyüklükler lig verisinden.
+  // Actor primary = 1.0 (referans). Reactor = reactorScale/moraleResilience.
+  // Cross-dimension (territory, pressing) = terrMod/pressMod.
+  const _r = reactorScale;
+  const _m = moraleResilience;
+  const _t = terrMod;
+  const _p = pressMod;
+  const _ps = penSurprise;
+
+  return {
+    // Gol: Tam etki. Reactor kaybı HT continuation'dan, territory possession spread'den.
+    goal:            { actorMom: +1.0,       reactorMom: -_r,        actorMorale: +1.0,       reactorMorale: -_m,        actorTerr: +_t,         reactorTerr: -_t * _r,    actorPress: +_p,        reactorPress: -_p * _r },
+    // Penaltı: Sürpriz faktörü düşük → etki daha küçük. Territory: restart yüzünden daha az.
+    penalty_scored:  { actorMom: +_ps,       reactorMom: -_ps * _r,  actorMorale: +_ps,       reactorMorale: -_ps * _m,  actorTerr: +_t * _ps,   reactorTerr: -_t*_ps*_r,  actorPress: +_p * _ps,  reactorPress: -_p*_ps*_r },
+    // İsabetli şut: Momentum güçlü, morale zayıf (gol değil). Reactor etkisi yok.
+    shot_on_target:  { actorMom: +1.0,       reactorMom: -_r * _t,   actorMorale: +_t,        reactorMorale: 0,          actorTerr: +_t,         reactorTerr: 0,           actorPress: +_p * _t,   reactorPress: 0 },
+    // Bloklanan şut: Savunma başarısı → savunmacı momentum kazanır. Actor hafif kayıp.
+    shot_blocked:    { actorMom: -_t,        reactorMom: +1.0,       actorMorale: 0,          reactorMorale: +_t,        actorTerr: -_t,         reactorTerr: +_t,         actorPress: 0,          reactorPress: +_p * _t },
+    // İsabetsiz şut: Actor momentum kaybeder. Etki küçük.
+    shot_off_target: { actorMom: -1.0,       reactorMom: +_t,        actorMorale: -_t * _t,   reactorMorale: 0,          actorTerr: -_t,         reactorTerr: +_t * _t,    actorPress: 0,          reactorPress: 0 },
+    // Büyük kurtarış: Kaleci tarafı güçlü boost, şut atan taraf sert düşüş.
+    big_save:        { actorMom: -_m,        reactorMom: +1.0,       actorMorale: -_m * _r,   reactorMorale: +_m,        actorTerr: -_t * _r,    reactorTerr: +_t,         actorPress: -_p * _t,   reactorPress: +_p },
+    // Korner: Territory yoğun, morale etkisiz. Reactor etkilenmez (restart).
+    corner:          { actorMom: +_t,        reactorMom: 0,          actorMorale: 0,          reactorMorale: 0,          actorTerr: +_t,         reactorTerr: 0,           actorPress: +_p * _t,   reactorPress: 0 },
+    // Serbest vuruş: Korner benzeri ama biraz daha zayıf.
+    free_kick:       { actorMom: +_t * _p,   reactorMom: 0,          actorMorale: 0,          reactorMorale: 0,          actorTerr: +_t * _p,    reactorTerr: 0,           actorPress: +_p * _t,   reactorPress: 0 },
+    // Faul: Pressing/territory dominant. Morale nötr.
+    foul:            { actorMom: +_p,        reactorMom: -_p * _r,   actorMorale: 0,          reactorMorale: 0,          actorTerr: +_t * _p,    reactorTerr: -_t * _p,    actorPress: 0,          reactorPress: -_p },
+    // Sarı kart: Actor morale sert düşüş, pressing azalır. Reactor hafif boost.
+    yellow_card:     { actorMom: -_t,        reactorMom: +_t * _t,   actorMorale: -1.0,       reactorMorale: +_t * _t,   actorTerr: -_t,         reactorTerr: 0,           actorPress: -_p,        reactorPress: 0 },
+    // Kırmızı kart: Tüm boyutlarda sert etki. Reaktör çıkış yapar.
+    red_card:        { actorMom: -_m,        reactorMom: +_m,        actorMorale: -1.0,       reactorMorale: +_r,        actorTerr: -_t,         reactorTerr: +_t,         actorPress: -_p,        reactorPress: +_p },
+    // Kaçan penaltı: En sert psikolojik olay. Tam simetrik etki.
+    penalty_missed:  { actorMom: -1.0,       reactorMom: +1.0,       actorMorale: -_m,        reactorMorale: +_m,        actorTerr: -_t * _r,    reactorTerr: +_t * _r,    actorPress: -_p * _r,   reactorPress: +_p * _t },
+    // Taç atışı: Minimal etki. Sadece territory/momentum.
+    throw_in:        { actorMom: +_t * _t,   reactorMom: 0,          actorMorale: 0,          reactorMorale: 0,          actorTerr: +_t * _t,    reactorTerr: 0,           actorPress: 0,          reactorPress: 0 },
+    // Ofsayt: Hücum momentum kaybı. Reactor hafif kazanım.
+    offside:         { actorMom: -_p,        reactorMom: +_t * _t,   actorMorale: -_t * _t,   reactorMorale: 0,          actorTerr: +_t * _t,    reactorTerr: 0,           actorPress: 0,          reactorPress: 0 },
+    // Kale vuruşu: Savunma territory kazanır. Actor etkisiz.
+    goal_kick:       { actorMom: 0,          reactorMom: +_t * _t,   actorMorale: 0,          reactorMorale: 0,          actorTerr: -_t * _t,    reactorTerr: +_t,         actorPress: 0,          reactorPress: +_p * _t * _t },
+    // Oyuncu değişikliği: Hafif morale/pressing boost. Karşı taraf etkilenmez.
+    substitution:    { actorMom: 0,          reactorMom: 0,           actorMorale: +_t,        reactorMorale: 0,          actorTerr: 0,           reactorTerr: 0,           actorPress: +_p * _t,   reactorPress: 0 },
+  };
+}
 
 /**
  * applyEventImpact — Merkezi state güncelleme motoru.
  * SIFIR statik katsayı — tüm büyüklükler lig verisinden türetilir.
+ * EVENT_STATE_MATRIX artık dinamik: computeEventStateMatrix(baseline) ile hesaplanır.
  */
 function applyEventImpact(eventType, actorSide, reactorSide, minute, state, homeUnits, awayUnits, baseline, DYN_LIMITS) {
-  const matrix = EVENT_STATE_MATRIX[eventType];
+  const dynMatrix = computeEventStateMatrix(baseline);
+  const matrix = dynMatrix[eventType];
   if (!matrix) return;
 
   const actorUnits = actorSide === 'home' ? homeUnits : awayUnits;
@@ -418,5 +536,6 @@ module.exports = {
   computeTerritoryImpactScale,
   computePressingImpactScale,
   computeRegressionRate,
+  computeEventStateMatrix,
   EVENT_STATE_MATRIX
 };

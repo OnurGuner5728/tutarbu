@@ -273,7 +273,7 @@ function generatePrediction(metricsResult, data, baseline, audit, rng) {
       // cvSensitivity: dominant ligde düşük hassasiyet (varyans düşük, favori güvenilir)
       const cvSensitivity = compIndex != null
         ? compIndex / (compIndex * compIndex + 16)  // compIndex=3→0.12, compIndex=5→0.12, compIndex=10→0.09
-        : 0.25;
+        : (lgCV != null ? lgCV / (lgCV + 1) : null);
       let temperature = 1.0 + cvVal * cvSensitivity;
       if (compIndex != null && compIndex > 0) {
         temperature += (cvVal / compIndex) * 0.10;
@@ -297,6 +297,25 @@ function generatePrediction(metricsResult, data, baseline, audit, rng) {
         homeWin = T_probs[0] * 100;
         draw = T_probs[1] * 100;
         awayWin = T_probs[2] * 100;
+      }
+
+      // ── Lig Beraberlik Gerçekliği Kalibrasyonu (Bayesian Posterior) ──
+      // leagueDrawTendency = gerçek_beraberlik_oranı / Poisson_beraberlik_referansı.
+      // 1'den uzaklığı, Poisson'un kendi başına yakalayamadığı yapısal beraberlik
+      // eğilimini ölçer (kupa/derbi maçlarında uzayan oyun, defansif lig kültürü vs.).
+      // >1 → lig Poisson'dan fazla beraberlik üretiyor → probDraw boost.
+      // <1 → daha az beraberlik üretiyor → probDraw azalt.
+      // Veri yoksa düzeltme uygulanmaz (no fallbacks).
+      const _ldT = baseline?.leagueDrawTendency;
+      if (_ldT != null && _ldT > 0 && Math.abs(_ldT - 1) > 0.05) {
+        const _newDraw = draw * _ldT;
+        const _total = _newDraw + homeWin + awayWin;
+        if (_total > 0) {
+          const _scale = 100 / _total;
+          draw = _newDraw * _scale;
+          homeWin = homeWin * _scale;
+          awayWin = awayWin * _scale;
+        }
       }
 
       // source etiketi: ağırlık dengesizliğinin doğal eşiği 2/3 (matematiksel bölünme).

@@ -7,24 +7,24 @@
 'use strict';
 
 const SIM_CONFIG = {
-  // ─── Clamps & Limits (ULTIMA RATIO — MATEMATİKSEL SİMETRİ) ────────────────
+  // ─── Clamps & Limits (ULTIMA RATIO — VERİ YOKSA NULL) ────────────────────
   // getDynamicLimits() lig verisinden TÜM sınırları türetir. Aşağıdaki değerler
-  // YALNIZCA tüm dinamik katmanlar başarısız olduğunda kullanılır ve tamamen
-  // MATEMATİKSEL SİMETRİ taşır: çarpansal sınırlar için MIN × MAX = 1
-  // (geometrik birim), oransal alanlar için [0, 1]. Davranışsal "tahmin" yok.
+  // YALNIZCA tüm dinamik katmanlar başarısız olduğunda kullanılır.
+  // Statik 0.5/2.0 simetri kaldırıldı — veri yoksa null döner, caller identity (1.0) kullanır.
+  // Sadece FIZIKSEL/MATEMATİKSEL SINIRLAR korunur: olasılık [0,1], Poisson λ > 0.
   LIMITS: {
-    POWER:       { MIN: 0.5, MAX: 2.0 },          // 0.5 × 2.0 = 1 (geometrik birim)
-    MOMENTUM:    { MIN: 0.5, MAX: 2.0 },          // 0.5 × 2.0 = 1
-    MORALE:      { MIN: 0.5, MAX: 2.0 },          // 0.5 × 2.0 = 1 (önce 0.4/1.6 asimetrik idi)
-    POSSESSION:  { MIN: 0,   MAX: 100 },
-    PROBABILITY: { MIN: 0,   MAX: 1 },
-    ON_TARGET:   { MIN: 0,   MAX: 1 },
-    BLOCK:       { MIN: 0,   MAX: 1 },
-    CORNER:      { MIN: 0,   MAX: 1 },
-    CORNER_GOAL: { MIN: 0,   MAX: 1 },
-    CARDS:       { YELLOW_MAX: 1, RED_MAX: 1 },
-    LAMBDA:      { MIN: 0.01, MAX: 20 },          // Poisson λ > 0; 20 numerik üst tavan
-    FORM_MORALE: { MIN: 0.5, MAX: 2.0, SCALE: 1.5 }, // simetrik; SCALE = MAX − MIN
+    POWER:       { MIN: null, MAX: null },          // normMinRatio/normMaxRatio'dan türetilir
+    MOMENTUM:    { MIN: null, MAX: null },          // lgCV ile power'dan türetilir
+    MORALE:      { MIN: null, MAX: null },          // competitiveness × power'dan türetilir
+    POSSESSION:  { MIN: 0,   MAX: 100 },            // Fiziksel kural: %0-%100
+    PROBABILITY: { MIN: 0,   MAX: 1 },              // Matematiksel: olasılık ∈ [0,1]
+    ON_TARGET:   { MIN: 0,   MAX: 1 },              // Fiziksel: oran ∈ [0,1]
+    BLOCK:       { MIN: 0,   MAX: 1 },              // Fiziksel: oran ∈ [0,1]
+    CORNER:      { MIN: 0,   MAX: 1 },              // Fiziksel: oran ∈ [0,1]
+    CORNER_GOAL: { MIN: 0,   MAX: 1 },              // Fiziksel: oran ∈ [0,1]
+    CARDS:       { YELLOW_MAX: 1, RED_MAX: 1 },      // Fiziksel: olasılık ∈ [0,1]
+    LAMBDA:      { MIN: 0.01, MAX: null },           // Poisson λ > 0; üst sınır veriden
+    FORM_MORALE: { MIN: null, MAX: null, SCALE: null }, // normRatio'dan türetilir
   },
 
   // ─── Model Sabitler (Matematiksel — Statik Veri Değil) ─────────────────────

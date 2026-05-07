@@ -1372,8 +1372,16 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
       const attkProb = isHome ? hProb : aProb;
       const discUnit = isHome ? homeUnits.DISIPLIN : awayUnits.DISIPLIN;
 
-      const yellowProb = clamp(attkProb.yellowPerMin / Math.max(discUnit, EPS), 0.0001, 0.05);
-      const redProb = clamp(attkProb.redPerMin / Math.max(discUnit, EPS), 0, 0.002);
+      // Clamp sınırları lig verisinden türetilir — statik 0.0001/0.05/0.002 kaldırıldı.
+      // Alt sınır: lig oranının 1/100'ü (neredeyse imkansız ama sıfır değil).
+      // Üst sınır: lig oranının 5 katı (aşırı disiplinsiz takım limiti).
+      const _lgYellow = baseline.yellowPerMin ?? attkProb.yellowPerMin;
+      const _lgRed = baseline.redPerMin ?? attkProb.redPerMin;
+      const _yMin = _lgYellow / 100;
+      const _yMax = _lgYellow * 5;
+      const _rMax = _lgRed * 5;
+      const yellowProb = clamp(attkProb.yellowPerMin / Math.max(discUnit, EPS), _yMin, _yMax);
+      const redProb = clamp(attkProb.redPerMin / Math.max(discUnit, EPS), 0, _rMax);
       const resilience = geo2(isHome ? homeUnits.DISIPLIN : awayUnits.DISIPLIN, isHome ? homeUnits.ZİHİNSEL_DAYANIKLILIK : awayUnits.ZİHİNSEL_DAYANIKLILIK);
       const kadroDepth = isHome ? homeUnits.KADRO_DERINLIGI : awayUnits.KADRO_DERINLIGI;
       const _rcPM = _rcMinPenalty ?? 0;

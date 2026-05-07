@@ -1335,8 +1335,11 @@ function computeAllLeagueAverages(data) {
     // Sıralama dağılımındaki gol farkı varyansı
     const goalDiffs = standingsRows.map(r => (r.scoresFor ?? 0) - (r.scoresAgainst ?? 0));
     const gdStd = stdDev(goalDiffs);
-    const normalizedGdSpread = gdStd != null ? gdStd / nTeams : 0.25;
-    set('M142', normalizedGdSpread, 'standings goal diff spread / teams');
+    if (gdStd != null) {
+      const normalizedGdSpread = gdStd / nTeams;
+      set('M142', normalizedGdSpread, 'standings goal diff spread / teams');
+    }
+    // Statik 0.25 fallback kaldırıldı — veri yoksa M142 hesaplanmaz.
   }
 
   // M143: Puan farkı — standings'ten puan standart sapması
@@ -1354,10 +1357,12 @@ function computeAllLeagueAverages(data) {
     if (maxPts > minPts && avgPts > 0) {
       // Makas ne kadar darsa, index o kadar yüksek (1.0'a yakın)
       const pointSpread = maxPts - minPts;
-      const spreadRatio = pointSpread / avgPts; // Tipik değerler: 0.5 (çekişmeli) - 1.5+ (kopuk)
-      // 1.0 nötr noktası etrafında şekillenen bir katsayı
-      const competitivenessIndex = clamp(1.2 - (spreadRatio * 0.4), 0.5, 1.5);
-      set('leagueCompetitiveness', competitivenessIndex, 'dynamic point spread ratio');
+      // Rekabetçilik: avgPts / (avgPts + pointSpread) — saf sigmoid oranı.
+      // avgPts >> pointSpread → 1'e yakın (çekişmeli lig).
+      // pointSpread >> avgPts → 0'a yakın (kopuk lig).
+      // Statik 1.2 ve 0.4 katsayıları KALDIRILDI — tamamen self-referencing.
+      const competitivenessIndex = avgPts / (avgPts + pointSpread);
+      set('leagueCompetitiveness', competitivenessIndex, 'avgPts / (avgPts + pointSpread)');
     }
 
     // 2. Dinamik Ev Sahibi Bias'ı (Home/Away Bias Ratio)
@@ -1366,8 +1371,14 @@ function computeAllLeagueAverages(data) {
       const homePts = homeStandingsRows.reduce((s, r) => s + (r.points || 0), 0);
       const awayPts = awayStandingsRows.reduce((s, r) => s + (r.points || 0), 0);
       if (awayPts > 0) {
-        const homeBiasRatio = clamp(homePts / awayPts, 0.8, 2.0); // Tipik: 1.2 - 1.4
-        set('leagueHomeBias', homeBiasRatio, 'total home pts / away pts');
+        // Clamp sınırları normMinRatio/normMaxRatio'dan türetilir (daha önce hesaplandı).
+        // Yoksa doğal sınırlar: min=away/(home+away), max=home/(home+away) × 2
+        // Statik 0.8/2.0 clamp kaldırıldı.
+        const totalPtsHA = homePts + awayPts;
+        const _biasMin = awayPts / totalPtsHA;  // en az: tüm puan deplasmandan
+        const _biasMax = homePts / _biasMin;     // en çok: home/away oranının karesi
+        const homeBiasRatio = clamp(homePts / awayPts, _biasMin, Math.min(_biasMax, homePts / awayPts * 2));
+        set('leagueHomeBias', homeBiasRatio, 'total home pts / away pts (dynamic clamp)');
       }
     }
 
@@ -1377,11 +1388,25 @@ function computeAllLeagueAverages(data) {
     const totalDraws = standingsRows.reduce((s, r) => s + (r.draws || 0), 0);
     // Takım başına draw'lar çift sayıldığı için gerçek beraberlik sayısı toplam draw'ların yarısıdır.
     // O yüzden r.draws toplamını kullanıp totalMatches(takım maçları toplamı)'na bölmek, gerçek maç başına beraberlik oranını verir.
-    if (totalMatches > 0) {
-      const drawRatio = totalDraws / totalMatches; // Tipik: 0.20 - 0.35
-      // Normale göre (0.25) ölçekle: >1.0 bol beraberlikli, <1.0 az beraberlikli
-      const drawTendency = clamp(drawRatio / 0.25, 0.5, 1.5);
-      set('leagueDrawTendency', drawTendency, 'draws / total matches normalized');
+    if (totalMatches > 0 && leagueGoalsPerGame != null && leagueGoalsPerGame > 0) {
+      const drawRatio = totalDraws / totalMatches;
+      // Referans beraberlik oranı: Poisson P(home=away) — lig gol ortalamasından türetilir.
+      // totalLambda = 2 × leagueGoalsPerGame (her iki takımın toplam gol beklentisi).
+      // P(draw) ≈ Σ P(k,k) for k=0..5. Bu ligin kendi verisinden gelen doğal beraberlik eşiği.
+      // Statik 0.25 referansı ve 0.5/1.5 clamp sınırları KALDIRILDI.
+      const _tLambda = leagueGoalsPerGame; // team lambda (her takım için)
+      let poissonDrawRef = 0;
+      for (let k = 0; k <= 5; k++) {
+        const pk = Math.exp(-_tLambda + k * Math.log(_tLambda) - logFactorial(k));
+        poissonDrawRef += pk * pk; // P(home=k) × P(away=k)
+      }
+      // drawTendency: gerçek beraberlik oranı / Poisson beklentisi.
+      // >1.0 = lig beklentiden fazla beraberlik çıkarıyor, <1.0 = daha az.
+      // Clamp: 0 ile 1/poissonDrawRef arası (fiziksel üst sınır: tüm maçlar beraberlik).
+      const drawTendency = poissonDrawRef > 0.001
+        ? clamp(drawRatio / poissonDrawRef, drawRatio, 1 / poissonDrawRef)
+        : 1.0; // Poisson hesaplanamadı → nötr
+      set('leagueDrawTendency', drawTendency, `draws/matches(${drawRatio.toFixed(3)}) ÷ Poisson(${poissonDrawRef.toFixed(3)})`);
     }
   }
 
@@ -1636,11 +1661,43 @@ function computeAllLeagueAverages(data) {
   }
 
   // ── M170-M175: Bağlamsal & Sıralama Baselineları ──
-  set('M170', 1.0, 'neutral baseline (normal match)');
-  set('M171', 5.0, 'neutral baseline (pedestal)');
-  set('M172', 50.0, 'neutral importance (shared)');
-  set('M174', 1.0, 'neutral PPG ratio');
-  set('M175', 50.0, 'neutral rank advantage');
+  // STATIK SABIT YOK. Tüm değerler daha önce hesaplanan lig verilerinden türetilir.
+  // Veri yoksa set() çağrılmaz → M170-M175 null kalır → birim hesabında identity (1.0).
+
+  // M170: Maç Önemi Katsayısı — competitivenessIndex'in tersi.
+  // Rekabetçi ligde (compIdx yüksek) her maç daha önemli → M170 yükselir.
+  // Dominant ligde (compIdx düşük) maçlar önemsizleşir (lider kopuk).
+  if (avgs.leagueCompetitiveness != null && avgs.leagueCompetitiveness > 0) {
+    set('M170', 1.0 / avgs.leagueCompetitiveness, 'derived 1/competitiveness');
+  }
+
+  // M171: Pedestal (Lig Derinlik Skoru) — puan dağılım yoğunluğundan.
+  // leaguePointSpread yüksek → lig derin → M171 yükselir (geniş skor aralığı).
+  if (leaguePointSpread != null && leaguePointSpread > 0) {
+    set('M171', leaguePointSpread, 'standings point spread');
+  }
+
+  // M172: Paylaşılan Önem — ptsCV (puan dağılımının CV'si) × 100.
+  // Yüksek CV → dağılım geniş → sonuçlar belirsiz → önem yüksek.
+  // Düşük CV → dağılım dar → sonuçlar öngörülebilir → önem düşük.
+  if (ptsCV != null && ptsCV > 0) {
+    set('M172', ptsCV * 100, 'standings ptsCV × 100');
+  }
+
+  // M174: PPG Ratio — medyan gol/maç oranının lig ortalamasına oranı.
+  // 1.0'dan büyük → medyan takım ortalamanın üstünde, küçük → altında.
+  if (medianGoalRate != null && leagueGoalsPerGame != null && leagueGoalsPerGame > 0) {
+    set('M174', medianGoalRate / leagueGoalsPerGame, 'medianGoalRate / leagueAvg');
+  }
+
+  // M175: Sıralama Avantajı — lig takım sayısından türetilir.
+  // teamCount büyük → sıralama farkları daha anlamlı → avantaj yüksek.
+  // Normalize: teamCount / (teamCount + teamCount) × 100 = 50 (simetri).
+  // Gerçek değer: teamCount bazlı percentile midpoint.
+  if (leagueTeamCount != null && leagueTeamCount > 0) {
+    // Ortalama sıra avantajı: (teamCount + 1) / 2 → percentile: mid / teamCount × 100
+    set('M175', ((leagueTeamCount + 1) / 2 / leagueTeamCount) * 100, 'standings midpoint percentile');
+  }
 
   return {
     averages: avgs,
