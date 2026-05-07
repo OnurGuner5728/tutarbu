@@ -247,12 +247,23 @@ function calculateAllMetrics(data) {
   const awayStMatches = _aStRow?.matches || 0;
 
   // ── Takım Skor Profilleri (Score Fingerprint) ──────────────────────────────
-  // Öncelik: konum-özel (ev/deplasman maçları). Yetersiz örneklem → takımın tüm maçları.
-  // Her iki adım da gerçek API verisinden türer; statik default veya null fallback yoktur.
+  // Öncelik hiyerarşisi:
+  //   1. SAME tournament + SAME location (UCL knockout × ev maçları → en doğru)
+  //   2. SAME tournament + ANY location (UCL knockout × tüm maçları)
+  //   3. ANY tournament + SAME location (tüm liglerden ev maçları → fallback)
+  //   4. ANY tournament + ANY location (son çare)
+  // Bu, Bundesliga gol oranlarını UCL knockout'a aktarmayı önler — bağlam korunur.
+  const _tId = data.event?.event?.tournament?.uniqueTournament?.id
+            ?? data.event?.event?.tournament?.id
+            ?? null;
   const homeScoreProfile =
+    extractTeamScoreProfile(data.homeLastEvents, data.homeTeamId, 'home', 20, undefined, _tId) ??
+    extractTeamScoreProfile(data.homeLastEvents, data.homeTeamId, null, 20, undefined, _tId) ??
     extractTeamScoreProfile(data.homeLastEvents, data.homeTeamId, 'home', 20) ??
     extractTeamScoreProfile(data.homeLastEvents, data.homeTeamId, null, 20);
   const awayScoreProfile =
+    extractTeamScoreProfile(data.awayLastEvents, data.awayTeamId, 'away', 20, undefined, _tId) ??
+    extractTeamScoreProfile(data.awayLastEvents, data.awayTeamId, null, 20, undefined, _tId) ??
     extractTeamScoreProfile(data.awayLastEvents, data.awayTeamId, 'away', 20) ??
     extractTeamScoreProfile(data.awayLastEvents, data.awayTeamId, null, 20);
   // Eşleşme (H2H) skor parmak izi — iki takımın karşılıklı geçmişi (home-perspektif)

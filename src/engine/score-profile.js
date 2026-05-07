@@ -74,15 +74,18 @@ function lgamma(x) {
  * @param {number} teamId - Takım ID'si
  * @param {'home'|'away'|null} location - Sadece ev/deplasman maçları filtrele
  * @param {number} maxMatches - Kullanılacak max maç sayısı
+ * @param {number} [nowMs] - Şu anın milisaniye değeri (test için)
+ * @param {number|null} [tournamentId] - Tournament filter: sadece bu turnuva maçları
  * @returns {object|null}
  */
-function extractTeamScoreProfile(lastEvents, teamId, location = null, maxMatches = 20, nowMs = Date.now()) {
+function extractTeamScoreProfile(lastEvents, teamId, location = null, maxMatches = 20, nowMs = Date.now(), tournamentId = null) {
   if (!lastEvents || !Array.isArray(lastEvents) || lastEvents.length === 0) {
     return null;
   }
 
   const finished = lastEvents
     .filter(e => e.status?.type === 'finished' && e.homeScore?.current != null)
+    .filter(e => tournamentId == null || e.tournament?.uniqueTournament?.id === tournamentId || e.tournament?.id === tournamentId)
     .slice(0, maxMatches * 3);
 
   const matches = [];
