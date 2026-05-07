@@ -330,13 +330,29 @@ function calculateAdvancedMetrics(allMetrics) {
   const awayAttackRate_source = awayAtkRaw != null ? Math.max(0, awayAtkRaw - _awayGoalDrop) : null;
   const homeDefenseRate_source = homeDefRaw;
 
-  // Dixon-Coles baz lambda (home advantage dahil değil)
-  const dcBase_home = (homeAttackRate_source != null && awayDefenseRate_source != null && leagueAvgGoals != null && leagueAvgGoals > 0)
-    ? (homeAttackRate_source / leagueAvgGoals) * (awayDefenseRate_source / leagueAvgGoals) * leagueAvgGoals
-    : null;
-  const dcBase_away = (awayAttackRate_source != null && homeDefenseRate_source != null && leagueAvgGoals != null && leagueAvgGoals > 0)
-    ? (awayAttackRate_source / leagueAvgGoals) * (homeDefenseRate_source / leagueAvgGoals) * leagueAvgGoals
-    : null;
+  // ── Dixon-Coles + Dinamik Asimetri Açıcı ─────────────────────────────────
+  // Standart Dixon-Coles: λ = α × β × leagueAvg, α=atkR/avg, β=defR/avg.
+  // Sorun: α × β çarpımı [0.5, 1.5]² = [0.25, 2.25] aralığında sıkışıyor.
+  // Bayern (α=1.5) × dip takım (β=1.4): α×β = 2.1 → λ = 2.1×1.32 = 2.77.
+  // Gerçekte 4-0 maçları için λ=4 gerekiyor → asimetri yapısal olarak eziliyor.
+  //
+  // Açıcı: λ = leagueAvg × (α × β)^k, k = 1 + lgCV.
+  // - Stabil lig (CV→0): k=1 → standart Dixon-Coles.
+  // - Volatil lig (CV>0): k>1 → asimetri açılır (top×weak combinations boost).
+  // - α×β = 1 (dengeli maç): (1)^k = 1, etki yok (ortalama maç değişmez).
+  // - α×β >> 1 veya << 1 (asimetrik maç): exponent büyütür/küçültür.
+  // k tamamen lig verisinden (lgCV = leagueGoalVolatility / leagueAvgGoals).
+  const _kAsymm = (_cv != null && _cv > 0) ? 1 + _cv : 1;
+  const _dcBase = (atkR, defR_opp) => {
+    if (atkR == null || defR_opp == null || leagueAvgGoals == null || leagueAvgGoals <= 0) return null;
+    const alpha = atkR / leagueAvgGoals;
+    const beta = defR_opp / leagueAvgGoals;
+    const ab = alpha * beta;
+    if (ab <= 0) return null;
+    return leagueAvgGoals * Math.pow(ab, _kAsymm);
+  };
+  const dcBase_home = _dcBase(homeAttackRate_source, awayDefenseRate_source);
+  const dcBase_away = _dcBase(awayAttackRate_source, homeDefenseRate_source);
 
   // ── Dinamik Hassasiyet Kalibrasyonu (Physics-based Scaling) ────────────────
   // vol ve den yukarıda tanımlandı (getPower'dan önce gerekli)
@@ -391,17 +407,29 @@ function calculateAdvancedMetrics(allMetrics) {
     }
     return null; // Gerçekten veri yoksa null — sabit yok
   })();
-  // Lambda tavanı: max(μ + 3σ, μ × 1.5) — backtest kanıtı: μ+2σ çok sıkıydı
-  // (Poisson ort. 1.41, gerçek 2.65). %99.7 güven aralığı + minimum 1.5× lig ortalaması.
-  // normMaxRatio yoksa CV'den türet (vol/avg ile lig en güçlü oranı yaklaşığı).
-  // Statik 1.5 fallback kaldırıldı — veri yoksa SIM_CONFIG matematiksel sınırına düşer.
-  const _lambdaCeilMult = allMetrics.normMaxRatio
-    ?? (_volForMax != null && leagueAvgGoals > 0 ? 1 + _volForMax / leagueAvgGoals : null);
-  const dynamicLambdaMax = (leagueAvgGoals != null && _volForMax != null && _lambdaCeilMult != null)
-    ? Math.max(leagueAvgGoals + _volForMax * 3, leagueAvgGoals * _lambdaCeilMult)
-    : (leagueAvgGoals != null && _volForMax != null
-        ? leagueAvgGoals + _volForMax * 3
-        : SIM_CONFIG.LIMITS.LAMBDA.MAX);
+  // Lambda tavanı — KARESELLEŞTİRİLDİ ÇÜNKÜ ÖNCEKİ FORMÜL ASİMETRİYİ ÖLDÜRÜYORDU.
+  //
+  // Önceki: leagueAvg × normMaxRatio = top takımın TEK BAŞINA maç başı oranı.
+  //   Premier League: 1.32 × 1.89 = 2.49 → Bayern × dip takım için bile lambda
+  //   2.5'te kesiliyor → 4-0, 3-1 gibi skorlar yapısal olarak imkansızlaşıyor.
+  //
+  // Yeni: leagueAvg × normMaxRatio² = top atak × top defansif zafiyet.
+  //   Premier League: 1.32 × 1.89² = 4.71 → asimetrik maçlarda lambda açılır.
+  //
+  // Aynı simetri lambdaMin için de uygulanır (worst takım × en iyi savunma).
+  // Tüm parametreler veriden — statik 1.5/2.0/3.0 katsayısı YOK.
+  const dynamicLambdaMax = (() => {
+    if (leagueAvgGoals == null || leagueAvgGoals <= 0) return SIM_CONFIG.LIMITS.LAMBDA.MAX;
+    if (allMetrics.normMaxRatio != null) {
+      // Asimetri-açıcı: top × top kombinasyonu (matematiksel max).
+      return leagueAvgGoals * allMetrics.normMaxRatio * allMetrics.normMaxRatio;
+    }
+    if (_volForMax != null) {
+      // Volatilite fallback: μ + 3σ (99.7% güven aralığı, tek-yönlü).
+      return leagueAvgGoals + _volForMax * 3;
+    }
+    return SIM_CONFIG.LIMITS.LAMBDA.MAX;
+  })();
 
   // Hırs Hassasiyeti (URGENCY_SENS): veri yoksa sıfır → urgency etkisi lambda'ya yansımaz
   // 0.5 ölçeği → volatiliteye bağlı: volatil lig, aciliyet etkisi daha belirgin
@@ -435,15 +463,21 @@ function calculateAdvancedMetrics(allMetrics) {
   // dampFactor güçlü favori maçlarında (City vs Burnley) avantajın %23'ünü siliyordu.
   // Bayesian regresyon zaten profileN küçükse düşük ağırlık vererek yapılıyor.
 
-  // normMinRatio yoksa CV'den türet (1 - vol/avg ≈ ligin en zayıf takımının oranı).
-  // Statik 0.35 fallback kaldırıldı — veriden türetilemiyorsa SIM_CONFIG matematiksel min.
-  const _lambdaFloorMult = allMetrics.normMinRatio
-    ?? (_volForMax != null && leagueAvgGoals > 0
-        ? Math.max(0, 1 - _volForMax / leagueAvgGoals)
-        : null);
-  const dynamicLambdaMin = (leagueAvgGoals != null && leagueAvgGoals > 0 && _lambdaFloorMult != null)
-    ? Math.max(SIM_CONFIG.LIMITS.LAMBDA.MIN, leagueAvgGoals * _lambdaFloorMult)
-    : SIM_CONFIG.LIMITS.LAMBDA.MIN;
+  // Lambda tabanı — KARESELLEŞTİRİLDİ (üst sınırla simetrik).
+  // worst atak × en iyi savunma kombinasyonu = matematiksel min.
+  // Premier League: 1.32 × 0.5² = 0.33 → defansif maçlarda lambda küçülebilir.
+  const dynamicLambdaMin = (() => {
+    if (leagueAvgGoals == null || leagueAvgGoals <= 0) return SIM_CONFIG.LIMITS.LAMBDA.MIN;
+    if (allMetrics.normMinRatio != null) {
+      return Math.max(SIM_CONFIG.LIMITS.LAMBDA.MIN,
+        leagueAvgGoals * allMetrics.normMinRatio * allMetrics.normMinRatio);
+    }
+    if (_volForMax != null) {
+      return Math.max(SIM_CONFIG.LIMITS.LAMBDA.MIN,
+        leagueAvgGoals * Math.max(0, 1 - _volForMax / leagueAvgGoals));
+    }
+    return SIM_CONFIG.LIMITS.LAMBDA.MIN;
+  })();
   let lambda_home = (dcBase_home != null)
     ? clamp(dcBase_home * behavMod_home * lambdaMod_home, dynamicLambdaMin, dynamicLambdaMax)
     : null;
