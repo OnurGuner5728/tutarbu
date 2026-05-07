@@ -574,9 +574,13 @@ function calculateAdvancedMetrics(allMetrics) {
       referenceTotalGoals = matchScoreProfile.avgHomeGoals + matchScoreProfile.avgAwayGoals;
       referenceReliability = (matchScoreProfile.n || 0) / ((matchScoreProfile.n || 0) + 3);
     } else if (leagueAvgGoals != null && leagueAvgGoals > 0) {
-      // Standings: her takım için goals/match → × 2 = maç başı toplam
+      // Standings: her takım için goals/match → × 2 = maç başı toplam.
+      // Reliability standings sample size'ından türetilir (statik 0.35 kaldırıldı):
+      //   wReliability = nTeams × matchesPerTeam / (n + sqrt(n+1))
+      // Tipik 20 takım × 30 maç = 600 örnek → reliability ≈ 0.96.
+      const _stN = (allMetrics.leagueTeamCount ?? 0) * 30;
       referenceTotalGoals = leagueAvgGoals * 2;
-      referenceReliability = 0.35; // standings veri her zaman mevcut ama tek referans olarak zayıf
+      referenceReliability = _stN > 0 ? _stN / (_stN + Math.sqrt(_stN + 1)) : 0;
     }
 
     // 2. Kalibrasyon oranı ve ölçekleme faktörü — SİMETRİK + TAM REFERANSA YAKLAŞIM
@@ -591,10 +595,12 @@ function calculateAdvancedMetrics(allMetrics) {
       const _trigger = (calibrationRatio > 1 + _tol) || (calibrationRatio < 1 - _tol);
 
       if (_trigger) {
-        // exponent = reliability — TAMAMEN data-driven, sabit 0.5 katsayısı kaldırıldı.
-        // reliability=1 → tam referansa yaklaş; reliability=0.3 → daha yumuşak.
-        const exponent = Math.max(0, Math.min(1, referenceReliability));
-        let scalingFactor = Math.pow(calibrationRatio, exponent);
+        // FULL CALIBRATION — referenceTotalGoals zaten ölçülen lig gerçeği.
+        // Önceki "exponent = reliability" yumuşak düzeltmesi, %30 sistematik bias'ı
+        // kapatamıyordu (backtest: lambdaSum 1.84 vs gerçek 2.64). Reliability sadece
+        // TRIGGER için kullanılır (zaten _trigger'da değerlendirildi); calibration
+        // tetiklenince hedef referansa TAM yaklaşılır.
+        let scalingFactor = calibrationRatio;
 
         // Güvenlik tavanları: normMaxRatio + normMinRatio'dan dinamik (sabit 1.50/0.70 kaldırıldı).
         // Üst: ligin en güçlü takımının lig ortalamasına oranı (zaten ölçülmüş veri).
