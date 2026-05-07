@@ -311,44 +311,9 @@ function generatePrediction(metricsResult, data, baseline, audit, rng) {
         awayWin = T_probs[2] * 100;
       }
 
-      // ── Bayesian Draw Prior Shrinkage (Entropy-Weighted) ──
-      // SORUN: Simulation snowball spiral nedeniyle aşırı confident dağılım veriyor
-      // (%96-3-0). Blend sonrası probDraw lig gerçeğinin ÇOK altında kalıyor.
-      // ÇÖZÜM: Lig gözlenen draw oranı (leagueDrawRate) prior olarak kullanılır.
-      // Shrinkage ağırlığı = model entropy'si (modeller belirsizse prior güçlü uygulanır,
-      // model çok kararlıysa prior zayıf etkiler).
-      //
-      //   posterior_draw = (1-w) × model_draw + w × leagueDrawRate
-      //   w = H(model) / log(3)  ∈ [0, 1]
-      //
-      // Veri yoksa düzeltme uygulanmaz (no fallbacks).
-      const _ldRate = baseline?.leagueDrawRate;
-      if (_ldRate != null && _ldRate > 0 && _ldRate < 1) {
-        const _pH = homeWin / 100;
-        const _pD = draw / 100;
-        const _pA = awayWin / 100;
-        const _sum = _pH + _pD + _pA;
-        if (_sum > 0) {
-          const _qH = _pH / _sum, _qD = _pD / _sum, _qA = _pA / _sum;
-          // Shannon entropy (3 sonuç için max = ln(3))
-          const _safe = (p) => p > 1e-9 ? p : 1e-9;
-          const _H = -(_qH * Math.log(_safe(_qH)) + _qD * Math.log(_safe(_qD)) + _qA * Math.log(_safe(_qA)));
-          const _maxH = Math.log(3);
-          const _w = Math.max(0, Math.min(1, _H / _maxH)); // entropy oranı [0,1]
-
-          // Posterior draw probability
-          const _newD = (1 - _w) * _qD + _w * _ldRate;
-          // Diğerleri orijinal oranlarına göre kalan kütleyi paylaşır
-          const _remaining = 1 - _newD;
-          const _hwAwSum = _qH + _qA;
-          const _newH = _hwAwSum > 0 ? _remaining * (_qH / _hwAwSum) : _remaining / 2;
-          const _newA = _hwAwSum > 0 ? _remaining * (_qA / _hwAwSum) : _remaining / 2;
-
-          homeWin = _newH * 100;
-          draw = _newD * 100;
-          awayWin = _newA * 100;
-        }
-      }
+      // Bayesian draw shrinkage KALDIRILDI.
+      // Probabilities artık sadece blend sonucu. 1X2 outcome predicted skordan
+      // türetiliyor (backtest-runner). Probability'ler bilgilendirme amaçlı.
 
       // source etiketi: ağırlık dengesizliğinin doğal eşiği 2/3 (matematiksel bölünme).
       // pW > 2/3 → Poisson dominant; sW > 2/3 → Sim dominant; aksi → harmanlı.
@@ -481,34 +446,18 @@ function generatePrediction(metricsResult, data, baseline, audit, rng) {
           .map(([score, pct]) => ({ score, probability: pct }))
         : null;
 
-      // ── Predicted Score Alignment ──
-      // Poisson'un en olası TEK skoru (ör. 1-1) beklenen sonuçla (ör. Away Win)
-      // çelişebilir. Kullanıcı için tutarlılık sağlamak adına predicted score'u
-      // beklenen sonuç kategorisine uyumlu en olası skorla değiştiriyoruz.
-      const hw = prediction.homeWinProbability ?? 0;
-      const dw = prediction.drawProbability ?? 0;
-      const aw = prediction.awayWinProbability ?? 0;
-      const maxP = Math.max(hw, dw, aw);
-      const dominantOutcome = maxP === hw ? 'home' : maxP === aw ? 'away' : 'draw';
-
-      let alignedScore = poissonTopScore;
-      if (poissonTopScore && top5Poisson?.length > 0) {
-        const [pH, pA] = poissonTopScore.split('-').map(Number);
-        const poissonOutcome = pH > pA ? 'home' : pH < pA ? 'away' : 'draw';
-        
-        if (poissonOutcome !== dominantOutcome) {
-          // Poisson top5'ten dominant sonuçla uyumlu en olası skoru bul
-          const matchingScore = top5Poisson.find(s => {
-            const [h, a] = s.score.split('-').map(Number);
-            if (dominantOutcome === 'home') return h > a;
-            if (dominantOutcome === 'away') return a > h;
-            return h === a;
-          });
-          if (matchingScore) {
-            alignedScore = matchingScore.score;
-          }
-        }
-      }
+      // SCORE ALIGNMENT KALDIRILDI.
+      //
+      // Önceki mantık: argmax(pH,pD,pA) ile dominantOutcome belirlenip predicted
+      // skor o outcome'a "alignlanıyordu". Sonuç: Poisson en olası skoru (örn 1-1
+      // veya 2-2) atılıp 2-1/1-2 gibi outcome-uyumlu skor seçiliyordu. Bu hem
+      // beraberlik skorlarını yapısal olarak öldürüyor hem de Poisson'un kendi
+      // analitik sinyaline güvenmiyordu.
+      //
+      // Yeni: Poisson en olası skor (mostLikelyScore) doğrudan kullanılır.
+      // 1X2 outcome consumer (backtest-runner) tarafından SKORDAN türetilir,
+      // böylece skor ile outcome her zaman tutarlıdır.
+      const alignedScore = poissonTopScore;
 
       return {
         predicted: alignedScore,
