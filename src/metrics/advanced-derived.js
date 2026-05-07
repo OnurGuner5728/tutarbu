@@ -367,13 +367,15 @@ function calculateAdvancedMetrics(allMetrics) {
   // Tüm parametreler veriden (lgCV, agreement). Statik katsayı YOK.
   // Çift sayım yok: agreement xGOverPerf/cleanSheet modifier'larıyla ÇAKIŞMAZ
   // çünkü bu modifier'lar lambda'ya çarpan olarak uygulanır, k exponent'i ayrı.
+  // _cv burada lokal hesaplanır (TDZ: aşağıdaki const _cv tanımı bu satırın ALTINDA).
+  const _cvLocal = (vol != null && leagueAvgGoals > 0) ? vol / leagueAvgGoals : null;
   const _dcBase = (atkR, defR_opp, agreement) => {
     if (atkR == null || defR_opp == null || leagueAvgGoals == null || leagueAvgGoals <= 0) return null;
     const alpha = atkR / leagueAvgGoals;
     const beta = defR_opp / leagueAvgGoals;
     const ab = alpha * beta;
     if (ab <= 0) return null;
-    const kMatch = (_cv != null && _cv > 0) ? 1 + _cv * agreement : 1;
+    const kMatch = (_cvLocal != null && _cvLocal > 0) ? 1 + _cvLocal * agreement : 1;
     return leagueAvgGoals * Math.pow(ab, kMatch);
   };
   const dcBase_home = _dcBase(homeAttackRate_source, awayDefenseRate_source, _agreementHome);

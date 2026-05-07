@@ -1,0 +1,373 @@
+{
+  "page": "Backtest – Gerçek Server Pipeline",
+  "filters": {
+    "baslangic": "06/05/2026",
+    "bitis": "06/05/2026",
+    "macSayisi": 10,
+    "turnuva": "Tüm Ligler",
+    "minGuven": 0,
+    "oynanmamis": false,
+    "tier": "ALL",
+    "dogru": true,
+    "yanlis": true,
+    "valueBet": true,
+    "htVerili": true,
+    "durum": "Tümü"
+  },
+  "summary": {
+    "totalMatches": 10,
+    "completedMatches": 10,
+    "metrics": {
+      "1X2": {
+        "accuracy": 30,
+        "correct": 3,
+        "total": 10
+      },
+      "OU25": {
+        "accuracy": 80,
+        "correct": 8,
+        "total": 10
+      },
+      "BTTS": {
+        "accuracy": 50,
+        "correct": 5,
+        "total": 10
+      },
+      "ExactFT": {
+        "accuracy": 20,
+        "correct": 2,
+        "total": 10
+      },
+      "HT1X2": {
+        "accuracy": 50,
+        "correct": 5,
+        "total": 10
+      },
+      "HTExact": {
+        "accuracy": 50,
+        "correct": 5,
+        "total": 10
+      },
+      "HTFT": {
+        "accuracy": 40,
+        "correct": 4,
+        "total": 10
+      },
+      "avgBrier": {
+        "value": 0.5970,
+        "reference": 0.667
+      }
+    },
+    "tierSummary": {
+      "HIGH": {
+        "accuracy": 33.3,
+        "matches": 6
+      },
+      "LOW": {
+        "accuracy": 25,
+        "matches": 4
+      }
+    },
+    "engineBreakdown": {
+      "hybrid": 30,
+      "poisson": 30,
+      "simulation": 70
+    },
+    "benchmark": {
+      "vsNaive": {
+        "accuracy": 6,
+        "points": -4
+      },
+      "brier": {
+        "change": 0,
+        "percentage": 0
+      },
+      "recall": 0,
+      "precision": 0
+    },
+    "valueBet": {
+      "matches": 1,
+      "x12": 0
+    }
+  },
+  "matches": [
+    {
+      "rank": 10,
+      "match": "Club Sporting Cristal vs Palmeiras",
+      "competition": "CONMEBOL Libertadores",
+      "actualFT": "0-2",
+      "actualFTResult": "2",
+      "predictedFT": "1-2",
+      "predictedFTResult": "2",
+      "simulation": "0-0",
+      "actualHT": "0-1",
+      "actualHTResult": "2",
+      "predictedHT": "0-0",
+      "predictedHTResult": "X",
+      "simulationHT": "0-0",
+      "HTFT": "X/X",
+      "checks": {
+        "1X2": true,
+        "OU": true,
+        "BTTS": true,
+        "score": false,
+        "HT": false
+      },
+      "brier": 0.319,
+      "tier": "HIGH",
+      "ps": "2/X",
+      "valueBet": null
+    },
+    {
+      "rank": 9,
+      "match": "Independiente Santa Fe vs Corinthians",
+      "competition": "CONMEBOL Libertadores",
+      "actualFT": "1-1",
+      "actualFTResult": "X",
+      "predictedFT": "2-1",
+      "predictedFTResult": "1",
+      "simulation": "0-0",
+      "actualHT": "0-0",
+      "actualHTResult": "X",
+      "predictedHT": "0-0",
+      "predictedHTResult": "X",
+      "simulationHT": "0-0",
+      "HTFT": "X/X",
+      "checks": {
+        "1X2": false,
+        "OU": true,
+        "BTTS": false,
+        "score": false,
+        "HT": true
+      },
+      "brier": 0.759,
+      "tier": "HIGH",
+      "ps": "1/X",
+      "valueBet": null
+    },
+    {
+      "rank": 8,
+      "match": "Universidad Católica vs Cruzeiro",
+      "competition": "CONMEBOL Libertadores",
+      "actualFT": "0-0",
+      "actualFTResult": "X",
+      "predictedFT": "2-1",
+      "predictedFTResult": "1",
+      "simulation": "0-0",
+      "actualHT": "0-0",
+      "actualHTResult": "X",
+      "predictedHT": "0-0",
+      "predictedHTResult": "X",
+      "simulationHT": "0-0",
+      "HTFT": "X/X",
+      "checks": {
+        "1X2": false,
+        "OU": true,
+        "BTTS": true,
+        "score": false,
+        "HT": true
+      },
+      "brier": 0.575,
+      "tier": "HIGH",
+      "ps": "1/X",
+      "valueBet": null
+    },
+    {
+      "rank": 7,
+      "match": "Barcelona SC Guayaquil vs Boca Juniors",
+      "competition": "CONMEBOL Libertadores",
+      "actualFT": "1-0",
+      "actualFTResult": "1",
+      "predictedFT": "0-1",
+      "predictedFTResult": "2",
+      "simulation": "0-0",
+      "actualHT": "0-0",
+      "actualHTResult": "X",
+      "predictedHT": "0-0",
+      "predictedHTResult": "X",
+      "simulationHT": "0-0",
+      "HTFT": "X/X",
+      "checks": {
+        "1X2": false,
+        "OU": true,
+        "BTTS": true,
+        "score": false,
+        "HT": true
+      },
+      "brier": 0.826,
+      "tier": "HIGH",
+      "ps": "2/X",
+      "valueBet": null
+    },
+    {
+      "rank": 6,
+      "match": "Independiente Rivadavia vs Fluminense",
+      "competition": "CONMEBOL Libertadores",
+      "actualFT": "1-1",
+      "actualFTResult": "X",
+      "predictedFT": "2-1",
+      "predictedFTResult": "1",
+      "simulation": "0-0",
+      "actualHT": "0-0",
+      "actualHTResult": "X",
+      "predictedHT": "0-0",
+      "predictedHTResult": "X",
+      "simulationHT": "0-0",
+      "HTFT": "X/X",
+      "checks": {
+        "1X2": false,
+        "OU": true,
+        "BTTS": false,
+        "score": false,
+        "HT": true
+      },
+      "brier": 0.557,
+      "tier": "LOW",
+      "ps": "1/X",
+      "valueBet": null
+    },
+    {
+      "rank": 5,
+      "match": "Deportivo La Guaira vs Bolívar",
+      "competition": "CONMEBOL Libertadores",
+      "actualFT": "1-1",
+      "actualFTResult": "X",
+      "predictedFT": "2-1",
+      "predictedFTResult": "1",
+      "simulation": "0-0",
+      "actualHT": "1-0",
+      "actualHTResult": "1",
+      "predictedHT": "0-0",
+      "predictedHTResult": "X",
+      "simulationHT": "0-0",
+      "HTFT": "X/X",
+      "checks": {
+        "1X2": false,
+        "OU": true,
+        "BTTS": false,
+        "score": false,
+        "HT": false
+      },
+      "brier": 0.458,
+      "tier": "HIGH",
+      "ps": "1/X",
+      "valueBet": null
+    },
+    {
+      "rank": 4,
+      "match": "Deportes Tolima vs Nacional",
+      "competition": "CONMEBOL Libertadores",
+      "actualFT": "3-0",
+      "actualFTResult": "1",
+      "predictedFT": "3-0",
+      "predictedFTResult": "1",
+      "simulation": "0-0",
+      "actualHT": "1-0",
+      "actualHTResult": "1",
+      "predictedHT": "0-0",
+      "predictedHTResult": "X",
+      "simulationHT": "0-0",
+      "HTFT": "X/X",
+      "checks": {
+        "1X2": true,
+        "OU": false,
+        "BTTS": true,
+        "score": true,
+        "HT": false
+      },
+      "brier": 0.507,
+      "tier": "LOW",
+      "ps": "1/X",
+      "valueBet": null
+    },
+    {
+      "rank": 3,
+      "match": "Cusco FC vs Estudiantes de La Plata",
+      "competition": "CONMEBOL Libertadores",
+      "actualFT": "1-1",
+      "actualFTResult": "X",
+      "predictedFT": "0-1",
+      "predictedFTResult": "2",
+      "simulation": "0-0",
+      "actualHT": "1-0",
+      "actualHTResult": "1",
+      "predictedHT": "0-0",
+      "predictedHTResult": "X",
+      "simulationHT": "0-0",
+      "HTFT": "X/X",
+      "checks": {
+        "1X2": false,
+        "OU": true,
+        "BTTS": false,
+        "score": false,
+        "HT": false
+      },
+      "brier": 0.725,
+      "tier": "LOW",
+      "ps": "2/X",
+      "valueBet": null
+    },
+    {
+      "rank": 2,
+      "match": "FC Bayern München vs Paris Saint-Germain",
+      "competition": "UEFA Champions League",
+      "actualFT": "1-1",
+      "actualFTResult": "X",
+      "predictedFT": "1-2",
+      "predictedFTResult": "2",
+      "simulation": "0-0",
+      "actualHT": "0-1",
+      "actualHTResult": "2",
+      "predictedHT": "0-0",
+      "predictedHTResult": "X",
+      "simulationHT": "0-0",
+      "HTFT": "X/X",
+      "checks": {
+        "1X2": false,
+        "OU": true,
+        "BTTS": false,
+        "score": false,
+        "HT": false
+      },
+      "brier": 0.865,
+      "tier": "LOW",
+      "ps": "2/X",
+      "valueBet": 17.5
+    },
+    {
+      "rank": 1,
+      "match": "Arsenal vs Atlético Madrid",
+      "competition": "UEFA Champions League",
+      "actualFT": "1-0",
+      "actualFTResult": "1",
+      "predictedFT": "1-0",
+      "predictedFTResult": "1",
+      "simulation": "3-0",
+      "actualHT": "1-0",
+      "actualHTResult": "1",
+      "predictedHT": "1-0",
+      "predictedHTResult": "1",
+      "simulationHT": "1-0",
+      "HTFT": "1/1",
+      "checks": {
+        "1X2": true,
+        "OU": false,
+        "BTTS": true,
+        "score": true,
+        "HT": true
+      },
+      "brier": 0.381,
+      "tier": "HIGH",
+      "ps": "1/1",
+      "valueBet": null
+    }
+  ],
+  "runInfo": {
+    "learningStore": {
+      "predictions": 533,
+      "outcomes": 456,
+      "residuals": 522,
+      "fingerprints": 360
+    }
+  }
+}
