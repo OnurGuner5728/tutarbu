@@ -165,9 +165,28 @@ async function runBacktest(date, matchLimit = 10, opts = {}) {
         const pDraw = report.result.draw || parseFloat(simDist.draw) || 0; 
         const pAway = report.result.awayWin || parseFloat(simDist.awayWin) || 0;
         
+        // ── Lift-Based Outcome Selection ──────────────────────────────────────
+        // Argmax tek başına draw'ı asla seçemiyor: pH-pA arasında yer alan pD,
+        // sayısal olarak max olmaz → tahminler hep 1/2'de yığılır. Lige göre
+        // normalize lift hesabı: pX / baseRate_X. En yüksek lift kazanır.
+        // baseRate yoksa argmax fallback (statik sayı yok).
+        const _lgBase = report.metadata?.baseline || {};
+        const _baseH = _lgBase.leagueHomeWinRate ?? null;
+        const _baseD = _lgBase.leagueDrawRate ?? null;
+        const _baseA = _lgBase.leagueAwayWinRate ?? null;
+
         let normalizedPredicted = 'X';
-        if (pHome >= pDraw && pHome >= pAway) normalizedPredicted = '1';
-        else if (pAway >= pDraw && pAway >= pHome) normalizedPredicted = '2';
+        if (_baseH != null && _baseD != null && _baseA != null && _baseH > 0 && _baseD > 0 && _baseA > 0) {
+          const liftH = (pHome / 100) / _baseH;
+          const liftD = (pDraw / 100) / _baseD;
+          const liftA = (pAway / 100) / _baseA;
+          if (liftD >= liftH && liftD >= liftA) normalizedPredicted = 'X';
+          else if (liftH >= liftA) normalizedPredicted = '1';
+          else normalizedPredicted = '2';
+        } else {
+          if (pHome >= pDraw && pHome >= pAway) normalizedPredicted = '1';
+          else if (pAway >= pDraw && pAway >= pHome) normalizedPredicted = '2';
+        }
         
         const pOU25 = parseFloat(simDist.over25) || report.goals?.over25 || 0;
         // Öneri C: Ligin/takımların gerçekleşen Over25 oranından türetilen dinamik eşik.

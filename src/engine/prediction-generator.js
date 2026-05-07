@@ -155,8 +155,18 @@ function generatePrediction(metricsResult, data, baseline, audit, rng) {
     },
     missingPlayers: data.missingPlayers?.players || [],
 
-    // Dynamic self-calibration metadata for UI_CFG transparency
-    metadata: metricsResult.meta || {},
+    // Dynamic self-calibration metadata for UI_CFG transparency.
+    // Baseline lig oranları lift-based outcome selection için yansıtılır.
+    metadata: {
+      ...(metricsResult.meta || {}),
+      baseline: {
+        leagueHomeWinRate: baseline?.leagueHomeWinRate ?? null,
+        leagueDrawRate: baseline?.leagueDrawRate ?? null,
+        leagueAwayWinRate: baseline?.leagueAwayWinRate ?? null,
+        leagueDrawTendency: baseline?.leagueDrawTendency ?? null,
+        leagueAvgGoals: baseline?.leagueAvgGoals ?? null,
+      },
+    },
 
     // Ana tahmin (Poisson + Simülasyon Dinamik Harmanlama)
     // Sabit ağırlıklar (0.6/0.4 vb.) kaldırıldı.

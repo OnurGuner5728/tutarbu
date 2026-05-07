@@ -1390,9 +1390,27 @@ function computeAllLeagueAverages(data) {
     // O yüzden r.draws toplamını kullanıp totalMatches(takım maçları toplamı)'na bölmek, gerçek maç başına beraberlik oranını verir.
     if (totalMatches > 0 && leagueGoalsPerGame != null && leagueGoalsPerGame > 0) {
       const drawRatio = totalDraws / totalMatches;
-      // Saf gözlenen beraberlik oranı — Bayesian prior olarak kullanılır.
-      // 0..1 arası: 0.28 = ligin %28'i beraberlik biter (Poisson tahmini bağımsız).
+      const totalWins = standingsRows.reduce((s, r) => s + (r.wins || 0), 0);
+      const totalLosses = standingsRows.reduce((s, r) => s + (r.losses || 0), 0);
+      // Tüm takımların toplam wins = tüm maçların kazananı (home+away). Ev sahibi avantajı
+      // için home/away spesifik standings kullanılır (hasHomeAwaySplit dalında).
+      // Saf gözlenen oranlar — Bayesian prior + lift-based outcome selection için.
       set('leagueDrawRate', drawRatio, `raw observed: ${totalDraws}/${totalMatches}`);
+      if (totalWins + totalLosses > 0) {
+        // Genel kazanma oranı (home/away ayrımı yok). Home/away spesifik aşağıda.
+        set('leagueWinRate', totalWins / totalMatches, `wins/matches`);
+      }
+      // Home win rate: hasHomeAwaySplit varsa standings.home.wins kullanılır
+      const homeWinsTotal = standingsRows.reduce((s, r) => s + (r.home?.wins ?? 0), 0);
+      const homeMatchesTotal = standingsRows.reduce((s, r) => s + (r.home?.matches ?? r.home?.played ?? 0), 0);
+      const awayWinsTotal = standingsRows.reduce((s, r) => s + (r.away?.wins ?? 0), 0);
+      const awayMatchesTotal = standingsRows.reduce((s, r) => s + (r.away?.matches ?? r.away?.played ?? 0), 0);
+      if (homeMatchesTotal > 0) {
+        set('leagueHomeWinRate', homeWinsTotal / homeMatchesTotal, `home wins/home matches`);
+      }
+      if (awayMatchesTotal > 0) {
+        set('leagueAwayWinRate', awayWinsTotal / awayMatchesTotal, `away wins/away matches`);
+      }
       // Referans beraberlik oranı: Poisson P(home=away) — lig gol ortalamasından türetilir.
       // totalLambda = 2 × leagueGoalsPerGame (her iki takımın toplam gol beklentisi).
       // P(draw) ≈ Σ P(k,k) for k=0..5. Bu ligin kendi verisinden gelen doğal beraberlik eşiği.
