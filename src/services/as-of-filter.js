@@ -184,7 +184,12 @@ function applyAsOfFilter(fullData, opts) {
     };
   };
 
-  // Home team standings'inde kendi satırını yeniden inşa et
+  // Home team standings'inde kendi satırını yeniden inşa et.
+  // Rebuild matches < MIN_REBUILD_N ise SATIRI KALDIR (advanced-derived fallback chain
+  // devreye girer — scoreProfile veya leagueFingerprint kullanır).
+  // Sebep: matches=0 ile rebuild edilen satır lambda formülünde NaN/extreme
+  // değerlere yol açıyor (λ=0.05 veya λ=6.38 anomalileri).
+  const MIN_REBUILD_N = 3; // En az 3 cutoff-öncesi maç olmadan rebuild güvenilir değil
   const _rebuildStandingsRow = (standingsObj, teamId, lastEvents) => {
     if (!standingsObj || !Array.isArray(standingsObj.standings) ||
         !standingsObj.standings[0]?.rows) return standingsObj;
@@ -193,6 +198,11 @@ function applyAsOfFilter(fullData, opts) {
     const newObj = JSON.parse(JSON.stringify(standingsObj));
     for (const tier of newObj.standings) {
       if (!Array.isArray(tier.rows)) continue;
+      // Yetersiz veri → satırı KALDIR (advanced-derived fallback'e düşer)
+      if (stats.matches < MIN_REBUILD_N) {
+        tier.rows = tier.rows.filter(row => row.team?.id !== teamId);
+        continue;
+      }
       for (const row of tier.rows) {
         if (row.team?.id === teamId) {
           row.matches = stats.matches;
