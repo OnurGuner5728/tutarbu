@@ -207,8 +207,13 @@ function calculateAllMetrics(data) {
     ...Object.keys(homeFlat_w), ...Object.keys(awayFlat_w), ...Object.keys(sharedFlat)
   ].filter(k => /^M[0-9]{3}[a-z]?$/i.test(k)));
 
-  // Dinamik lig ortalaması — standings verisinden hesaplanır
-  const leagueAvgGoals = computeLeagueAvgGoals(data.standingsTotal);
+  // Dinamik lig ortalaması — events pool'dan hesaplanır (leak-free).
+  // Standings sadece home/away takımın kendi satırını içerir; lig agregat'ı
+  // computeLeagueFingerprint'ten gelir (timestamp-filtered events havuzu).
+  const _earlyFingerprint = computeLeagueFingerprint(data);
+  const leagueAvgGoals = (_earlyFingerprint?.leagueAvgGoalsPerTeam != null && _earlyFingerprint.leagueAvgGoalsPerTeam > 0)
+    ? _earlyFingerprint.leagueAvgGoalsPerTeam
+    : computeLeagueAvgGoals(data.standingsTotal); // standings home+away'dan hesap (n=2 olabilir)
   const homeFormation = data.lineups?.home?.formation || null;
   const awayFormation = data.lineups?.away?.formation || null;
 
@@ -271,7 +276,8 @@ function calculateAllMetrics(data) {
 
   // ── Lig Parmak İzi (League Fingerprint) ──────────────────────────────────
   // Havuz: homeLastEvents ∪ awayLastEvents ∪ h2hEvents — dedup + tournament filtre + temporal decay
-  const leagueFingerprint = computeLeagueFingerprint(data);
+  // Yukarıda zaten hesaplandı (_earlyFingerprint), aynısını referansla.
+  const leagueFingerprint = _earlyFingerprint;
 
   const advanced = calculateAdvancedMetrics({
     homeAttack, awayAttack, homeDefense, awayDefense,
@@ -295,14 +301,23 @@ function calculateAllMetrics(data) {
     // Standings home/away-specific goal rates — en güvenilir home advantage kaynağı
     homeStGF, homeStGA, awayStGF, awayStGA,
     homeStMatches, awayStMatches,
-    // Dinamik lig fiziği: yoğunluk ve volatilite — veri yoksa null
+    // Lig istatistikleri — fingerprint'ten (events pool, leak-free) önce.
+    // Fingerprint yetersizse leagueAvgResult (standings) kullanılır.
     leaguePointDensity: leagueAvgResult.leaguePointSpread ?? null,
-    leagueGoalVolatility: leagueAvgResult.leagueGoalVolatility ?? null,
+    leagueGoalVolatility: (leagueFingerprint?.leagueGoalRateStd != null)
+      ? leagueFingerprint.leagueGoalRateStd
+      : (leagueAvgResult.leagueGoalVolatility ?? null),
     medianGoalRate: leagueAvgResult.medianGoalRate ?? null,
-    leagueTeamCount: leagueAvgResult.leagueTeamCount ?? null,
+    leagueTeamCount: (leagueFingerprint?.teamCount != null && leagueFingerprint.teamCount > 0)
+      ? leagueFingerprint.teamCount
+      : (leagueAvgResult.leagueTeamCount ?? null),
     ptsCV: leagueAvgResult.ptsCV ?? null,
-    normMinRatio: leagueAvgResult.normMinRatio ?? null,
-    normMaxRatio: leagueAvgResult.normMaxRatio ?? null,
+    normMinRatio: (leagueFingerprint?.normMinRatio != null)
+      ? leagueFingerprint.normMinRatio
+      : (leagueAvgResult.normMinRatio ?? null),
+    normMaxRatio: (leagueFingerprint?.normMaxRatio != null)
+      ? leagueFingerprint.normMaxRatio
+      : (leagueAvgResult.normMaxRatio ?? null),
     leagueCompetitiveness: leagueAvgResult.leagueCompetitiveness ?? null,
     leagueHomeBias: leagueAvgResult.leagueHomeBias ?? null,
     leagueDrawTendency: leagueAvgResult.leagueDrawTendency ?? null,
@@ -413,12 +428,20 @@ function calculateAllMetrics(data) {
       awayTeam: data.event?.event?.awayTeam?.name,
       timestamp: new Date().toISOString(),
       leaguePointDensity: leagueAvgResult.leaguePointSpread ?? null,
-      leagueGoalVolatility: leagueAvgResult.leagueGoalVolatility ?? null,
+      leagueGoalVolatility: (leagueFingerprint?.leagueGoalRateStd != null)
+        ? leagueFingerprint.leagueGoalRateStd
+        : (leagueAvgResult.leagueGoalVolatility ?? null),
       medianGoalRate: leagueAvgResult.medianGoalRate ?? null,
-      leagueTeamCount: leagueAvgResult.leagueTeamCount ?? null,
+      leagueTeamCount: (leagueFingerprint?.teamCount != null && leagueFingerprint.teamCount > 0)
+        ? leagueFingerprint.teamCount
+        : (leagueAvgResult.leagueTeamCount ?? null),
       ptsCV: leagueAvgResult.ptsCV ?? null,
-      normMinRatio: leagueAvgResult.normMinRatio ?? null,
-      normMaxRatio: leagueAvgResult.normMaxRatio ?? null,
+      normMinRatio: (leagueFingerprint?.normMinRatio != null)
+        ? leagueFingerprint.normMinRatio
+        : (leagueAvgResult.normMinRatio ?? null),
+      normMaxRatio: (leagueFingerprint?.normMaxRatio != null)
+        ? leagueFingerprint.normMaxRatio
+        : (leagueAvgResult.normMaxRatio ?? null),
       leagueCompetitiveness: leagueAvgResult.leagueCompetitiveness ?? null,
       leagueHomeBias: leagueAvgResult.leagueHomeBias ?? null,
       leagueDrawTendency: leagueAvgResult.leagueDrawTendency ?? null,

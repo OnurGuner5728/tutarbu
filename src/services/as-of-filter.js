@@ -220,14 +220,42 @@ function applyAsOfFilter(fullData, opts) {
     return newObj;
   };
 
+  // STANDINGS LEAK FİX (büyük): Diğer 18 takım sadece "post-match snapshot"
+  // şeklinde geliyor. Bu nedenle leagueGoalsPerGame, leagueGoalVolatility,
+  // normMaxRatio, normMinRatio sızıntılı hesaplanıyordu. Çözüm:
+  //   - Sadece HOME ve AWAY takım satırları rebuild edilir + tutulur
+  //   - Diğer 18 takım satırı KALDIRILIR
+  //   - league-averages.js hasStandings (>= 4 takım) tetiklenmez
+  //   - Lig istatistikleri leagueFingerprint'ten (timestamp-filtered) gelir
   if (fullData.standingsTotal && fullData.homeTeamId != null) {
+    // Sadece home ve away takımlarını rebuild et
     fullData.standingsTotal = _rebuildStandingsRow(
       fullData.standingsTotal, fullData.homeTeamId, fullData.homeLastEvents?.events
     );
     fullData.standingsTotal = _rebuildStandingsRow(
       fullData.standingsTotal, fullData.awayTeamId, fullData.awayLastEvents?.events
     );
-    meta.filtered.push({ field: 'standingsTotal', kept: 'rebuilt', total: 'rebuilt' });
+    // Şimdi diğer 18 takımı tamamen kaldır (lig agregat'ını leak'siz tutmak için).
+    if (Array.isArray(fullData.standingsTotal.standings)) {
+      let homeKept = 0, awayKept = 0, removed = 0;
+      for (const tier of fullData.standingsTotal.standings) {
+        if (!Array.isArray(tier.rows)) continue;
+        const before = tier.rows.length;
+        tier.rows = tier.rows.filter(row => {
+          const tid = row.team?.id;
+          if (tid === fullData.homeTeamId) { homeKept++; return true; }
+          if (tid === fullData.awayTeamId) { awayKept++; return true; }
+          return false;
+        });
+        removed += before - tier.rows.length;
+      }
+      meta.filtered.push({
+        field: 'standingsTotal',
+        kept: homeKept + awayKept,
+        total: homeKept + awayKept + removed,
+        note: 'rebuilt+pruned (only home+away rows kept)'
+      });
+    }
   }
 
   // Team season stats — son n maçtan agregat. Kümülatif sayılar burada
@@ -254,17 +282,29 @@ function applyAsOfFilter(fullData, opts) {
     return _rebuildStandingsRow(standingsObj, teamId, filtered);
   };
 
+  // standingsHome/Away — sadece ilgili takım satırı tutulur (lig leak'i önlenir)
+  const _pruneToTeam = (standingsObj, teamId) => {
+    if (!standingsObj || !Array.isArray(standingsObj.standings)) return standingsObj;
+    for (const tier of standingsObj.standings) {
+      if (!Array.isArray(tier.rows)) continue;
+      tier.rows = tier.rows.filter(row => row.team?.id === teamId);
+    }
+    return standingsObj;
+  };
+
   if (fullData.standingsHome) {
     fullData.standingsHome = _rebuildLocationSpecific(
       fullData.standingsHome, fullData.homeTeamId, fullData.homeLastEvents?.events, 'home'
     );
-    meta.filtered.push({ field: 'standingsHome', kept: 'rebuilt', total: 'rebuilt' });
+    fullData.standingsHome = _pruneToTeam(fullData.standingsHome, fullData.homeTeamId);
+    meta.filtered.push({ field: 'standingsHome', kept: 'home_only', total: 'pruned' });
   }
   if (fullData.standingsAway) {
     fullData.standingsAway = _rebuildLocationSpecific(
       fullData.standingsAway, fullData.awayTeamId, fullData.awayLastEvents?.events, 'away'
     );
-    meta.filtered.push({ field: 'standingsAway', kept: 'rebuilt', total: 'rebuilt' });
+    fullData.standingsAway = _pruneToTeam(fullData.standingsAway, fullData.awayTeamId);
+    meta.filtered.push({ field: 'standingsAway', kept: 'away_only', total: 'pruned' });
   }
 
   fullData._asOfMeta = meta;

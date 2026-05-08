@@ -39,10 +39,11 @@ function extractFinishedMatches(events, tournamentId) {
       ts,
       home: e.homeScore.current,
       away: e.awayScore.current,
-      // period1: HT skoru. Bazı maçlarda yok (fallback null).
       htHome: e?.homeScore?.period1 ?? null,
       htAway: e?.awayScore?.period1 ?? null,
       tournamentId: e?.tournament?.uniqueTournament?.id,
+      homeTeamId: e?.homeTeam?.id ?? null,
+      awayTeamId: e?.awayTeam?.id ?? null,
     });
   }
   return out;
@@ -121,6 +122,19 @@ function computeLeagueFingerprint(data, nowMs = Date.now()) {
   let ftGoals_htAvail_w = 0;
   let htAvailW = 0;
 
+  // Takım bazlı agregat — pool'daki tüm takımların gol/maç oranlarını biriktir.
+  // Her maçtan hem home hem away takımının golleri sample olarak kullanılır.
+  // teamId → { goals_w, matches_w, goalsAgainst_w }
+  const teamAgg = new Map();
+  const _addTeam = (tid, scored, conceded, w) => {
+    if (tid == null) return;
+    let t = teamAgg.get(tid);
+    if (!t) { t = { goals_w: 0, matches_w: 0, conceded_w: 0 }; teamAgg.set(tid, t); }
+    t.goals_w += scored * w;
+    t.conceded_w += conceded * w;
+    t.matches_w += w;
+  };
+
   for (const m of pool) {
     const w = m.w;
     totalW += w;
@@ -155,6 +169,9 @@ function computeLeagueFingerprint(data, nowMs = Date.now()) {
       ftGoals_htAvail_w += (m.home + m.away) * w;
       htAvailW += w;
     }
+    // Takım bazlı agregat
+    _addTeam(m.homeTeamId, m.home, m.away, w);
+    _addTeam(m.awayTeamId, m.away, m.home, w);
   }
 
   // Pool toplam maç sayısı: 2× (hem home hem away taraftan sayıldı); marjinal dağılımları buna göre normalize
@@ -178,6 +195,22 @@ function computeLeagueFingerprint(data, nowMs = Date.now()) {
     ? leagueVarGoalsPerTeam / leagueAvgGoalsPerTeam
     : null;
 
+  // Takım gol/maç oranları — pool'daki her takım için ağırlıklı ortalama.
+  // En az 2 maçı olan takımlar dahil edilir (1 maç noisy).
+  const teamRates = [];
+  for (const t of teamAgg.values()) {
+    if (t.matches_w >= 2) teamRates.push(t.goals_w / t.matches_w);
+  }
+  let normMinRatio = null, normMaxRatio = null, leagueGoalRateStd = null;
+  if (teamRates.length >= 4 && leagueAvgGoalsPerTeam > 0) {
+    teamRates.sort((a, b) => a - b);
+    normMinRatio = teamRates[0] / leagueAvgGoalsPerTeam;
+    normMaxRatio = teamRates[teamRates.length - 1] / leagueAvgGoalsPerTeam;
+    const meanRate = teamRates.reduce((a, b) => a + b, 0) / teamRates.length;
+    const varRate = teamRates.reduce((s, r) => s + (r - meanRate) ** 2, 0) / teamRates.length;
+    leagueGoalRateStd = Math.sqrt(varRate);
+  }
+
   const result = {
     tournamentId,
     poolSize: pool.length,
@@ -200,6 +233,11 @@ function computeLeagueFingerprint(data, nowMs = Date.now()) {
     leagueAvgGoalsPerTeam,
     leagueVarGoalsPerTeam,
     leagueOverdispersion,
+    // Lig içi takım gol oranı dağılımı (pool'dan dinamik)
+    normMinRatio,
+    normMaxRatio,
+    leagueGoalRateStd,
+    teamCount: teamRates.length,
     // Faz 1.1: HT gol payı (period1 mevcut maçlardan ağırlıklı)
     // λ_HT = λ_FT × htGoalShare. Veri yoksa null → caller matematiksel
     // simetri (1/2) maxent fallback kullansın.
