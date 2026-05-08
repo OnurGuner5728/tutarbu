@@ -147,13 +147,115 @@ function applyAsOfFilter(fullData, opts) {
     });
   }
 
-  // Standings / team season stats — kümülatif. API as-of vermiyor.
-  // Filtre yok ama leakage işareti.
-  if (fullData.standingsTotal) meta.leakedFields.push('standingsTotal');
-  if (fullData.standingsHome)  meta.leakedFields.push('standingsHome');
-  if (fullData.standingsAway)  meta.leakedFields.push('standingsAway');
-  if (fullData.homeTeamSeasonStats) meta.leakedFields.push('homeTeamSeasonStats');
-  if (fullData.awayTeamSeasonStats) meta.leakedFields.push('awayTeamSeasonStats');
+  // Standings / team season stats — KÜMÜLATIF VERİ LEAK FİX'İ
+  // API as-of vermiyor. Bu alanlar "bugünün" snapshot'ını içeriyor → maçın kendi
+  // sonucu da dahil. Çözüm: filtered last_events'ten yeniden hesapla.
+  //
+  // standingsRows.scoresFor/Against/matches/wins/draws/losses → her takım için
+  // sadece cutoff'tan ÖNCEKİ maçlardan toplanır. Bu spurious accuracy yaratan
+  // ana leak'ın kaynağı (50-maç testte Freiburg 3-1, Bayern 1-1 tam atışlar).
+  const _rebuildTeamStats = (teamId, lastEvents) => {
+    if (!Array.isArray(lastEvents)) return null;
+    const valid = lastEvents.filter(e =>
+      e.status?.type === 'finished' &&
+      e.homeScore?.current != null &&
+      e.awayScore?.current != null &&
+      (e.startTimestamp ?? 0) < cutoff &&
+      e.id !== matchEventId
+    );
+    let matches = 0, wins = 0, draws = 0, losses = 0;
+    let scoresFor = 0, scoresAgainst = 0;
+    for (const e of valid) {
+      const isHome = e.homeTeam?.id === teamId;
+      const isAway = e.awayTeam?.id === teamId;
+      if (!isHome && !isAway) continue;
+      const ourGoals = isHome ? e.homeScore.current : e.awayScore.current;
+      const theirGoals = isHome ? e.awayScore.current : e.homeScore.current;
+      matches++;
+      scoresFor += ourGoals;
+      scoresAgainst += theirGoals;
+      if (ourGoals > theirGoals) wins++;
+      else if (ourGoals < theirGoals) losses++;
+      else draws++;
+    }
+    return {
+      matches, wins, draws, losses, scoresFor, scoresAgainst,
+      points: wins * 3 + draws,
+    };
+  };
+
+  // Home team standings'inde kendi satırını yeniden inşa et
+  const _rebuildStandingsRow = (standingsObj, teamId, lastEvents) => {
+    if (!standingsObj || !Array.isArray(standingsObj.standings) ||
+        !standingsObj.standings[0]?.rows) return standingsObj;
+    const stats = _rebuildTeamStats(teamId, lastEvents);
+    if (stats == null) return standingsObj;
+    const newObj = JSON.parse(JSON.stringify(standingsObj));
+    for (const tier of newObj.standings) {
+      if (!Array.isArray(tier.rows)) continue;
+      for (const row of tier.rows) {
+        if (row.team?.id === teamId) {
+          row.matches = stats.matches;
+          row.wins = stats.wins;
+          row.draws = stats.draws;
+          row.losses = stats.losses;
+          row.scoresFor = stats.scoresFor;
+          row.scoresAgainst = stats.scoresAgainst;
+          row.points = stats.points;
+          row._rebuiltAsOf = true;
+        }
+      }
+    }
+    newObj._asOfRebuilt = true;
+    return newObj;
+  };
+
+  if (fullData.standingsTotal && fullData.homeTeamId != null) {
+    fullData.standingsTotal = _rebuildStandingsRow(
+      fullData.standingsTotal, fullData.homeTeamId, fullData.homeLastEvents?.events
+    );
+    fullData.standingsTotal = _rebuildStandingsRow(
+      fullData.standingsTotal, fullData.awayTeamId, fullData.awayLastEvents?.events
+    );
+    meta.filtered.push({ field: 'standingsTotal', kept: 'rebuilt', total: 'rebuilt' });
+  }
+
+  // Team season stats — son n maçtan agregat. Kümülatif sayılar burada
+  // hesaplanır ama API'nin verdiği değer "bugüne kadar tüm sezon" olduğu için
+  // güvenilmez. Şimdilik stats'i null'a çek; advanced-derived scoreProfile'dan türetir.
+  if (fullData.homeTeamSeasonStats) {
+    fullData.homeTeamSeasonStats = null;
+    meta.filtered.push({ field: 'homeTeamSeasonStats', kept: 0, total: 1 });
+  }
+  if (fullData.awayTeamSeasonStats) {
+    fullData.awayTeamSeasonStats = null;
+    meta.filtered.push({ field: 'awayTeamSeasonStats', kept: 0, total: 1 });
+  }
+
+  // Home/Away spesifik standings — total ile aynı mantıkla rebuild edilmeli ama
+  // "home maçları sadece" filtresi ekleyerek
+  const _rebuildLocationSpecific = (standingsObj, teamId, lastEvents, location) => {
+    if (!standingsObj || !Array.isArray(lastEvents)) return standingsObj;
+    const filtered = lastEvents.filter(e => {
+      if (location === 'home') return e.homeTeam?.id === teamId;
+      if (location === 'away') return e.awayTeam?.id === teamId;
+      return true;
+    });
+    return _rebuildStandingsRow(standingsObj, teamId, filtered);
+  };
+
+  if (fullData.standingsHome) {
+    fullData.standingsHome = _rebuildLocationSpecific(
+      fullData.standingsHome, fullData.homeTeamId, fullData.homeLastEvents?.events, 'home'
+    );
+    meta.filtered.push({ field: 'standingsHome', kept: 'rebuilt', total: 'rebuilt' });
+  }
+  if (fullData.standingsAway) {
+    fullData.standingsAway = _rebuildLocationSpecific(
+      fullData.standingsAway, fullData.awayTeamId, fullData.awayLastEvents?.events, 'away'
+    );
+    meta.filtered.push({ field: 'standingsAway', kept: 'rebuilt', total: 'rebuilt' });
+  }
 
   fullData._asOfMeta = meta;
   return fullData;
