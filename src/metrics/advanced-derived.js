@@ -849,12 +849,26 @@ function calculateAdvancedMetrics(allMetrics) {
       const _trigger = (calibrationRatio > 1 + _tol) || (calibrationRatio < 1 - _tol);
 
       if (_trigger) {
-        // Soft calibration: scalingFactor = ratio^reliability.
-        // Reliability=1 (takımın çok maçı var) → tama yakın düzeltme.
-        // Reliability=0.5 → yarım yola düzeltme. Bu, asimetrik takımları
-        // (lider/dip) lig ortalamasına çekmemek için kritik.
-        const exponent = Math.max(0, Math.min(1, referenceReliability));
-        let scalingFactor = Math.pow(calibrationRatio, exponent);
+        // ASİMETRİK SCALING — 50-maç audit bulgusuna göre revize.
+        //
+        // Sorun: Tournament-filtered scoreProfile UCL takımları için sadece UCL
+        // maçlarını kullanıyor → reference total < dcBase λ_sum → modifier λ'ları
+        // sistematik AŞAĞI çekiyor (-%12.5 deflate, OU2.5 isabeti %36 düşürdü).
+        //
+        // Çözüm:
+        //   - Yukarı çekme (ratio > 1, reference > λ_sum): exponent=reliability (TAM güç)
+        //     Lambda altta kaldı, takım profili "aslında daha çok atıyor" diyor → güven.
+        //   - Aşağı çekme (ratio < 1, reference < λ_sum): exponent=reliability/2 (YARIM güç)
+        //     Lambda yukarda. Tournament-filter düşük örneklem gürültüsü olabilir.
+        //     Yarım güç → ortalama deflate -%12.5 → -%6 (kontrollü).
+        //
+        // Yön mantığı:
+        //   ratio > 1: takım profili lambda'dan büyük → boost
+        //   ratio < 1: takım profili lambda'dan küçük → shrink (ama yumuşak)
+        const _baseExponent = Math.max(0, Math.min(1, referenceReliability));
+        const _exponent = calibrationRatio >= 1 ? _baseExponent : _baseExponent * 0.5;
+        let scalingFactor = Math.pow(calibrationRatio, _exponent);
+        const exponent = _exponent; // legacy trace için
 
         // Güvenlik tavanları: normMaxRatio + normMinRatio'dan dinamik (sabit 1.50/0.70 kaldırıldı).
         // Üst: ligin en güçlü takımının lig ortalamasına oranı (zaten ölçülmüş veri).
