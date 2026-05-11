@@ -218,7 +218,20 @@ function generatePrediction(metricsResult, data, baseline, audit, rng) {
       } else {
         pW = basePoissonW; // Conf yoksa taban ağırlık
       }
-      const sW = 1.0 - pW;
+      // Sim peakedness guard — Shannon entropy ile sim güvensizliğini ölç.
+      // Sim dağılımı çok eğri ise (örn. %99.9 home) → sim güvensizdir → ağırlığını kıs.
+      // simBalance = H(sim) / log(3) ∈ [0,1]; 1 = uniform, 0 = tek noktaya yığılmış.
+      // Sıfır statik: entropy formülü matematiksel.
+      const _eps = 1e-9;
+      const _simH = -(pH_mc * Math.log(pH_mc + _eps)
+                    + pD_mc * Math.log(pD_mc + _eps)
+                    + pA_mc * Math.log(pA_mc + _eps));
+      const _maxH = Math.log(3);
+      const _simBalance = _maxH > 0 ? Math.max(0, Math.min(1, _simH / _maxH)) : 0;
+      // sim ağırlığı = (1 - pW) × simBalance, kalan Poisson'a iade
+      const _rawSW = 1.0 - pW;
+      const sW = _rawSW * _simBalance;
+      pW = pW + _rawSW * (1 - _simBalance);
 
       // cvVal burada tanımlanıyor: market blend (gamma) ve temperature scaling ikisi de kullanır
       const cvVal = (vol != null && avg != null && avg > 0) ? (vol / avg) : 0;

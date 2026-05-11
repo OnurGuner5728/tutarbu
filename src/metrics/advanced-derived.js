@@ -320,9 +320,46 @@ function calculateAdvancedMetrics(allMetrics) {
       sources.push({ val: profileConceded, w: profW, src: 'profile' });
     }
     if (sources.length === 0) return { rate: null, agreement: 0, n_sources: 0, sources: [] };
-    const totalW = sources.reduce((s, x) => s + x.w, 0);
+    // ── Korelasyon Shrinkage — Çift Sayım Önleme ─────────────────────────
+    // Sorun: M001 (genel ortalama) ve M002 (ev/dep aware) AYNI temel istatistiği
+    // farklı pencereden gösteriyor — bağımsız değiller. xG ile M001 da yüksek
+    // korelasyona sahip (her ikisi de gol ortalaması).
+    //
+    // Çözüm: Kaynak çiftleri arasındaki Pearson benzeri korelasyonu
+    // değerlerin yakınlığından türet:
+    //   ρ_ij = 1 - |v_i - v_j| / (v_i + v_j)   (oranlı yakınlık)
+    // Yüksek korelasyon → efektif ağırlık düşür:
+    //   w_eff_i = w_i × (1 - mean(ρ_ij, j≠i)) + (eşit dağılım için kalan)
+    // İki kaynak özdeş ise efektif ağırlığı yarıya iner.
+    const _correlationShrink = (srcs) => {
+      if (srcs.length <= 1) return srcs;
+      const corrFactors = srcs.map((s, i) => {
+        let avgCorr = 0;
+        let count = 0;
+        for (let j = 0; j < srcs.length; j++) {
+          if (i === j) continue;
+          const denom = Math.abs(s.val) + Math.abs(srcs[j].val);
+          const corr = denom > 0
+            ? 1 - Math.abs(s.val - srcs[j].val) / denom
+            : 0; // her ikisi 0 → tanımsız, sıfır say
+          avgCorr += Math.max(0, Math.min(1, corr));
+          count++;
+        }
+        return count > 0 ? avgCorr / count : 0;
+      });
+      // Efektif ağırlık: tam korelasyonda (ρ=1) ağırlık 1/n_correlated'a düşer.
+      return srcs.map((s, i) => ({
+        ...s,
+        w: s.w * (1 - corrFactors[i] * (srcs.length - 1) / srcs.length),
+      }));
+    };
+    const shrunken = _correlationShrink(sources);
+    const totalW = shrunken.reduce((s, x) => s + x.w, 0);
     if (totalW <= 0) return { rate: null, agreement: 0, n_sources: 0, sources: [] };
-    const rate = sources.reduce((s, x) => s + x.val * x.w, 0) / totalW;
+    const rate = shrunken.reduce((s, x) => s + x.val * x.w, 0) / totalW;
+    // sources artık shrunken — agreement ve nEff aşağıda aynı set üzerinden
+    sources.length = 0;
+    sources.push(...shrunken);
     // Source agreement: kaynaklar arası tutarlılık × etkin kaynak sayısı.
     //   consistency = weighted_geomean / weighted_arith_mean ∈ (0, 1]
     //     (Jensen eşitsizliği — her zaman ≤ 1, kaynaklar aynıysa = 1)
@@ -918,10 +955,18 @@ function calculateAdvancedMetrics(allMetrics) {
       const calibrationRatio = referenceTotalGoals / lambdaSum;
 
       // Simetrik tetikleme: hem Poisson eksik (ratio > eşik) hem fazla (ratio < 1/eşik) için.
-      // Eşik: lig CV'sinden türer. Düşük CV (öngörülebilir lig) → küçük tolerans → hızlı düzelt.
-      // Yüksek CV (volatil) → geniş tolerans → fazla müdahale etme.
-      // _cv yoksa simetrik sabit eşik %5 (matematiksel yakınlık).
-      const _tol = (_cv != null && _cv > 0) ? Math.min(0.20, _cv * 0.5) : 0.05;
+      // Eşik: lig CV / sqrt(N_eff) — örneklem büyüklüğüne duyarlı.
+      //   Mantık: standart hatadan türer (binom std ∝ √(p(1-p)/n)).
+      //   Düşük örneklem → geniş tolerance (gürültü olabilir, sakin dur)
+      //   Yüksek örneklem → dar tolerance (sinyal güvenilir, küçük sapmaya bile müdahale)
+      // _cv yoksa minN'den türeyen 1/√N fallback. Sıfır sabit eşik (eski Math.min(0.20, ...) kaldırıldı).
+      const _nEffForTol = Math.max(1, Math.min(
+        homeScoreProfile?.n ?? 1,
+        awayScoreProfile?.n ?? 1
+      ));
+      const _tol = (_cv != null && _cv > 0)
+        ? _cv / Math.sqrt(_nEffForTol)
+        : 1 / Math.sqrt(_nEffForTol);
       const _trigger = (calibrationRatio > 1 + _tol) || (calibrationRatio < 1 - _tol);
 
       if (_trigger) {
@@ -1263,9 +1308,43 @@ function calculateAdvancedMetrics(allMetrics) {
 
       totalProb = _homeWin + _draw + _awayWin;
       if (totalProb > 0) {
-        homeWinProb = (_homeWin / totalProb) * 100;
-        drawProb = (_draw / totalProb) * 100;
-        awayWinProb = (_awayWin / totalProb) * 100;
+        let _hwN = _homeWin / totalProb;
+        let _dwN = _draw / totalProb;
+        let _awN = _awayWin / totalProb;
+        // ── Lig 1X2 prior blend — beraberlik sinyali eksikliği için ─────────
+        // Sorun: düşük λ'da Poisson P(draw)≈%9 ama lig gerçek draw oranı ~%28.
+        // ρ tek başına yetmiyor çünkü etkisi sadece P(0,0)/P(1,1)/P(1,0)/P(0,1).
+        // Çözüm: fingerprint'ten gözlemlenen lig 1X2 oranlarını prior olarak blend.
+        // Ağırlık: model olasılıklarının Shannon entropy'sinden — düz dağılım
+        // → modelin az bilgisi var → prior'a güven; tepe dağılım → modele güven.
+        // Sıfır statik: ağırlık tamamen entropy formülünden + reliability'den.
+        const _lgHWR = leagueFingerprint?.leagueHomeWinRate;
+        const _lgDWR = leagueFingerprint?.leagueDrawRate;
+        const _lgAWR = leagueFingerprint?.leagueAwayWinRate;
+        const _lfRelPrior = leagueFingerprint?.reliability ?? 0;
+        if (_lgHWR != null && _lgDWR != null && _lgAWR != null && _lfRelPrior > 0) {
+          const _eps = 1e-9;
+          const _modelH = -(_hwN * Math.log(_hwN + _eps)
+                          + _dwN * Math.log(_dwN + _eps)
+                          + _awN * Math.log(_awN + _eps));
+          const _maxH3 = Math.log(3);
+          // Model balance: 1 = uniform (no info), 0 = max-info
+          const _modelBalance = _maxH3 > 0 ? _modelH / _maxH3 : 0;
+          // Prior ağırlığı = modelBalance × _lfRelPrior
+          // Model bilgisizse VE lig fingerprint güvenilirse → prior dominant
+          const _priorW = _modelBalance * _lfRelPrior;
+          _hwN = _hwN * (1 - _priorW) + _lgHWR * _priorW;
+          _dwN = _dwN * (1 - _priorW) + _lgDWR * _priorW;
+          _awN = _awN * (1 - _priorW) + _lgAWR * _priorW;
+          // Renormalize (lig prior toplamı 1.0 olmayabilir)
+          const _sumN = _hwN + _dwN + _awN;
+          if (_sumN > 0) {
+            _hwN /= _sumN; _dwN /= _sumN; _awN /= _sumN;
+          }
+        }
+        homeWinProb = _hwN * 100;
+        drawProb    = _dwN * 100;
+        awayWinProb = _awN * 100;
       }
 
       over15 = _over15;
