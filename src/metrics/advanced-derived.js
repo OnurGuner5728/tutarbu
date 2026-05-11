@@ -995,8 +995,13 @@ function calculateAdvancedMetrics(allMetrics) {
   const leagueM018 = dynamicAvgs?.M018 ?? null;
 
   const calcM156 = (m011, m018) => {
-    const c1 = (m011 != null && leagueM011 != null && leagueM011 > 0) ? m011 / leagueM011 : null;
-    const c2 = (m018 != null && leagueM018 != null && leagueM018 > 0) ? m018 / leagueM018 : null;
+    // KÖKSEL FIX: homeFlat aslında homeFlat_w (MetricValue wrapper'lı).
+    // calcM156 ham sayı bekliyor, ama wrapper geçince division NaN üretirdi.
+    // unwrap ile wrapper'ı çöz (yukarıda zaten import edilmiş).
+    const _m011 = unwrap(m011);
+    const _m018 = unwrap(m018);
+    const c1 = (_m011 != null && leagueM011 != null && leagueM011 > 0) ? _m011 / leagueM011 : null;
+    const c2 = (_m018 != null && leagueM018 != null && leagueM018 > 0) ? _m018 / leagueM018 : null;
     const vals = [c1, c2].filter(v => v != null);
     if (vals.length === 0) return null;
     // Eşit ağırlıklı ortalama → [0.5, 2.0] aralığına clamp → ×50 UI skalası
