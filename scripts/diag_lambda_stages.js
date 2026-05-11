@@ -52,8 +52,15 @@ const MATCH_ID = parseInt(process.argv[2] || '14024024', 10); // Liverpool vs Ch
     if (!t) { console.log(`  ${s.padEnd(20)} : MISSING from trace`); return; }
     const hRatio = (t.hAfter && t.hBefore) ? t.hAfter / t.hBefore : null;
     const aRatio = (t.aAfter && t.aBefore) ? t.aAfter / t.aBefore : null;
-    const isDead = (hRatio === 1 || hRatio == null) && (aRatio === 1 || aRatio == null);
-    const status = isDead ? 'DEAD (no effect)' : `home×${hRatio?.toFixed(3)} away×${aRatio?.toFixed(3)}`;
+    const isUnit = (hRatio === 1 || hRatio == null) && (aRatio === 1 || aRatio == null);
+    let status;
+    if (isUnit) {
+      // Skipped meta (within_tolerance / no_reference) → BENİGN, etki yok ama veri doğru
+      if (t.meta?.skipped) status = `SKIPPED (${t.meta.reason || 'condition_not_met'})`;
+      else status = 'DEAD (no effect — input eksik)';
+    } else {
+      status = `home×${hRatio?.toFixed(3)} away×${aRatio?.toFixed(3)}`;
+    }
     console.log(`  ${s.padEnd(20)} : ${status}`);
   });
 

@@ -689,19 +689,43 @@ function calculateAdvancedMetrics(allMetrics) {
   // Lambda'ya sqrt damping ile uygulanır:
   //   Örnek: 11'in ortalaması 85 → 65'e düştüyse ratio=0.765 → sqrt=0.875 → lambda %12.5 düşer
   //   Bu, tüm Poisson çıktılarını (1X2, O/U, BTTS, skor) direkt etkiler.
-  const _hLQR = allMetrics.homeLineupQualityRatio ?? 1.0;
-  const _aLQR = allMetrics.awayLineupQualityRatio ?? 1.0;
+  // LQR — Workshop kadro değişikliği oranı (ana kaynak: baseline.homeLineupQualityRatio).
+  // Pre-match'te değişiklik yok → 1.0. Bu durumda DİNAMİK FALLBACK devreye girer:
+  //   PVKD breakdown'dan iki takımın total MV'lerinin geometrik nötr noktaya oranı.
+  //   homeLQR = sqrt(homeMV / geoMean(homeMV, awayMV))
+  //   awayLQR = sqrt(awayMV / geoMean(homeMV, awayMV))
+  // Geo-mean nötr çünkü iki takımın kalitesinin geometrik ortası "fair maç" referansı.
+  // sqrt damping zaten kod altında uygulanıyor → çift sqrt yok, MV ratio direkt.
+  // Çift sayım riski: dcBase α/β gerçek gol oranlarına dayalı (sezon istatistiği);
+  // LQR piyasa değerine dayalı (transfer market) → bağımsız kaynak.
+  const _hMV = (homeMVBreakdown && homeMVBreakdown.total > 0) ? homeMVBreakdown.total : null;
+  const _aMV = (awayMVBreakdown && awayMVBreakdown.total > 0) ? awayMVBreakdown.total : null;
+  const _mvGeo = (_hMV != null && _aMV != null) ? Math.sqrt(_hMV * _aMV) : null;
+  const _hLQRfromMV = (_hMV != null && _mvGeo != null && _mvGeo > 0) ? _hMV / _mvGeo : null;
+  const _aLQRfromMV = (_aMV != null && _mvGeo != null && _mvGeo > 0) ? _aMV / _mvGeo : null;
+  // Bayesian shrinkage: lig CV ile ölçekle. Sönük lig (low CV) → MV ratio etkisi düşük.
+  // CV yoksa nötr 1.0. cvLocal yukarıda hesaplandı (_cvLocal).
+  const _lqrSens = (_cvLocal != null && _cvLocal > 0) ? Math.min(1.0, _cvLocal) : 0;
+  const _shrinkLQR = (r) => (r != null) ? 1.0 + (r - 1.0) * _lqrSens : 1.0;
+
+  const _hLQR_raw = allMetrics.homeLineupQualityRatio ?? 1.0;
+  const _aLQR_raw = allMetrics.awayLineupQualityRatio ?? 1.0;
+  // Workshop'tan gelen LQR varsa öncelik onun. Yoksa MV-based fallback.
+  const _hLQR = (_hLQR_raw !== 1.0) ? _hLQR_raw : _shrinkLQR(_hLQRfromMV);
+  const _aLQR = (_aLQR_raw !== 1.0) ? _aLQR_raw : _shrinkLQR(_aLQRfromMV);
   const _hBeforeLQR = lambda_home;
   const _aBeforeLQR = lambda_away;
-  if (_hLQR !== 1.0 && lambda_home != null) {
+  if (_hLQR !== 1.0 && lambda_home != null && isFinite(_hLQR)) {
     lambda_home = clamp(lambda_home * Math.sqrt(_hLQR), _lambdaHomeMin, _lambdaHomeMax);
   }
-  if (_aLQR !== 1.0 && lambda_away != null) {
+  if (_aLQR !== 1.0 && lambda_away != null && isFinite(_aLQR)) {
     lambda_away = clamp(lambda_away * Math.sqrt(_aLQR), _lambdaAwayMin, _lambdaAwayMax);
   }
   // Trace daima push (observability): mod=1.0 olsa bile stage'in görülmesi gerekir.
   _pushTrace('lqr', _hBeforeLQR, lambda_home, _aBeforeLQR, lambda_away, {
     hLQR: _hLQR, aLQR: _aLQR,
+    hLQRfromMV: _hLQRfromMV, aLQRfromMV: _aLQRfromMV,
+    hMV: _hMV, aMV: _aMV, lqrSens: _lqrSens,
   });
 
   // ── Değişiklik 4: xGOverPerformance → lambda modifiyesi ──────────────────
@@ -716,10 +740,27 @@ function calculateAdvancedMetrics(allMetrics) {
 
   const _homeActualGoals = homeAttack?.M001 ?? homeScoreProfile?.avgScored ?? null;
   const _awayActualGoals = awayAttack?.M001 ?? awayScoreProfile?.avgScored ?? null;
+
+  // xG fallback — cache'te expectedGoals yoksa scoreProfile'dan dinamik proxy üret.
+  // Mantık: "expected" = takımın gol attığı maçlarda göreceli verimlilik.
+  //   xgProxy = avgScored / scoringRate  (gol başına maç oranı — clinical capacity)
+  //   lgProxy = leagueAvgGoals / leagueScoringRate  (lig referansı, pool-driven)
+  //   overPerf = (xgProxy / lgProxy) — 1.0 = nötr, >1.0 = clinical, <1.0 = tutuk
+  // Bu xG ile aynı bilgiyi taşımaz ama bağımsız bir verimlilik sinyalidir.
+  // dcBase α ile farklı (α gol/maç oranı; bu gol/scoring-event yoğunluğu).
+  const _lgSR = leagueFingerprint?.leagueScoringRate ?? null;
+  const _lgGProxy = (leagueAvgGoals != null && _lgSR != null && _lgSR > 0)
+    ? leagueAvgGoals / _lgSR : null;
+  const _xgProxy = (avg, sr) => (avg != null && sr != null && sr > 0) ? avg / sr : null;
+  const _hXgProxy = _xgProxy(homeScoreProfile?.avgScored, homeScoreProfile?.scoringRate);
+  const _aXgProxy = _xgProxy(awayScoreProfile?.avgScored, awayScoreProfile?.scoringRate);
+
   const _homeXGOverPerf = (homeXGScored != null && homeXGScored > 0 && _homeActualGoals != null)
-    ? _homeActualGoals / homeXGScored : null;
+    ? _homeActualGoals / homeXGScored
+    : ((_hXgProxy != null && _lgGProxy != null && _lgGProxy > 0) ? _hXgProxy / _lgGProxy : null);
   const _awayXGOverPerf = (awayXGScored != null && awayXGScored > 0 && _awayActualGoals != null)
-    ? _awayActualGoals / awayXGScored : null;
+    ? _awayActualGoals / awayXGScored
+    : ((_aXgProxy != null && _lgGProxy != null && _lgGProxy > 0) ? _aXgProxy / _lgGProxy : null);
 
   // Faz 4.1: xgOverPerf modifier — reliability-shrinkage ile uygulanır.
   // matchCount düşükse mod^reliability ile tam etki azaltılır (Bayesian shrinkage).
