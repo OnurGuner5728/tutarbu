@@ -1151,31 +1151,43 @@ function calculateAdvancedMetrics(allMetrics) {
       return null;
     })();
 
-    // negBinomWeight: overdispersion'ın Poisson'dan ne kadar saptığı × fingerprint güvenilirliği.
-    // Büyük sapma + güvenilir veri → yüksek NegBinom ağırlığı. Veri yoksa → 0 (saf Poisson).
+    // ── Dinamik Blend Ağırlıkları — Veri Güvenilirliği Tabanlı ──────────────
+    // SIFIR STATİK SABİT. Tüm ağırlıklar 3 kaynağın göreceli güveninden türer:
+    //   - Poisson (analitik): lig fingerprint pool'u Poisson'a ne kadar uyuyor
+    //   - NegBinom (overdispersion): per-team gol dağılımı Poisson'dan ne kadar sapıyor
+    //   - Profile (empirik): home + away + H2H örneklem toplamı
+    // Üç ağırlık [0,1] toplamı 1.0 — matematiksel zorunluluk, sabit alt/üst sınır yok.
     const _lfRel = leagueFingerprint?.reliability ?? 0;
-    const negBinomWeight = (() => {
-      if (overdispersion == null || overdispersion <= 1.0) return 0;
-      const dispSignal = Math.min(0.50, (overdispersion - 1.0) / overdispersion);
-      const relFactor = _lfRel > 0 ? _lfRel : (_cv != null ? Math.min(0.50, _cv) : 0);
-      return Math.max(0.10, Math.min(0.45, dispSignal * relFactor * 2.5)); // Backtest: daha geniş skor yelpazesi için artırıldı
-    })();
+    const _lfN   = leagueFingerprint?.poolSize ?? leagueFingerprint?.n ?? 0;
 
-    // profileWeight: iki bileşenden türetilir
-    //   (a) Lig CV'si — volatil ligde empirik sinyal daha değerli
-    //   (b) Toplam profil örneklemi — çok H2H/maç varsa profili daha ağır tart
-    const _totalProfileN =
-      (homeScoreProfile?.n || 0) +
-      (awayScoreProfile?.n || 0) +
-      (matchScoreProfile?.n || 0) * 2; // H2H karşılaşma direkt sinyal → 2× ağırlık
-    const _nWeight = _totalProfileN > 0
-      ? _totalProfileN / (_totalProfileN + 15) // Bayesian shrinkage: n=15 → 0.5, n=30 → 0.67
-      : 0;
-    const _cvBoost = _cv != null ? Math.min(0.50, _cv * 1.2) : 0.30;
-    // Nihai: CV boost × örneklem güveni, sınırlar veri miktarına bağlı dinamik
-    const _pwLower = Math.max(0.05, _nWeight * 0.15);
-    const _pwUpper = Math.min(0.60, 0.30 + _nWeight * 0.30);
-    const profileWeight = Math.max(_pwLower, Math.min(_pwUpper, _cvBoost * (0.5 + 0.5 * _nWeight)));
+    // Toplam profil örneklemi (H2H direkt sinyal → 2× ağırlık)
+    // Bayesian shrinkage: tpRel = n / (n + sqrt(n+1)) — n→∞ → 1, n=0 → 0
+    const _tpN = (homeScoreProfile?.n || 0)
+               + (awayScoreProfile?.n || 0)
+               + (matchScoreProfile?.n || 0) * 2;
+    const _tpRel = _tpN > 0 ? _tpN / (_tpN + Math.sqrt(_tpN + 1)) : 0;
+
+    // NegBinom ağırlığı — overdispersion sinyali × lig güveni
+    //   strength = (over - 1) / over   ∈ [0, 1)
+    //     over=1.0 → 0 (Poisson eşdeğer)  | over=1.5 → 0.33 | over=2 → 0.50
+    //   lfRel: lig pool'unun istatistiksel güvenilirliği
+    const _overStrength = (overdispersion != null && overdispersion > 1)
+      ? (overdispersion - 1) / overdispersion : 0;
+    const _negBinomRaw = _overStrength * _lfRel;
+
+    // Profile ağırlığı — örneklem güveni × profil/lig göreceli baskınlığı
+    //   profileShare = tpN / (tpN + lfN) ∈ [0, 1)
+    //   Takım profili büyükse → empirik dağılıma güven artar
+    //   Lig fingerprint havuzu büyükse → analitik (Poisson) daha güvenilir
+    const _profileShare = _tpN > 0 ? _tpN / (_tpN + _lfN) : 0;
+    const _profileRaw = _tpRel * _profileShare;
+
+    // Toplam ağırlık ≤ 1.0 — eğer (NB + profile) > 1 ise oransal normalize et
+    // Aksi halde Poisson kalan farkı alır
+    const _wSum = _negBinomRaw + _profileRaw;
+    const negBinomWeight = _wSum > 1 ? _negBinomRaw / _wSum : _negBinomRaw;
+    const profileWeight  = _wSum > 1 ? _profileRaw  / _wSum : _profileRaw;
+    // poissonWeight = 1 - negBinom - profile  (blendScoreDistribution içinde hesaplanır)
 
     // ── Aşama 4: λ Simetrik Shrinkage ──────────────────────────────────
     // Yalnızca ÇOK aşırı sapmalarda devreye girer (z > 2.5).
@@ -1330,7 +1342,46 @@ function calculateAdvancedMetrics(allMetrics) {
       }
 
       scoreProbs.sort((a, b) => b.prob - a.prob);
-      mostLikelyScore = scoreProbs[0]; // Zaten prob'a göre sorted
+      // mostLikelyScore seçimi — argmax yerine EXPECTATION-AWARE.
+      // Sorun: düşük λ'da Poisson PMF düz → argmax mode'u verir, mode genelde
+      // λ_sum'dan az gol taşır. λ_h=2.4 → P(2)=0.27, P(1)=0.23 — argmax 2,
+      // ama beklenen gol 2.4. λ_a=1.15 ekleyince argmax 2-1 (3 gol), beklenen 3.5.
+      //
+      // Çözüm: top-K içinde toplam gol'ü λ_sum'a en yakın olan + olasılığı en yüksek.
+      // K = entropy'den türetilir: dağılım ne kadar düz ise o kadar geniş top-K bakarız.
+      // Sıfır statik. K = effective_K = exp(entropy).
+      const _lambdaSum = (lambda_final_home ?? 0) + (lambda_final_away ?? 0);
+      if (_lambdaSum > 0 && scoreProbs.length > 0) {
+        // Entropy-driven adaptive K: H = -Σ p log p, K_eff = exp(H)
+        // Düz dağılım (yüksek H) → büyük K_eff → toplam gol'e göre seçim
+        // Tepe dağılım (düşük H) → K_eff~1 → argmax baskın
+        const _topProbs = scoreProbs.slice(0, Math.min(10, scoreProbs.length));
+        const _sumTop = _topProbs.reduce((s, x) => s + x.prob, 0);
+        let _entropy = 0;
+        for (const sp of _topProbs) {
+          const p = sp.prob / _sumTop;
+          if (p > 0) _entropy -= p * Math.log(p);
+        }
+        const _kEff = Math.max(1, Math.round(Math.exp(_entropy)));
+        const _candidates = scoreProbs.slice(0, _kEff);
+        // Skoru "λ_sum'a yakınlık × olasılık" ile sıralı
+        // distScore = 1 / (1 + |totalGoals - λsum|) → mesafeye ters orantılı [0,1]
+        // combined = prob × distScore (her ikisi de [0,1])
+        let _best = _candidates[0];
+        let _bestScore = -Infinity;
+        for (const sp of _candidates) {
+          const total = sp.home + sp.away;
+          const distScore = 1 / (1 + Math.abs(total - _lambdaSum));
+          const combined = sp.prob * distScore;
+          if (combined > _bestScore) {
+            _bestScore = combined;
+            _best = sp;
+          }
+        }
+        mostLikelyScore = _best;
+      } else {
+        mostLikelyScore = scoreProbs[0];
+      }
     }
   }
 
