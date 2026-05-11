@@ -1,0 +1,208 @@
+{
+  "diag": {
+    "sources": {
+      "hAtk": {
+        "n": 4,
+        "agreement": 0.7393357963184527,
+        "rate": 1.8891097424008538
+      },
+      "aDef": {
+        "n": 4,
+        "agreement": 0.7442159217996333,
+        "rate": 1.6529394482689819
+      },
+      "aAtk": {
+        "n": 4,
+        "agreement": 0.7331720700109988,
+        "rate": 1.607115795862713
+      },
+      "hDef": {
+        "n": 4,
+        "agreement": 0.7455838406627767,
+        "rate": 1.1092321626423123
+      }
+    },
+    "agreementHome": 0.7393357963184527,
+    "agreementAway": 0.7331720700109988,
+    "kMatchHome": 1.2304620907420256,
+    "kMatchAway": 1.2285407645210435,
+    "alphaHome": 1.2719462768241583,
+    "betaHome": 1.112931731731754,
+    "alphaAway": 1.0820784558418293,
+    "betaAway": 0.7468511160253813,
+    "cvLocal": 0.3117150446246745,
+    "leagueAvgGoals": 1.4852118967773165,
+    "dynamicLambdaMin": 0.01,
+    "dynamicLambdaMax": 4.387483760952705,
+    "lambdaHomeMin": 0.01,
+    "lambdaHomeMax": 4.387483760952705,
+    "lambdaAwayMin": 0.01,
+    "lambdaAwayMax": 3.710565043317912,
+    "clampHomeMinHit": false,
+    "clampHomeMaxHit": false,
+    "clampAwayMinHit": false,
+    "clampAwayMaxHit": false
+  },
+  "trace": [
+    {
+      "stage": "dcBase",
+      "hBefore": null,
+      "hAfter": 2.277776,
+      "aBefore": null,
+      "aAfter": 1.143246,
+      "dLogH": null,
+      "dLogA": null,
+      "meta": {
+        "kMatchHome": 1.2304620907420256,
+        "kMatchAway": 1.2285407645210435,
+        "agreementHome": 0.7393357963184527,
+        "agreementAway": 0.7331720700109988
+      }
+    },
+    {
+      "stage": "behavMod",
+      "hBefore": 2.277776,
+      "hAfter": 2.285651,
+      "aBefore": 1.143246,
+      "aAfter": 1.116939,
+      "dLogH": 0.003451,
+      "dLogA": -0.02328,
+      "meta": {
+        "behavModHome": 1.0034570504702278,
+        "behavModAway": 0.9769892932976625,
+        "BEHAV_SENS": 0.15013307858461658
+      }
+    },
+    {
+      "stage": "urgencyMod",
+      "hBefore": 2.285651,
+      "hAfter": 2.330913,
+      "aBefore": 1.116939,
+      "aAfter": 1.130124,
+      "dLogH": 0.01961,
+      "dLogA": 0.011736,
+      "meta": {
+        "lambdaModHome": 1.0198030909039209,
+        "lambdaModAway": 1.01180520054323,
+        "URGENCY_SENS": 0.22012951007480452
+      }
+    },
+    {
+      "stage": "initialClamp",
+      "hBefore": 2.330913,
+      "hAfter": 2.330913,
+      "aBefore": 1.130124,
+      "aAfter": 1.130124,
+      "dLogH": 0,
+      "dLogA": 0,
+      "meta": {
+        "lambdaHomeMin": 0.01,
+        "lambdaHomeMax": 4.387483760952705,
+        "lambdaAwayMin": 0.01,
+        "lambdaAwayMax": 3.710565043317912,
+        "clampHomeMinHit": false,
+        "clampHomeMaxHit": false,
+        "clampAwayMinHit": false,
+        "clampAwayMaxHit": false
+      }
+    },
+    {
+      "stage": "lqr",
+      "hBefore": 2.330913,
+      "hAfter": 2.330913,
+      "aBefore": 1.130124,
+      "aAfter": 1.130124,
+      "dLogH": 0,
+      "dLogA": 0,
+      "meta": {
+        "hLQR": 1,
+        "aLQR": 1
+      }
+    },
+    {
+      "stage": "xgOverPerf",
+      "hBefore": 2.330913,
+      "hAfter": 2.330913,
+      "aBefore": 1.130124,
+      "aAfter": 1.130124,
+      "dLogH": 0,
+      "dLogA": 0,
+      "meta": {
+        "xgModHome": null,
+        "xgModAway": null,
+        "xgOverPerfHome": null,
+        "xgOverPerfAway": null,
+        "xgSens": 0.18592209179436894,
+        "homeXGScored": null,
+        "awayXGScored": null,
+        "homeActualGoals": 1.75,
+        "awayActualGoals": 1.7,
+        "reliabilityHome": 0.8848219891058494,
+        "reliabilityAway": 0.8848219891058494
+      }
+    },
+    {
+      "stage": "refMod",
+      "hBefore": 2.330913,
+      "hAfter": 2.345714,
+      "aBefore": 1.130124,
+      "aAfter": 1.1373,
+      "dLogH": 0.006329,
+      "dLogA": 0.006329,
+      "meta": {
+        "refMod": 1.0063494877423447,
+        "refRatio": 1.0331742978562746,
+        "refSens": 0.1913978034999687,
+        "refGoalsPerMatch": 3.0689655172413794
+      }
+    },
+    {
+      "stage": "cleanSheet",
+      "hBefore": 2.345714,
+      "hAfter": 2.345714,
+      "aBefore": 1.1373,
+      "aAfter": 1.127686,
+      "dLogH": 0,
+      "dLogA": -0.008489,
+      "meta": {
+        "csModHome": 1,
+        "csModAway": 0.9896199791854936,
+        "homeCSR": 0.22981727935945445,
+        "awayCSR": 0.12259480883110795,
+        "lgCSR": 0.20484952444079546,
+        "floor": 0.6882849553753255,
+        "homeScoringRate": 0.8894162925632615,
+        "awayScoringRate": 0.7267904171531316,
+        "relHome": 0.8135843960445467,
+        "relAway": 0.8135843960445467
+      }
+    },
+    {
+      "stage": "referenceScaling",
+      "hBefore": 2.345714,
+      "hAfter": 2.345714,
+      "aBefore": 1.127686,
+      "aAfter": 1.127686,
+      "dLogH": 0,
+      "dLogA": 0,
+      "meta": {
+        "skipped": true,
+        "reason": "within_tolerance",
+        "calibrationRatio": 0.9551375494697679,
+        "referenceTotalGoals": 3.3175745794096514,
+        "referenceReliability": 0.8135843960445467,
+        "tolerance": 0.15585752231233724
+      }
+    },
+    {
+      "stage": "finalM167",
+      "hBefore": null,
+      "hAfter": 2.345714,
+      "aBefore": null,
+      "aAfter": 1.127686,
+      "dLogH": null,
+      "dLogA": null,
+      "meta": {}
+    }
+  ]
+}

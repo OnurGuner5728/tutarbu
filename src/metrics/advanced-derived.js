@@ -22,7 +22,8 @@ function calculateAdvancedMetrics(allMetrics) {
     homeStGF, homeStGA, awayStGF, awayStGA, homeStMatches, awayStMatches,
     homeMVBreakdown, awayMVBreakdown,
     homeScoreProfile, awayScoreProfile, matchScoreProfile,
-    leagueFingerprint } = allMetrics;
+    leagueFingerprint,
+    homeTeamId, awayTeamId } = allMetrics;
 
   // leagueAvgGoals çözüm hiyerarşisi (statik sabit yasak — yalnızca API verisinden türetme):
   //   1. standings'ten doğrudan hesaplanan değer (_leagueAvgGoals)
@@ -603,8 +604,34 @@ function calculateAdvancedMetrics(allMetrics) {
   const URGENCY_SENS = (_urgRaw != null && _urgLow != null && _urgHigh != null)
     ? clamp(_urgRaw, _urgLow, _urgHigh) : null;
 
-  const urgencyFactorHome = homeUnits.GOL_IHTIYACI;
-  const urgencyFactorAway = awayUnits.GOL_IHTIYACI;
+  // urgencyFactor: önce GOL_IHTIYACI unit'inden (M171/M172/M188/M189) dene.
+  // NaN/null → fingerprint'in teamPpgMap'inden takım PPG'sinin lig ortalamasından
+  // sapmasıyla türet (standings yoksa pool-based, leak-safe).
+  // Mantık: ratio = teamPPG / leaguePPG; sapma kuvvetlendikçe (her iki yönde) urgency ↑.
+  //   ratio=1   → urgency=1.0 (nötr)
+  //   ratio=1.5 (top team) → urgency = 1 + |0.5| * ptsCV (şampiyonluk baskısı)
+  //   ratio=0.5 (relegasyon) → urgency = 1 + |0.5| * ptsCV (düşme paniği)
+  // Bu signal absolute deviation × ptsCV ile ölçeklendiğinden lig dinamiğine duyarlı.
+  const _urgFactorH_raw = homeUnits.GOL_IHTIYACI;
+  const _urgFactorA_raw = awayUnits.GOL_IHTIYACI;
+  const _isUrgValid = v => v != null && isFinite(v) && v !== 1.0; // 1.0 = nötr/varsayılan, sinyal yok
+  const _ppgMap = leagueFingerprint?.teamPpgMap ?? {};
+  const _lgPPG = leagueFingerprint?.leagueAvgPPG ?? null;
+  const _ptsCV_dyn = _lgPtsCV; // yukarıda hesaplandı
+  const _urgFromPpg = (teamId) => {
+    if (teamId == null || _lgPPG == null || _lgPPG <= 0 || _ptsCV_dyn == null) return null;
+    const t = _ppgMap[teamId] || _ppgMap[String(teamId)];
+    if (!t || t.ppg == null) return null;
+    const ratio = t.ppg / _lgPPG;
+    // Absolute deviation × ptsCV — pozisyon ne kadar uçtaysa o kadar urgency
+    return 1.0 + Math.abs(ratio - 1.0) * _ptsCV_dyn;
+  };
+  const urgencyFactorHome = _isUrgValid(_urgFactorH_raw)
+    ? _urgFactorH_raw
+    : (_urgFromPpg(homeTeamId) ?? 1.0);
+  const urgencyFactorAway = _isUrgValid(_urgFactorA_raw)
+    ? _urgFactorA_raw
+    : (_urgFromPpg(awayTeamId) ?? 1.0);
   const lambdaMod_home = URGENCY_SENS != null ? 1.0 + (urgencyFactorHome - 1.0) * URGENCY_SENS : 1.0;
   const lambdaMod_away = URGENCY_SENS != null ? 1.0 + (urgencyFactorAway - 1.0) * URGENCY_SENS : 1.0;
 
@@ -672,11 +699,10 @@ function calculateAdvancedMetrics(allMetrics) {
   if (_aLQR !== 1.0 && lambda_away != null) {
     lambda_away = clamp(lambda_away * Math.sqrt(_aLQR), _lambdaAwayMin, _lambdaAwayMax);
   }
-  if (_hLQR !== 1.0 || _aLQR !== 1.0) {
-    _pushTrace('lqr', _hBeforeLQR, lambda_home, _aBeforeLQR, lambda_away, {
-      hLQR: _hLQR, aLQR: _aLQR,
-    });
-  }
+  // Trace daima push (observability): mod=1.0 olsa bile stage'in görülmesi gerekir.
+  _pushTrace('lqr', _hBeforeLQR, lambda_home, _aBeforeLQR, lambda_away, {
+    hLQR: _hLQR, aLQR: _aLQR,
+  });
 
   // ── Değişiklik 4: xGOverPerformance → lambda modifiyesi ──────────────────
   // xGOverPerf = gerçek gol ort. / xG ort. → >1 beklentiden fazla gol atıyor (clinical)
@@ -713,14 +739,15 @@ function calculateAdvancedMetrics(allMetrics) {
     _xgModA = clamp(1.0 + (_awayXGOverPerf - 1.0) * _xgSens, 1.0 - _xgSens, 1.0 + _xgSens);
     lambda_away = clamp(lambda_away * Math.pow(_xgModA, _xgRelA), _lambdaAwayMin, _lambdaAwayMax);
   }
-  if (_xgModH != null || _xgModA != null) {
-    _pushTrace('xgOverPerf', _hBeforeXG, lambda_home, _aBeforeXG, lambda_away, {
-      xgModHome: _xgModH, xgModAway: _xgModA,
-      xgOverPerfHome: _homeXGOverPerf, xgOverPerfAway: _awayXGOverPerf,
-      xgSens: _xgSens,
-      reliabilityHome: _xgRelH, reliabilityAway: _xgRelA,
-    });
-  }
+  // Trace daima push — etki yok da olsa hangi input'un eksik olduğunu görmek için.
+  _pushTrace('xgOverPerf', _hBeforeXG, lambda_home, _aBeforeXG, lambda_away, {
+    xgModHome: _xgModH, xgModAway: _xgModA,
+    xgOverPerfHome: _homeXGOverPerf, xgOverPerfAway: _awayXGOverPerf,
+    xgSens: _xgSens,
+    homeXGScored, awayXGScored,
+    homeActualGoals: _homeActualGoals, awayActualGoals: _awayActualGoals,
+    reliabilityHome: _xgRelH, reliabilityAway: _xgRelA,
+  });
 
   // ── Değişiklik 5: Hakem refGoalsPerMatch → lambda ────────────────────────
   // Bu hakemin maçlarında lig ortalamasından gol sapması → simetrik lambda etkisi
@@ -780,13 +807,19 @@ function calculateAdvancedMetrics(allMetrics) {
         _floor, 1.0);
       lambda_home = clamp(lambda_home * Math.pow(_csModH, _csRelAway), _lambdaHomeMin, _lambdaHomeMax);
     }
-    if (_csModH != null || _csModA != null) {
-      _pushTrace('cleanSheet', _hBeforeCS, lambda_home, _aBeforeCS, lambda_away, {
-        csModHome: _csModH, csModAway: _csModA,
-        homeCSR: _hCSR, awayCSR: _aCSR, lgCSR: _lgCSR, floor: _floor,
-        relHome: _csRelHome, relAway: _csRelAway,
-      });
-    }
+    // Trace daima push — eksik input'u görmek için
+    _pushTrace('cleanSheet', _hBeforeCS, lambda_home, _aBeforeCS, lambda_away, {
+      csModHome: _csModH, csModAway: _csModA,
+      homeCSR: _hCSR, awayCSR: _aCSR, lgCSR: _lgCSR, floor: _floor,
+      homeScoringRate: homeScoreProfile?.scoringRate ?? null,
+      awayScoringRate: awayScoreProfile?.scoringRate ?? null,
+      relHome: _csRelHome, relAway: _csRelAway,
+    });
+  } else {
+    // _lgCSR veya _cv yoksa stage tamamen atlanır — trace'e neden eksik girdiği bildirilir.
+    _pushTrace('cleanSheet', lambda_home, lambda_home, lambda_away, lambda_away, {
+      skipped: true, lgCSR: _lgCSR, cv: _cv,
+    });
   }
 
   // ── Öneri B: Lambda Referans Kalibrasyonu ───────────────────────────────────
@@ -816,8 +849,10 @@ function calculateAdvancedMetrics(allMetrics) {
     let referenceReliability = 0;
 
     if (homeScoreProfile?.avgScored != null && awayScoreProfile?.avgScored != null
-        && (homeScoreProfile.n ?? 0) >= 3 && (awayScoreProfile.n ?? 0) >= 3) {
+        && (homeScoreProfile.n ?? 0) >= 2 && (awayScoreProfile.n ?? 0) >= 2) {
       // İlk öncelik: takımın KENDİ gerçek gol ortalaması (asimetrik takımları korur).
+      // Eşik n>=2 — n=4 örneklemde de tetiklenmesi gerekiyordu, 3'e zorunluluk gereksiz katı idi.
+      // Bayesian shrinkage zaten zayıf örneklem güvenini düşürecek.
       referenceTotalGoals = homeScoreProfile.avgScored + awayScoreProfile.avgScored;
       const minN = Math.min(homeScoreProfile.n, awayScoreProfile.n);
       referenceReliability = minN / (minN + Math.sqrt(minN + 1));
@@ -888,7 +923,18 @@ function calculateAdvancedMetrics(allMetrics) {
           scalingFactor, calibrationRatio, referenceTotalGoals, referenceReliability,
           tolerance: _tol, exponent,
         });
+      } else {
+        // Trigger yok — referenceTotalGoals zaten λsum'a yakın. Stage'i görünür kıl.
+        _pushTrace('referenceScaling', lambda_home, lambda_home, lambda_away, lambda_away, {
+          skipped: true, reason: 'within_tolerance',
+          calibrationRatio, referenceTotalGoals, referenceReliability, tolerance: _tol,
+        });
       }
+    } else {
+      _pushTrace('referenceScaling', lambda_home, lambda_home, lambda_away, lambda_away, {
+        skipped: true, reason: 'no_reference',
+        referenceTotalGoals, referenceReliability,
+      });
     }
   }
 

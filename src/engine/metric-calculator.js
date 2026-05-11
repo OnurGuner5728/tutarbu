@@ -284,6 +284,9 @@ function calculateAllMetrics(data) {
     homeForm, awayForm, homePlayer, awayPlayer,
     homeGK, awayGK, referee, h2h, contextual,
     homeMomentum, awayMomentum,
+    // Takım kimlikleri — urgency fingerprint fallback için
+    homeTeamId: data.homeTeamId ?? data.event?.event?.homeTeam?.id ?? null,
+    awayTeamId: data.awayTeamId ?? data.event?.event?.awayTeam?.id ?? null,
     leagueAvgGoals,
     homeFormation, awayFormation,
     homeMatchCount: data.homeLastEvents?.length || 0,
@@ -303,7 +306,11 @@ function calculateAllMetrics(data) {
     homeStMatches, awayStMatches,
     // Lig istatistikleri — fingerprint'ten (events pool, leak-free) önce.
     // Fingerprint yetersizse leagueAvgResult (standings) kullanılır.
-    leaguePointDensity: leagueAvgResult.leaguePointSpread ?? null,
+    // leaguePointDensity & ptsCV — fingerprint pool öncelikli (leak-free).
+    // Standings as-of filter'da budanmış olabilir; pool zaten temporal-decay'li.
+    leaguePointDensity: (leagueFingerprint?.leaguePointDensity != null)
+      ? leagueFingerprint.leaguePointDensity
+      : (leagueAvgResult.leaguePointSpread ?? null),
     leagueGoalVolatility: (leagueFingerprint?.leagueGoalRateStd != null)
       ? leagueFingerprint.leagueGoalRateStd
       : (leagueAvgResult.leagueGoalVolatility ?? null),
@@ -311,7 +318,9 @@ function calculateAllMetrics(data) {
     leagueTeamCount: (leagueFingerprint?.teamCount != null && leagueFingerprint.teamCount > 0)
       ? leagueFingerprint.teamCount
       : (leagueAvgResult.leagueTeamCount ?? null),
-    ptsCV: leagueAvgResult.ptsCV ?? null,
+    ptsCV: (leagueFingerprint?.ptsCV != null)
+      ? leagueFingerprint.ptsCV
+      : (leagueAvgResult.ptsCV ?? null),
     normMinRatio: (leagueFingerprint?.normMinRatio != null)
       ? leagueFingerprint.normMinRatio
       : (leagueAvgResult.normMinRatio ?? null),
@@ -427,7 +436,9 @@ function calculateAllMetrics(data) {
       homeTeam: data.event?.event?.homeTeam?.name,
       awayTeam: data.event?.event?.awayTeam?.name,
       timestamp: new Date().toISOString(),
-      leaguePointDensity: leagueAvgResult.leaguePointSpread ?? null,
+      leaguePointDensity: (leagueFingerprint?.leaguePointDensity != null)
+        ? leagueFingerprint.leaguePointDensity
+        : (leagueAvgResult.leaguePointSpread ?? null),
       leagueGoalVolatility: (leagueFingerprint?.leagueGoalRateStd != null)
         ? leagueFingerprint.leagueGoalRateStd
         : (leagueAvgResult.leagueGoalVolatility ?? null),
@@ -435,7 +446,9 @@ function calculateAllMetrics(data) {
       leagueTeamCount: (leagueFingerprint?.teamCount != null && leagueFingerprint.teamCount > 0)
         ? leagueFingerprint.teamCount
         : (leagueAvgResult.leagueTeamCount ?? null),
-      ptsCV: leagueAvgResult.ptsCV ?? null,
+      ptsCV: (leagueFingerprint?.ptsCV != null)
+        ? leagueFingerprint.ptsCV
+        : (leagueAvgResult.ptsCV ?? null),
       normMinRatio: (leagueFingerprint?.normMinRatio != null)
         ? leagueFingerprint.normMinRatio
         : (leagueAvgResult.normMinRatio ?? null),

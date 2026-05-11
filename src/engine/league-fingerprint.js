@@ -110,6 +110,12 @@ function computeLeagueFingerprint(data, nowMs = Date.now()) {
   let totalGoalsSq_w = 0;
   // Per-team istatistik: her maçtan iki sample (home goals + away goals)
   let perTeamGoals_w = 0, perTeamGoalsSq_w = 0, perTeamW = 0;
+  // Per-team-match clean sheet ve scoring: bir maçtaki 2 takım × 2 olay (CS/Score)
+  // Ev sahibi conceded=0 ise ev sahibi CS, dep CS=0 (ev sahibi gol atmadıysa)
+  let cleanSheet_w = 0;      // takım × maç başına CS olayı (her maçtan 0-2 sample)
+  let scoring_w = 0;          // takım × maç başına gol atma olayı
+  // Per-team-match points (3/1/0) — lig puan yoğunluğu ve volatilitesi için
+  let perTeamPts_w = 0, perTeamPtsSq_w = 0;
   let btts_w = 0;
   let over25_w = 0;
   let over15_w = 0;
@@ -124,15 +130,17 @@ function computeLeagueFingerprint(data, nowMs = Date.now()) {
 
   // Takım bazlı agregat — pool'daki tüm takımların gol/maç oranlarını biriktir.
   // Her maçtan hem home hem away takımının golleri sample olarak kullanılır.
-  // teamId → { goals_w, matches_w, goalsAgainst_w }
+  // teamId → { goals_w, matches_w, goalsAgainst_w, pts_w, ptsSq_w }
   const teamAgg = new Map();
-  const _addTeam = (tid, scored, conceded, w) => {
+  const _addTeam = (tid, scored, conceded, w, pts) => {
     if (tid == null) return;
     let t = teamAgg.get(tid);
-    if (!t) { t = { goals_w: 0, matches_w: 0, conceded_w: 0 }; teamAgg.set(tid, t); }
+    if (!t) { t = { goals_w: 0, matches_w: 0, conceded_w: 0, pts_w: 0, ptsSq_w: 0 }; teamAgg.set(tid, t); }
     t.goals_w += scored * w;
     t.conceded_w += conceded * w;
     t.matches_w += w;
+    t.pts_w += pts * w;
+    t.ptsSq_w += pts * pts * w;
   };
 
   for (const m of pool) {
@@ -156,6 +164,19 @@ function computeLeagueFingerprint(data, nowMs = Date.now()) {
     perTeamGoals_w   += (m.home + m.away) * w;
     perTeamGoalsSq_w += (m.home * m.home + m.away * m.away) * w;
     perTeamW         += 2 * w;
+    // CleanSheet/Scoring: per-team-match olay. m.away=0 ise ev sahibi CS;
+    // m.home=0 ise deplasman CS. Scoring: m.home>0 ise ev gol attı; m.away>0 ise dep gol attı.
+    if (m.away === 0) cleanSheet_w += w;
+    if (m.home === 0) cleanSheet_w += w;
+    if (m.home > 0) scoring_w += w;
+    if (m.away > 0) scoring_w += w;
+    // Puan dağılımı (3/1/0)
+    let homePts, awayPts;
+    if (m.home > m.away) { homePts = 3; awayPts = 0; }
+    else if (m.home < m.away) { homePts = 0; awayPts = 3; }
+    else { homePts = 1; awayPts = 1; }
+    perTeamPts_w   += (homePts + awayPts) * w;
+    perTeamPtsSq_w += (homePts * homePts + awayPts * awayPts) * w;
     if (m.home > 0 && m.away > 0) btts_w += w;
     if (total > 2.5) over25_w += w;
     if (total > 1.5) over15_w += w;
@@ -169,9 +190,9 @@ function computeLeagueFingerprint(data, nowMs = Date.now()) {
       ftGoals_htAvail_w += (m.home + m.away) * w;
       htAvailW += w;
     }
-    // Takım bazlı agregat
-    _addTeam(m.homeTeamId, m.home, m.away, w);
-    _addTeam(m.awayTeamId, m.away, m.home, w);
+    // Takım bazlı agregat — points (3/1/0) ile birlikte
+    _addTeam(m.homeTeamId, m.home, m.away, w, homePts);
+    _addTeam(m.awayTeamId, m.away, m.home, w, awayPts);
   }
 
   // Pool toplam maç sayısı: 2× (hem home hem away taraftan sayıldı); marjinal dağılımları buna göre normalize
@@ -198,8 +219,12 @@ function computeLeagueFingerprint(data, nowMs = Date.now()) {
   // Takım gol/maç oranları — pool'daki her takım için ağırlıklı ortalama.
   // En az 2 maçı olan takımlar dahil edilir (1 maç noisy).
   const teamRates = [];
+  const teamPpgs = []; // points-per-game (puan yoğunluğu CV'si için)
   for (const t of teamAgg.values()) {
-    if (t.matches_w >= 2) teamRates.push(t.goals_w / t.matches_w);
+    if (t.matches_w >= 2) {
+      teamRates.push(t.goals_w / t.matches_w);
+      teamPpgs.push(t.pts_w / t.matches_w);
+    }
   }
   let normMinRatio = null, normMaxRatio = null, leagueGoalRateStd = null;
   if (teamRates.length >= 4 && leagueAvgGoalsPerTeam > 0) {
@@ -210,6 +235,38 @@ function computeLeagueFingerprint(data, nowMs = Date.now()) {
     const varRate = teamRates.reduce((s, r) => s + (r - meanRate) ** 2, 0) / teamRates.length;
     leagueGoalRateStd = Math.sqrt(varRate);
   }
+
+  // Lig puan istatistikleri — per-team-match örnekleminden
+  // pointDensity: takım başına maç başı ortalama puan (sıkışıklık göstergesi)
+  // ptsCV: takımlar arası PPG dağılımının CV'si (kompetisyon volatilitesi)
+  const leaguePointDensity = perTeamW > 0 ? perTeamPts_w / perTeamW : null;
+  let ptsCV = null;
+  if (teamPpgs.length >= 4 && leaguePointDensity != null && leaguePointDensity > 0) {
+    const meanPpg = teamPpgs.reduce((a, b) => a + b, 0) / teamPpgs.length;
+    const varPpg = teamPpgs.reduce((s, p) => s + (p - meanPpg) ** 2, 0) / teamPpgs.length;
+    ptsCV = Math.sqrt(varPpg) / meanPpg;
+  }
+
+  // Lig CS ve scoring oranı — per-team-match (toplam takım-maç olayı = perTeamW)
+  // Her maç → 2 sample (ev sahibi CS olabilir mi, dep CS olabilir mi)
+  const leagueCleanSheetRate = perTeamW > 0 ? cleanSheet_w / perTeamW : null;
+  const leagueScoringRate    = perTeamW > 0 ? scoring_w    / perTeamW : null;
+
+  // Takım PPG haritası — urgency fallback için (standings as-of'ta budanıyor)
+  // {teamId: {ppg, goalRate, matches}} — caller (advanced-derived) takım kimliğiyle çekecek.
+  const teamPpgMap = {};
+  for (const [tid, t] of teamAgg.entries()) {
+    if (t.matches_w >= 2) {
+      teamPpgMap[tid] = {
+        ppg: t.pts_w / t.matches_w,
+        goalRate: t.goals_w / t.matches_w,
+        concededRate: t.conceded_w / t.matches_w,
+        matches_w: t.matches_w,
+      };
+    }
+  }
+  // Lig PPG ortalaması (per-team-match'ten direkt) — urgency'nin nötr noktası
+  const leagueAvgPPG = leaguePointDensity; // aynı şey — açık adlandırma
 
   const result = {
     tournamentId,
@@ -238,6 +295,13 @@ function computeLeagueFingerprint(data, nowMs = Date.now()) {
     normMaxRatio,
     leagueGoalRateStd,
     teamCount: teamRates.length,
+    // Lig puan & savunma/atak istatistikleri — pool-driven (standings'ten bağımsız)
+    leaguePointDensity,
+    leagueAvgPPG,
+    ptsCV,
+    leagueCleanSheetRate,
+    leagueScoringRate,
+    teamPpgMap,
     // Faz 1.1: HT gol payı (period1 mevcut maçlardan ağırlıklı)
     // λ_HT = λ_FT × htGoalShare. Veri yoksa null → caller matematiksel
     // simetri (1/2) maxent fallback kullansın.
