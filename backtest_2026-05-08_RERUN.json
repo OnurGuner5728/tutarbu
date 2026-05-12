@@ -1,0 +1,250 @@
+{
+  "n": 18,
+  "new": {
+    "hit1X2": 14,
+    "hitScore": 5,
+    "acc1X2": 0.7777777777777778,
+    "accScore": 0.2777777777777778,
+    "totalGoalAvg": 3.2777777777777777
+  },
+  "old": {
+    "hit1X2": 12,
+    "hitScore": 2,
+    "acc1X2": 0.6666666666666666,
+    "accScore": 0.1111111111111111
+  },
+  "realGoalAvg": 3.2777777777777777,
+  "distNew": {
+    "1": 13,
+    "2": 3,
+    "X": 2
+  },
+  "distOld": {
+    "1": 15,
+    "2": 2,
+    "X": 1
+  },
+  "distReal": {
+    "1": 11,
+    "2": 4,
+    "X": 3
+  },
+  "rows": [
+    {
+      "match": "Liverpool FC vs Chelsea",
+      "predFT": "2-1",
+      "pred1X2": "1",
+      "realFT": "1-1",
+      "real1X2": "X",
+      "hit1X2": false,
+      "hitScore": false,
+      "oldPredFT": "2-1",
+      "oldHit1X2": false,
+      "oldHitScore": false
+    },
+    {
+      "match": "Torino vs Sassuolo",
+      "predFT": "2-1",
+      "pred1X2": "1",
+      "realFT": "2-1",
+      "real1X2": "1",
+      "hit1X2": true,
+      "hitScore": true,
+      "oldPredFT": "1-0",
+      "oldHit1X2": true,
+      "oldHitScore": false
+    },
+    {
+      "match": "Levante UD vs Osasuna",
+      "predFT": "2-1",
+      "pred1X2": "1",
+      "realFT": "3-2",
+      "real1X2": "1",
+      "hit1X2": true,
+      "hitScore": false,
+      "oldPredFT": "1-0",
+      "oldHit1X2": true,
+      "oldHitScore": false
+    },
+    {
+      "match": "RC Lens vs Nantes",
+      "predFT": "3-0",
+      "pred1X2": "1",
+      "realFT": "1-0",
+      "real1X2": "1",
+      "hit1X2": true,
+      "hitScore": false,
+      "oldPredFT": "3-0",
+      "oldHit1X2": true,
+      "oldHitScore": false
+    },
+    {
+      "match": "Borussia Dortmund vs Eintracht Frankfurt",
+      "predFT": "4-0",
+      "pred1X2": "1",
+      "realFT": "3-2",
+      "real1X2": "1",
+      "hit1X2": true,
+      "hitScore": false,
+      "oldPredFT": "3-0",
+      "oldHit1X2": true,
+      "oldHitScore": false
+    },
+    {
+      "match": "Standard Liège vs Oud-Heverlee Leuven",
+      "predFT": "2-1",
+      "pred1X2": "1",
+      "realFT": "2-1",
+      "real1X2": "1",
+      "hit1X2": true,
+      "hitScore": true,
+      "oldPredFT": "1-0",
+      "oldHit1X2": true,
+      "oldHitScore": false
+    },
+    {
+      "match": "Al-Hilal vs Al-Kholood",
+      "predFT": "4-1",
+      "pred1X2": "1",
+      "realFT": "2-1",
+      "real1X2": "1",
+      "hit1X2": true,
+      "hitScore": false,
+      "oldPredFT": "2-0",
+      "oldHit1X2": true,
+      "oldHitScore": false
+    },
+    {
+      "match": "HNK Rijeka vs HNK Vukovar 1991",
+      "predFT": "3-0",
+      "pred1X2": "1",
+      "realFT": "3-0",
+      "real1X2": "1",
+      "hit1X2": true,
+      "hitScore": true,
+      "oldPredFT": "2-0",
+      "oldHit1X2": true,
+      "oldHitScore": false
+    },
+    {
+      "match": "FK Vojvodina vs FK Čukarički",
+      "predFT": "2-0",
+      "pred1X2": "1",
+      "realFT": "1-0",
+      "real1X2": "1",
+      "hit1X2": true,
+      "hitScore": false,
+      "oldPredFT": "1-0",
+      "oldHit1X2": true,
+      "oldHitScore": true
+    },
+    {
+      "match": "Cádiz vs Deportivo de La Coruña",
+      "predFT": "0-2",
+      "pred1X2": "2",
+      "realFT": "0-1",
+      "real1X2": "2",
+      "hit1X2": true,
+      "hitScore": false,
+      "oldPredFT": "0-1",
+      "oldHit1X2": true,
+      "oldHitScore": true
+    },
+    {
+      "match": "1. FC Kaiserslautern vs Arminia Bielefeld",
+      "predFT": "2-1",
+      "pred1X2": "1",
+      "realFT": "2-0",
+      "real1X2": "1",
+      "hit1X2": true,
+      "hitScore": false,
+      "oldPredFT": "1-0",
+      "oldHit1X2": true,
+      "oldHitScore": false
+    },
+    {
+      "match": "SC Paderborn 07 vs Karlsruher SC",
+      "predFT": "2-2",
+      "pred1X2": "X",
+      "realFT": "2-2",
+      "real1X2": "X",
+      "hit1X2": true,
+      "hitScore": true,
+      "oldPredFT": "2-0",
+      "oldHit1X2": false,
+      "oldHitScore": false
+    },
+    {
+      "match": "Eintracht Braunschweig vs SG Dynamo Dresden",
+      "predFT": "1-2",
+      "pred1X2": "2",
+      "realFT": "2-1",
+      "real1X2": "1",
+      "hit1X2": false,
+      "hitScore": false,
+      "oldPredFT": "1-2",
+      "oldHit1X2": false,
+      "oldHitScore": false
+    },
+    {
+      "match": "Holstein Kiel vs 1. FC Magdeburg",
+      "predFT": "1-3",
+      "pred1X2": "2",
+      "realFT": "1-3",
+      "real1X2": "2",
+      "hit1X2": true,
+      "hitScore": true,
+      "oldPredFT": "1-0",
+      "oldHit1X2": false,
+      "oldHitScore": false
+    },
+    {
+      "match": "VfL Bochum 1848 vs Hannover 96",
+      "predFT": "2-2",
+      "pred1X2": "X",
+      "realFT": "1-1",
+      "real1X2": "X",
+      "hit1X2": true,
+      "hitScore": false,
+      "oldPredFT": "2-2",
+      "oldHit1X2": true,
+      "oldHitScore": false
+    },
+    {
+      "match": "Catanzaro vs Bari",
+      "predFT": "2-1",
+      "pred1X2": "1",
+      "realFT": "2-3",
+      "real1X2": "2",
+      "hit1X2": false,
+      "hitScore": false,
+      "oldPredFT": "2-0",
+      "oldHit1X2": false,
+      "oldHitScore": false
+    },
+    {
+      "match": "Cesena vs Padova",
+      "predFT": "2-1",
+      "pred1X2": "1",
+      "realFT": "3-4",
+      "real1X2": "2",
+      "hit1X2": false,
+      "hitScore": false,
+      "oldPredFT": "1-0",
+      "oldHit1X2": false,
+      "oldHitScore": false
+    },
+    {
+      "match": "Frosinone vs Mantova",
+      "predFT": "4-0",
+      "pred1X2": "1",
+      "realFT": "5-0",
+      "real1X2": "1",
+      "hit1X2": true,
+      "hitScore": false,
+      "oldPredFT": "2-0",
+      "oldHit1X2": true,
+      "oldHitScore": false
+    }
+  ]
+}
