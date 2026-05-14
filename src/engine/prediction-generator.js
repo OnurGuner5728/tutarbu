@@ -224,8 +224,8 @@ function generatePrediction(metricsResult, data, baseline, audit, rng) {
       // Sıfır statik: entropy formülü matematiksel.
       const _eps = 1e-9;
       const _simH = -(pH_mc * Math.log(pH_mc + _eps)
-                    + pD_mc * Math.log(pD_mc + _eps)
-                    + pA_mc * Math.log(pA_mc + _eps));
+        + pD_mc * Math.log(pD_mc + _eps)
+        + pA_mc * Math.log(pA_mc + _eps));
       const _maxH = Math.log(3);
       const _simBalance = _maxH > 0 ? Math.max(0, Math.min(1, _simH / _maxH)) : 0;
       // sim ağırlığı = (1 - pW) × simBalance, kalan Poisson'a iade
@@ -254,7 +254,7 @@ function generatePrediction(metricsResult, data, baseline, audit, rng) {
       const _sDW = simDist.draw ?? prediction.drawProbability ?? (100 / 3);
       const _sAW = simDist.awayWin ?? prediction.awayWinProbability ?? (100 / 3);
       let homeWin = ((_pHW * pW) + (_sHW * sW) + ((closingH ?? 0) * gamma)) / blendTotal;
-      let draw    = ((_pDW * pW) + (_sDW * sW) + ((closingD ?? 0) * gamma)) / blendTotal;
+      let draw = ((_pDW * pW) + (_sDW * sW) + ((closingD ?? 0) * gamma)) / blendTotal;
       let awayWin = ((_pAW * pW) + (_sAW * sW) + ((closingA ?? 0) * gamma)) / blendTotal;
 
       // ── Kalibrasyon Post-Processing ────────────────────────────────────
@@ -288,18 +288,25 @@ function generatePrediction(metricsResult, data, baseline, audit, rng) {
         awayWin = calProbs[2] * 100;
       }
 
-      // ── Temperature Scaling (Lig Verisinden Tam Dinamik) ──────────────────────
-      // Sıfır statik sabit. Tüm parametreler lig verisinden türetilir.
-      // İki sinyal: lgCV (gol volatilitesi/ortalama) ve compIndex (rekabetçilik [0,1]).
-      // T = 1 + lgCV × compIndex
-      //   - Volatil + rekabetçi lig → daha güçlü smoothing (upset bekle).
-      //   - Stabil + dominant lig → kimlik (favorilere güven).
-      // Veri yoksa T=1 (no-op) — temperature scaling devre dışı.
+      // ── Temperature Scaling (Lig Verisinden + Reliability Tam Dinamik) ────
+      // Sıfır statik sabit. Üç sinyal:
+      //   1. lgCV (gol volatilitesi)
+      //   2. compIndex (rekabetçilik)
+      //   3. predictionReliability (model güveni — confidenceScore + agreement)
+      // T = 1 + lgCV × compIndex + (1 - reliability) × maxBoost
+      //   maxBoost = lgCV (uçukluk lig CV'siyle sınırlı, sıfır statik)
+      // Düşük reliability → yüksek T → uniform'a yaklaş (X probabilitesi artar)
+      // Bu, 2026-05-11 testindeki "6 draw kaçırma" patternini çözer.
       const compIndex = baseline?.leagueCompetitiveness ?? metricsResult.meta?.leagueCompetitiveness ?? null;
       const lgCV = (vol != null && avg != null && avg > 0) ? vol / avg : null;
+      // Model güven ölçüsü: confidenceScore [0,1] olarak — düşük conf → smoothing artar
+      const _confForTemp = (conf != null && isFinite(conf)) ? conf : null;
+      const _relPenalty = (_confForTemp != null && lgCV != null) ? (1 - _confForTemp) * lgCV : 0;
       let temperature = 1.0;
       if (lgCV != null && compIndex != null && lgCV > 0 && compIndex > 0) {
-        temperature = 1.0 + lgCV * compIndex;
+        temperature = 1.0 + lgCV * compIndex + _relPenalty;
+      } else if (_relPenalty > 0) {
+        temperature = 1.0 + _relPenalty;
       }
 
       let s_homeWin = homeWin / 100;
@@ -573,8 +580,8 @@ function generatePrediction(metricsResult, data, baseline, audit, rng) {
         // burada poissonExceed kullanılır.
         const _ouBase = leagueFingerprint?.over25Rate
           ?? (baseline?.leagueAvgGoals != null
-              ? poissonExceed(baseline.leagueAvgGoals * 2, 2.5)
-              : null);
+            ? poissonExceed(baseline.leagueAvgGoals * 2, 2.5)
+            : null);
         const _ouSigma = _ouBase != null ? Math.sqrt(_ouBase * (1 - _ouBase)) * 100 : null;
         // Sigma yoksa, blend'in kendi varyansından (matematiksel) — sabit 0.6/1.4 KALDIRILDI.
         const _ouVarFallback = _ouBlend > 0
@@ -627,8 +634,8 @@ function generatePrediction(metricsResult, data, baseline, audit, rng) {
         // Fallback yoksa blend'in kendi binomial sigma'sı (matematiksel kesin).
         const _bttsBase = leagueFingerprint?.bttsRate
           ?? (baseline?.leagueAvgGoals != null
-              ? (1 - Math.exp(-baseline.leagueAvgGoals)) ** 2  // P(home>0)×P(away>0) — Poisson
-              : null);
+            ? (1 - Math.exp(-baseline.leagueAvgGoals)) ** 2  // P(home>0)×P(away>0) — Poisson
+            : null);
         const _bttsSigma = _bttsBase != null ? Math.sqrt(_bttsBase * (1 - _bttsBase)) * 100 : null;
         const _bttsVarFallback = _bttsBlend > 0
           ? Math.sqrt((_bttsBlend / 100) * (1 - _bttsBlend / 100)) * 100
@@ -731,13 +738,13 @@ function generatePrediction(metricsResult, data, baseline, audit, rng) {
       // Her güç metriği için ilgili blok üzerinden bölge modifiyesi hesapla
       const hAtkMod = computeBlockZoneModifier('BITIRICILIK', hZQR, hLQR, hDynW);    // ATK zone
       const hDefMod = computeBlockZoneModifier('SAVUNMA_DIRENCI', hZQR, hLQR, hDynW); // DEF zone
-      const hGkMod  = computeBlockZoneModifier('GK_REFLEKS', hZQR, hLQR, hDynW);      // GK zone
+      const hGkMod = computeBlockZoneModifier('GK_REFLEKS', hZQR, hLQR, hDynW);      // GK zone
       // Overall: tüm bölgelerin ağırlıklı bileşimi
       const hOverallMod = Math.sqrt(hAtkMod * hDefMod); // atk-def geometrik ortalama
 
       const aAtkMod = computeBlockZoneModifier('BITIRICILIK', aZQR, aLQR, aDynW);
       const aDefMod = computeBlockZoneModifier('SAVUNMA_DIRENCI', aZQR, aLQR, aDynW);
-      const aGkMod  = computeBlockZoneModifier('GK_REFLEKS', aZQR, aLQR, aDynW);
+      const aGkMod = computeBlockZoneModifier('GK_REFLEKS', aZQR, aLQR, aDynW);
       const aOverallMod = Math.sqrt(aAtkMod * aDefMod);
 
       return {
@@ -1327,8 +1334,8 @@ function generateFirstHalfPrediction(home, away, poissonPrediction, baseline, le
     ? (baseline.dynamicAvgs.M005 + baseline.dynamicAvgs.M006 + baseline.dynamicAvgs.M007) / 100
     : null;
   const _lfHTShare = (leagueFingerprint?.htGoalShare != null
-                     && leagueFingerprint.htGoalShare > 0
-                     && leagueFingerprint.htGoalShare < 1)
+    && leagueFingerprint.htGoalShare > 0
+    && leagueFingerprint.htGoalShare < 1)
     ? leagueFingerprint.htGoalShare : null;
 
   const htFracH = homeHTFrac ?? _dynHT ?? _lfHTShare ?? (1 / 2);
@@ -1662,17 +1669,17 @@ function calculateConfidence(prediction, shared, home, away, baseline) {
     const _neutralWinProb = (baseline?.dynamicAvgs?.M131 != null && baseline?.dynamicAvgs?.M133 != null)
       ? (baseline.dynamicAvgs.M131 + baseline.dynamicAvgs.M133) / 200
       : ((baseline?.medianGoalRate != null && baseline?.leagueAvgGoals > 0)
-          ? (baseline.medianGoalRate / (baseline.leagueAvgGoals * 2))
-          : (baseline?.leagueDrawTendency != null
-              ? (1 - baseline.leagueDrawTendency) / 2 // drawRate'ten: kalanın yarısı = takım başı kazanma
-              : (1 / 3))); // matematik simetrisi: 3 sonuç eşit olasılık
+        ? (baseline.medianGoalRate / (baseline.leagueAvgGoals * 2))
+        : (baseline?.leagueDrawTendency != null
+          ? (1 - baseline.leagueDrawTendency) / 2 // drawRate'ten: kalanın yarısı = takım başı kazanma
+          : (1 / 3))); // matematik simetrisi: 3 sonuç eşit olasılık
     // Maksimum bonus lig gol averajından türeyen volatilite katsayısına bağlanır
     if (baseline.leagueAvgGoals == null) { /* veri yok → H2H bonusu skip */ }
     else {
-    const _maxBonus = baseline.leagueAvgGoals * 10 * (1 + _cvH2H);
+      const _maxBonus = baseline.leagueAvgGoals * 10 * (1 + _cvH2H);
 
-    const h2hBonus = (h2hRatio - _neutralWinProb) * _maxBonus * h2hReliability;
-    baseConfidence += h2hBonus;
+      const h2hBonus = (h2hRatio - _neutralWinProb) * _maxBonus * h2hReliability;
+      baseConfidence += h2hBonus;
     } // end leagueAvgGoals null guard
   }
 

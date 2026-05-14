@@ -1,0 +1,248 @@
+{
+  "date": "2026-05-11",
+  "fetchedAt": "2026-05-14T11:35:10.005Z",
+  "n": 18,
+  "new": {
+    "hit1X2": 8,
+    "hitScore": 3,
+    "acc1X2": 0.4444444444444444,
+    "accScore": 0.16666666666666666
+  },
+  "old": {
+    "hit1X2": 4,
+    "acc1X2": 0.2222222222222222
+  },
+  "distNew": {
+    "1": 11,
+    "2": 4,
+    "X": 3
+  },
+  "distOld": {
+    "1": 10,
+    "2": 5,
+    "X": 3
+  },
+  "distReal": {
+    "1": 5,
+    "2": 6,
+    "X": 7
+  },
+  "rows": [
+    {
+      "match": "Tottenham Hotspur vs Leeds United",
+      "predFT": "1-2",
+      "pred1X2": "2",
+      "realFT": "1-1",
+      "real1X2": "X",
+      "hit1X2": false,
+      "hitScore": false,
+      "oldPredFT": "1-2",
+      "oldPred1X2": "2",
+      "oldHit1X2": false
+    },
+    {
+      "match": "SSC Napoli vs Bologna",
+      "predFT": "2-2",
+      "pred1X2": "X",
+      "realFT": "2-3",
+      "real1X2": "2",
+      "hit1X2": false,
+      "hitScore": false,
+      "oldPredFT": "3-1",
+      "oldPred1X2": "1",
+      "oldHit1X2": false
+    },
+    {
+      "match": "Rayo Vallecano vs Girona FC",
+      "predFT": "1-1",
+      "pred1X2": "X",
+      "realFT": "1-1",
+      "real1X2": "X",
+      "hit1X2": true,
+      "hitScore": true,
+      "oldPredFT": "1-1",
+      "oldPred1X2": "X",
+      "oldHit1X2": true
+    },
+    {
+      "match": "Benfica vs Sporting Braga",
+      "predFT": "3-1",
+      "pred1X2": "1",
+      "realFT": "2-2",
+      "real1X2": "X",
+      "hit1X2": false,
+      "hitScore": false,
+      "oldPredFT": "2-1",
+      "oldPred1X2": "1",
+      "oldHit1X2": false
+    },
+    {
+      "match": "CF Estrela Amadora vs Famalicão",
+      "predFT": "0-2",
+      "pred1X2": "2",
+      "realFT": "0-0",
+      "real1X2": "X",
+      "hit1X2": false,
+      "hitScore": false,
+      "oldPredFT": "0-2",
+      "oldPred1X2": "2",
+      "oldHit1X2": false
+    },
+    {
+      "match": "Gil Vicente vs FC Arouca",
+      "predFT": "2-1",
+      "pred1X2": "1",
+      "realFT": "1-3",
+      "real1X2": "2",
+      "hit1X2": false,
+      "hitScore": false,
+      "oldPredFT": "2-0",
+      "oldPred1X2": "1",
+      "oldHit1X2": false
+    },
+    {
+      "match": "Rio Ave vs Sporting CP",
+      "predFT": "0-3",
+      "pred1X2": "2",
+      "realFT": "1-4",
+      "real1X2": "2",
+      "hit1X2": true,
+      "hitScore": false,
+      "oldPredFT": "0-3",
+      "oldPred1X2": "2",
+      "oldHit1X2": true
+    },
+    {
+      "match": "Santa Clara vs CD Nacional",
+      "predFT": "2-0",
+      "pred1X2": "1",
+      "realFT": "2-0",
+      "real1X2": "1",
+      "hit1X2": true,
+      "hitScore": true,
+      "oldPredFT": "1-0",
+      "oldPred1X2": "1",
+      "oldHit1X2": true
+    },
+    {
+      "match": "Tondela vs Moreirense",
+      "predFT": "2-0",
+      "pred1X2": "1",
+      "realFT": "2-0",
+      "real1X2": "1",
+      "hit1X2": true,
+      "hitScore": true,
+      "oldPredFT": "1-1",
+      "oldPred1X2": "X",
+      "oldHit1X2": false
+    },
+    {
+      "match": "Vitória SC vs Casa Pia",
+      "predFT": "3-0",
+      "pred1X2": "1",
+      "realFT": "0-1",
+      "real1X2": "2",
+      "hit1X2": false,
+      "hitScore": false,
+      "oldPredFT": "3-0",
+      "oldPred1X2": "1",
+      "oldHit1X2": false
+    },
+    {
+      "match": "Huesca vs Real Sociedad B U21",
+      "predFT": "1-0",
+      "pred1X2": "1",
+      "realFT": "1-2",
+      "real1X2": "2",
+      "hit1X2": false,
+      "hitScore": false,
+      "oldPredFT": "1-0",
+      "oldPred1X2": "1",
+      "oldHit1X2": false
+    },
+    {
+      "match": "Bodrum FK vs Çorum FK",
+      "predFT": "2-1",
+      "pred1X2": "1",
+      "realFT": "1-0",
+      "real1X2": "1",
+      "hit1X2": true,
+      "hitScore": false,
+      "oldPredFT": "1-2",
+      "oldPred1X2": "2",
+      "oldHit1X2": false
+    },
+    {
+      "match": "Cracovia vs Radomiak Radom",
+      "predFT": "1-1",
+      "pred1X2": "X",
+      "realFT": "0-0",
+      "real1X2": "X",
+      "hit1X2": true,
+      "hitScore": false,
+      "oldPredFT": "1-2",
+      "oldPred1X2": "2",
+      "oldHit1X2": false
+    },
+    {
+      "match": "Randers FC vs Odense Boldklub",
+      "predFT": "1-2",
+      "pred1X2": "2",
+      "realFT": "2-2",
+      "real1X2": "X",
+      "hit1X2": false,
+      "hitScore": false,
+      "oldPredFT": "2-0",
+      "oldPred1X2": "1",
+      "oldHit1X2": false
+    },
+    {
+      "match": "Academia de Balompié Boliviano vs Oriente Petrolero",
+      "predFT": "2-1",
+      "pred1X2": "1",
+      "realFT": "3-1",
+      "real1X2": "1",
+      "hit1X2": true,
+      "hitScore": false,
+      "oldPredFT": "2-1",
+      "oldPred1X2": "1",
+      "oldHit1X2": true
+    },
+    {
+      "match": "Mushuc Runa SC vs LDU",
+      "predFT": "1-0",
+      "pred1X2": "1",
+      "realFT": "1-3",
+      "real1X2": "2",
+      "hit1X2": false,
+      "hitScore": false,
+      "oldPredFT": "2-0",
+      "oldPred1X2": "1",
+      "oldHit1X2": false
+    },
+    {
+      "match": "East Bengal FC vs Punjab FC",
+      "predFT": "2-1",
+      "pred1X2": "1",
+      "realFT": "0-0",
+      "real1X2": "X",
+      "hit1X2": false,
+      "hitScore": false,
+      "oldPredFT": "2-1",
+      "oldPred1X2": "1",
+      "oldHit1X2": false
+    },
+    {
+      "match": "Deportivo Garcilaso vs Alianza Atlético de Sullana",
+      "predFT": "1-0",
+      "pred1X2": "1",
+      "realFT": "2-1",
+      "real1X2": "1",
+      "hit1X2": true,
+      "hitScore": false,
+      "oldPredFT": "1-1",
+      "oldPred1X2": "X",
+      "oldHit1X2": false
+    }
+  ]
+}

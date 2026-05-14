@@ -471,10 +471,28 @@ function calculateAdvancedMetrics(allMetrics) {
   // çünkü bu modifier'lar lambda'ya çarpan olarak uygulanır, k exponent'i ayrı.
   // _cv burada lokal hesaplanır (TDZ: aşağıdaki const _cv tanımı bu satırın ALTINDA).
   const _cvLocal = (vol != null && leagueAvgGoals > 0) ? vol / leagueAvgGoals : null;
+  // ── BAYESIAN α/β SHRINKAGE — düşük örneklem → α/β nötr (1.0) ──
+  // Sorun: scoreProfile.n=2 olunca atkR varyansı çok yüksek; α=1.5 olduğunda
+  // "asimetri tam açık" gibi davranıyor ama bu sadece 2 maçın gürültüsü olabilir.
+  // Çözüm: α_shrunk = α × rel + 1.0 × (1-rel)
+  //   rel = profileShare × sourceAgreement   (her ikisi de dinamik veriden)
+  //   profileShare = profileN / (profileN + sqrt(profileN+1))  Bayesian
+  //   sourceAgreement = _blendRate çıktısı (kaynaklar arası tutarlılık)
+  // Bu, _blendRate'in döndüğü "agreement" sinyalini α/β'ya direkt uygular.
+  // Çift sayım yok: kMatch agreement'i exponentte kullanıyor (asimetri sertliği),
+  // burada agreement α/β'yı 1.0'a çekiyor (asimetri büyüklüğü). Birbirini tamamlar.
+  const _shrinkAB = (rate, agreement) => {
+    if (rate == null || leagueAvgGoals == null || leagueAvgGoals <= 0) return null;
+    const raw = rate / leagueAvgGoals;
+    const rel = Math.max(0, Math.min(1, agreement ?? 0));
+    // Düşük rel → α/β → 1.0; Yüksek rel → raw değer korunur
+    return raw * rel + 1.0 * (1 - rel);
+  };
   const _dcBase = (atkR, defR_opp, agreement) => {
     if (atkR == null || defR_opp == null || leagueAvgGoals == null || leagueAvgGoals <= 0) return { lambda: null, alpha: null, beta: null, kMatch: null };
-    const alpha = atkR / leagueAvgGoals;
-    const beta = defR_opp / leagueAvgGoals;
+    // Bayesian shrinkage: agreement düşükse 1.0'a doğru çek
+    const alpha = _shrinkAB(atkR, agreement);
+    const beta  = _shrinkAB(defR_opp, agreement);
     const ab = alpha * beta;
     if (ab <= 0) return { lambda: null, alpha, beta, kMatch: null };
     const kMatch = (_cvLocal != null && _cvLocal > 0) ? 1 + _cvLocal * agreement : 1;
@@ -535,18 +553,19 @@ function calculateAdvancedMetrics(allMetrics) {
   const _volForMax = (() => {
     if (allMetrics.leagueGoalVolatility != null) return allMetrics.leagueGoalVolatility;
     if (leagueAvgGoals == null) return null;
-    // Takım gol ortalamalarının sapmasından CV tahmini
+    // Takım gol ortalamalarının sapmasından CV tahmini — STATİK CLAMP YOK.
+    // Spread/(leagueAvg×2) zaten doğal bir [0,1) oranı; ek clamp anlamsız.
     const hGoal = homeAttack?.M001 ?? homeAttack?.M002;
     const aGoal = awayAttack?.M001 ?? awayAttack?.M002;
     if (hGoal != null && aGoal != null && leagueAvgGoals > 0) {
       const spread = Math.abs(hGoal - aGoal);
-      const cvEstimate = clamp(spread / (leagueAvgGoals * 2), 0.15, 0.55);
+      const cvEstimate = spread / (leagueAvgGoals * 2);
       return leagueAvgGoals * cvEstimate;
     }
-    // Son çare: dynamicAvgs.M001 ile oranlama
+    // Son çare: dynamicAvgs.M001 ile oranlama — statik clamp kaldırıldı
     const dynM001 = allMetrics.dynamicAvgs?.M001;
     if (dynM001 != null && dynM001 > 0) {
-      return leagueAvgGoals * clamp(Math.abs(leagueAvgGoals - dynM001) / leagueAvgGoals, 0.18, 0.50);
+      return leagueAvgGoals * Math.abs(leagueAvgGoals - dynM001) / leagueAvgGoals;
     }
     return null; // Gerçekten veri yoksa null — sabit yok
   })();
