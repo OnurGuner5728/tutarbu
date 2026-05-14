@@ -1043,6 +1043,10 @@ function calculateAdvancedMetrics(allMetrics) {
     }
   }
 
+  // Motivation damping + magnitude shrinkage kaldırıldı — her ikisi over-correction
+  // (10-13 draw tahmin) yaratıyordu. α/β Bayesian shrinkage + temperature scaling
+  // reliability sinyalini yeterli ölçüde kapsıyor.
+
   // M167: lambda dinamik sınırlar içinde kalibre edildi.
   const M167_home = lambda_home != null ? round2(lambda_home) : null;
   const M167_away = lambda_away != null ? round2(lambda_away) : null;
@@ -1449,10 +1453,9 @@ function calculateAdvancedMetrics(allMetrics) {
       // K = entropy'den türetilir: dağılım ne kadar düz ise o kadar geniş top-K bakarız.
       // Sıfır statik. K = effective_K = exp(entropy).
       const _lambdaSum = (lambda_final_home ?? 0) + (lambda_final_away ?? 0);
+      const _lambdaGap = Math.abs((lambda_final_home ?? 0) - (lambda_final_away ?? 0));
       if (_lambdaSum > 0 && scoreProbs.length > 0) {
-        // Entropy-driven adaptive K: H = -Σ p log p, K_eff = exp(H)
-        // Düz dağılım (yüksek H) → büyük K_eff → toplam gol'e göre seçim
-        // Tepe dağılım (düşük H) → K_eff~1 → argmax baskın
+        // Entropy-driven adaptive K
         const _topProbs = scoreProbs.slice(0, Math.min(10, scoreProbs.length));
         const _sumTop = _topProbs.reduce((s, x) => s + x.prob, 0);
         let _entropy = 0;
@@ -1462,9 +1465,8 @@ function calculateAdvancedMetrics(allMetrics) {
         }
         const _kEff = Math.max(1, Math.round(Math.exp(_entropy)));
         const _candidates = scoreProbs.slice(0, _kEff);
-        // Skoru "λ_sum'a yakınlık × olasılık" ile sıralı
-        // distScore = 1 / (1 + |totalGoals - λsum|) → mesafeye ters orantılı [0,1]
-        // combined = prob × distScore (her ikisi de [0,1])
+        // 1D toplam gol mesafesi — λ_sum'a en yakın total-goal'lü skor.
+        // 2D Euclidean denedi (eski commit): over-correction yaptı, ed.io.iconv
         let _best = _candidates[0];
         let _bestScore = -Infinity;
         for (const sp of _candidates) {
