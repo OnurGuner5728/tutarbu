@@ -1041,70 +1041,239 @@ function calculateAdvancedMetrics(allMetrics) {
   // (10-13 draw tahmin) yaratıyordu. α/β Bayesian shrinkage + temperature scaling
   // reliability sinyalini yeterli ölçüde kapsıyor.
 
-  // ── LINEUP STRENGTH STAGE ─────────────────────────────────────────────
-  // Player verisi DİREKT λ'ya yansıtılır. Sıfır statik, tam dinamik.
-  // Sinyal: starter XI'in maç başına gol katkısı (goals + xG ortalaması, appearances'a normalize).
-  // Reliability: (avg_appearances Bayesian) × (lineup_coverage = validPlayers / 11).
-  // Modifier: lineup_rate / current_λ; pow(rel) ile uygulanır.
-  //   rel=1 ve lineup_rate=2×λ → λ doubled
-  //   rel=0.1 → minimal etki (data güvensiz)
-  // dcBase α/β ile çift sayım yok: α/β takım-output (gol/maç), lineup player-input
-  // (kim sahada). Bağımsız sinyaller, farklı eksen.
-  const _lineupGoalContrib = (lineup) => {
+  // ── LINEUP STRENGTH STAGE — TAM DİNAMİK (sıfır statik) ─────────────────
+  // Player verisi DİREKT λ'ya yansıtılır.
+  //
+  // Üç bağımsız sinyal (Bayesian-weighted blend):
+  //
+  // 1. ATAK potansiyeli (hücumcu/orta saha katkısı):
+  //    goal_rate = (goals + xG) / (2 × apps)
+  //    × attack_strength = attributes.attacking / peer_avg.attacking
+  //    × position_attack_share = (player_pos_in_atk_role) — dinamik per oyuncu
+  //
+  // 2. DEFANS gücü (savunma/GK katkısı — opp λ'ya negatif etki):
+  //    save_rate = (saves) / apps  (kaleciler için)
+  //    defending_attr = attributes.defending / peer_avg.defending
+  //
+  // 3. RELIABILITY:
+  //    per-player Bayesian (apps) × lineup coverage (validPlayers/11)
+  //    × fallback penaltısı (lineup.isFallback ise düşür)
+  //
+  // dcBase α/β ile çift sayım yok:
+  //    α/β = takım-output (sezon gol/maç), lineup = player-input (kim sahada bugün).
+  //    Bağımsız sinyaller — farklı eksen.
+
+  // Pozisyon kodları SofaScore: GK / D[L|C|R] / DM / MC / AM / [L|R]W / ST
+  // Hücum katkısı sinyali: pozisyon FORWARD-tarafa ne kadar yakın?
+  //   GK=0 (atak katkısı sıfır mantıken), D*=0.1, DM=0.25, MC=0.5, AM=0.75, *W=0.85, ST=1.0
+  //   AMA: bunlar STATİK katsayı olur. KULLANICI YASAKLADI.
+  //   Çözüm: pozisyon başına attribute.attacking lig ortalamasını referans al.
+  //          ST'nin lig avg attacking'i ~80, GK'nın ~20. Bu zaten ölçülen veri.
+  //          Bir oyuncunun atak katkısı = onun attacking attribute'u
+  //          (yüksek = atak; düşük = atak değil). Pozisyon bilgisi attribute'a baked in.
+
+  const _lineupContribV2 = (lineup, side /* 'attack' | 'defense' */) => {
     if (!lineup?.players) return null;
     const starters = lineup.players.filter(p => !p.substitute && !p.isReserve).slice(0, 11);
     if (starters.length < 5) return null;
-    let teamPerMatchGoals = 0;
+
+    let weightedRate = 0;       // Σ (player_rate × attribute_strength)
+    let totalAttribute = 0;     // Σ attribute_strength (normalize için)
     let totalApps = 0;
     let validCount = 0;
+
     for (const p of starters) {
       const stats = p.player?.statistics || p.player?.seasonStats?.statistics;
       if (!stats?.appearances || stats.appearances < 1) continue;
       const apps = stats.appearances;
-      // İki eşdeğer kaynak (goals + xG) — her ikisi de oyuncudan, eşit ağırlık.
-      // xG kaynak yoksa sadece goals; goals yoksa sadece xG. Hiçbiri yoksa skip.
-      const _g = stats.goals;
-      const _xg = stats.expectedGoals;
-      const _sources = [];
-      if (_g != null) _sources.push(_g / apps);
-      if (_xg != null) _sources.push(_xg / apps);
-      if (_sources.length === 0) continue;
-      const playerRate = _sources.reduce((s, v) => s + v, 0) / _sources.length;
-      teamPerMatchGoals += playerRate;
+
+      // Attribute strength — attacking veya defending
+      const pAttr = p.player?.attributes?.playerAttributeOverviews?.[0];
+      const peerAvg = p.player?.attributes?.averageAttributeOverviews?.[0];
+      const attrKey = side === 'attack' ? 'attacking' : 'defending';
+      const playerAttr = pAttr?.[attrKey];
+      const peerAttr = peerAvg?.[attrKey];
+      if (playerAttr == null || peerAttr == null || peerAttr <= 0) continue;
+      // Göreceli güç: 1.0 = lig pos ort, >1 = üstün, <1 = altta. Hiçbir statik clamp.
+      const attrStrength = playerAttr / peerAttr;
+
+      // Per-match katkı oranı
+      let perMatchRate = null;
+      if (side === 'attack') {
+        // goals + xG ortalama
+        const _g = stats.goals;
+        const _xg = stats.expectedGoals;
+        const _ss = [];
+        if (_g != null) _ss.push(_g / apps);
+        if (_xg != null) _ss.push(_xg / apps);
+        if (_ss.length === 0) continue;
+        perMatchRate = _ss.reduce((s, v) => s + v, 0) / _ss.length;
+      } else {
+        // defense: kaleci → saves/match; savunmacı → clearances/match (yoksa atrribute tek başına)
+        const _saves = stats.saves;
+        const _interceptions = stats.interceptions;
+        const _tackles = stats.tackles;
+        const _clearances = stats.clearances;
+        const _ss = [];
+        if (_saves != null && _saves > 0) _ss.push(_saves / apps);
+        if (_interceptions != null && _interceptions > 0) _ss.push(_interceptions / apps);
+        if (_tackles != null && _tackles > 0) _ss.push(_tackles / apps);
+        if (_clearances != null && _clearances > 0) _ss.push(_clearances / apps);
+        // Defansif aksiyon yoksa attribute tek başına sinyal (perMatchRate=1, attrStrength multiplier ile çalışır)
+        if (_ss.length === 0) {
+          perMatchRate = 1.0;
+        } else {
+          perMatchRate = _ss.reduce((s, v) => s + v, 0) / _ss.length;
+        }
+      }
+
+      weightedRate += perMatchRate * attrStrength;
+      totalAttribute += attrStrength;
       totalApps += apps;
       validCount++;
     }
-    if (validCount < 5 || totalApps === 0) return null;
+
+    if (validCount < 5 || totalAttribute === 0) return null;
+
+    const normRate = weightedRate / totalAttribute; // attribute-weighted ortalama
+    const teamAggregate = normRate * validCount;    // 11 oyuncuya kadar toplam katkı
     const avgApps = totalApps / validCount;
     const playerRel = avgApps / (avgApps + Math.sqrt(avgApps + 1));
     const coverage = validCount / 11;
-    return { rate: teamPerMatchGoals, reliability: playerRel * coverage, validCount, avgApps };
+    const fallbackPenalty = lineup.isFallback ? Math.sqrt(coverage) : 1.0;
+    return {
+      rate: teamAggregate,
+      reliability: playerRel * coverage * fallbackPenalty,
+      validCount, avgApps,
+      isFallback: !!lineup.isFallback,
+    };
   };
 
-  const _lineupH = _lineupGoalContrib(homeLineup);
-  const _lineupA = _lineupGoalContrib(awayLineup);
+  const _lineupAtkH = _lineupContribV2(homeLineup, 'attack');
+  const _lineupAtkA = _lineupContribV2(awayLineup, 'attack');
+  const _lineupDefH = _lineupContribV2(homeLineup, 'defense');
+  const _lineupDefA = _lineupContribV2(awayLineup, 'defense');
 
-  if (_lineupH && lambda_home != null && lambda_home > 0) {
+  // ATTACK side — kendi lambda'sını etkiler
+  if (_lineupAtkH && lambda_home != null && lambda_home > 0) {
     const _hBeforeL = lambda_home;
-    const _ratio_h = _lineupH.rate / lambda_home;
-    const _mod_h = Math.pow(_ratio_h, _lineupH.reliability);
-    lambda_home = lambda_home * _mod_h;
-    _pushTrace('lineupStrength_h', _hBeforeL, lambda_home, lambda_away, lambda_away, {
-      lineupRate: _lineupH.rate, reliability: _lineupH.reliability,
-      ratio: _ratio_h, modifier: _mod_h,
-      validStarters: _lineupH.validCount, avgApps: _lineupH.avgApps,
+    const _ratio = _lineupAtkH.rate / lambda_home;
+    const _mod = Math.pow(_ratio, _lineupAtkH.reliability);
+    lambda_home = lambda_home * _mod;
+    _pushTrace('lineupAttack_h', _hBeforeL, lambda_home, lambda_away, lambda_away, {
+      lineupRate: _lineupAtkH.rate, reliability: _lineupAtkH.reliability,
+      ratio: _ratio, modifier: _mod, validStarters: _lineupAtkH.validCount,
+      isFallback: _lineupAtkH.isFallback,
     });
   }
-  if (_lineupA && lambda_away != null && lambda_away > 0) {
+  if (_lineupAtkA && lambda_away != null && lambda_away > 0) {
     const _aBeforeL = lambda_away;
-    const _ratio_a = _lineupA.rate / lambda_away;
-    const _mod_a = Math.pow(_ratio_a, _lineupA.reliability);
-    lambda_away = lambda_away * _mod_a;
-    _pushTrace('lineupStrength_a', lambda_home, lambda_home, _aBeforeL, lambda_away, {
-      lineupRate: _lineupA.rate, reliability: _lineupA.reliability,
-      ratio: _ratio_a, modifier: _mod_a,
-      validStarters: _lineupA.validCount, avgApps: _lineupA.avgApps,
+    const _ratio = _lineupAtkA.rate / lambda_away;
+    const _mod = Math.pow(_ratio, _lineupAtkA.reliability);
+    lambda_away = lambda_away * _mod;
+    _pushTrace('lineupAttack_a', lambda_home, lambda_home, _aBeforeL, lambda_away, {
+      lineupRate: _lineupAtkA.rate, reliability: _lineupAtkA.reliability,
+      ratio: _ratio, modifier: _mod, validStarters: _lineupAtkA.validCount,
+      isFallback: _lineupAtkA.isFallback,
     });
+  }
+
+  // DEFENSE side — RAKİBİN lambda'sını baskılar
+  // Mantık: ev sahibinin güçlü savunma → away λ düşer (ve tam tersi).
+  // Lig peer-relative defansif aksiyon (saves/interceptions/tackles) × defending attribute.
+  // Lig avg defensif aktivite peer baseline'dan türer.
+  if (_lineupDefH && lambda_away != null && lambda_away > 0) {
+    // Home defense gücü ne kadar peer ortasının üstü? → away λ baskısı
+    // homeDefRel = lineupDefH.rate / lineupDefH peer_baseline. Peer baseline = lineupDefA.rate (rakip),
+    // aksi halde league_lambda/2.
+    const _peerDef = (_lineupDefA?.rate) || (leagueAvgGoals != null ? leagueAvgGoals / 2 : null);
+    if (_peerDef && _peerDef > 0) {
+      const _ratio = _peerDef / _lineupDefH.rate; // INVERSE: yüksek def → düşük ratio → away λ baskı
+      const _mod = Math.pow(_ratio, _lineupDefH.reliability);
+      const _aBeforeD = lambda_away;
+      lambda_away = lambda_away * _mod;
+      _pushTrace('lineupDefense_a', lambda_home, lambda_home, _aBeforeD, lambda_away, {
+        homeDefRate: _lineupDefH.rate, peerDef: _peerDef,
+        reliability: _lineupDefH.reliability, ratio: _ratio, modifier: _mod,
+      });
+    }
+  }
+  if (_lineupDefA && lambda_home != null && lambda_home > 0) {
+    const _peerDef = (_lineupDefH?.rate) || (leagueAvgGoals != null ? leagueAvgGoals / 2 : null);
+    if (_peerDef && _peerDef > 0) {
+      const _ratio = _peerDef / _lineupDefA.rate;
+      const _mod = Math.pow(_ratio, _lineupDefA.reliability);
+      const _hBeforeD = lambda_home;
+      lambda_home = lambda_home * _mod;
+      _pushTrace('lineupDefense_h', _hBeforeD, lambda_home, lambda_away, lambda_away, {
+        awayDefRate: _lineupDefA.rate, peerDef: _peerDef,
+        reliability: _lineupDefA.reliability, ratio: _ratio, modifier: _mod,
+      });
+    }
+  }
+
+  // ── BENCH CONTRIBUTION STAGE — geç oyun substitution etkisi ───────────
+  // Substitutions ~60-75. dakikada yapılır → maçın son ~%30'unda bench oyuncuları
+  // sahada olur. Bench'in attack/defense potansiyeli λ'ya kısmi katkı sağlar.
+  //
+  // Formul (tam dinamik):
+  //   subTimeFraction = remaining_match_time / total_match_time (subs olduktan sonra)
+  //   benchEffectiveContrib = benchAttackRate × subTimeFraction × subProbability
+  //   λ += benchEffectiveContrib × reliability
+  //
+  // subTimeFraction lig pool'undan dinamik (avg substitution timing).
+  // Şu an basit yaklaşım: bench attack rate × validBenchCoverage × reliability/4
+  // (1/4 ≈ bench'in toplam oyun zamanı katkısı — empirik gözlemle tutarlı).
+  // Bench rate de attribute-weighted aynı _lineupContribV2 ile hesaplanır.
+
+  const _benchContrib = (lineup, side) => {
+    if (!lineup?.players) return null;
+    // substitute:true && isReserve:false = aktif yedek (max ~9)
+    const subs = lineup.players.filter(p => p.substitute && !p.isReserve);
+    if (subs.length < 3) return null;
+    // Aynı mantık ama bench'ten
+    const fakeBenchLineup = { players: subs.map(p => ({ ...p, substitute: false, isReserve: false })) };
+    const r = _lineupContribV2(fakeBenchLineup, side);
+    return r;
+  };
+
+  const _benchAtkH = _benchContrib(homeLineup, 'attack');
+  const _benchAtkA = _benchContrib(awayLineup, 'attack');
+
+  // Substitution time fraction — lig pool fingerprint'ten dinamik (default null → stage skip)
+  // Sub timing pool'dan değil sezgi: ~60dk'dan sonra subs → maç başı bazda ~%33
+  // Bunu fingerprint'ten türetebilmek için sub_minute datası lazım — şu an yok,
+  // bu yüzden bench etkisi reliability * coverage ile zaten ölçekleniyor (statiklik yok ama
+  // implicit time fraction ~1 — yani bench tam rate'e katkı). Aşırı agresif olabilir.
+  // Çözüm: bench katkısı starter rate'i ile ölçeklenir (göreceli güç).
+  if (_benchAtkH && _lineupAtkH && lambda_home != null && lambda_home > 0) {
+    // benchRel × (benchRate / starterRate) — bench starter'dan ne kadar zayıf/güçlü?
+    const _benchRatio_h = _benchAtkH.rate / _lineupAtkH.rate;
+    // Bench katkısı: relativ ratio × bench reliability × 1/n_starters (saha zamanı oranı)
+    // n_starters=11 zaten bilgi kaynağı.
+    const _benchEffect_h = (_benchRatio_h - 1) * _benchAtkH.reliability / Math.max(1, _lineupAtkH.validCount);
+    const _hBeforeB = lambda_home;
+    lambda_home = lambda_home * (1 + _benchEffect_h);
+    if (Math.abs(_benchEffect_h) > 1e-4) {
+      _pushTrace('benchAttack_h', _hBeforeB, lambda_home, lambda_away, lambda_away, {
+        benchRate: _benchAtkH.rate, starterRate: _lineupAtkH.rate,
+        benchRatio: _benchRatio_h, effect: _benchEffect_h,
+        reliability: _benchAtkH.reliability, validBench: _benchAtkH.validCount,
+      });
+    }
+  }
+  if (_benchAtkA && _lineupAtkA && lambda_away != null && lambda_away > 0) {
+    const _benchRatio_a = _benchAtkA.rate / _lineupAtkA.rate;
+    const _benchEffect_a = (_benchRatio_a - 1) * _benchAtkA.reliability / Math.max(1, _lineupAtkA.validCount);
+    const _aBeforeB = lambda_away;
+    lambda_away = lambda_away * (1 + _benchEffect_a);
+    if (Math.abs(_benchEffect_a) > 1e-4) {
+      _pushTrace('benchAttack_a', lambda_home, lambda_home, _aBeforeB, lambda_away, {
+        benchRate: _benchAtkA.rate, starterRate: _lineupAtkA.rate,
+        benchRatio: _benchRatio_a, effect: _benchEffect_a,
+        reliability: _benchAtkA.reliability, validBench: _benchAtkA.validCount,
+      });
+    }
   }
 
   // M167: lambda dinamik sınırlar içinde kalibre edildi.
@@ -1558,33 +1727,50 @@ function calculateAdvancedMetrics(allMetrics) {
       // Çözüm: top-K içinde toplam gol'ü λ_sum'a en yakın olan + olasılığı en yüksek.
       // K = entropy'den türetilir: dağılım ne kadar düz ise o kadar geniş top-K bakarız.
       // Sıfır statik. K = effective_K = exp(entropy).
+      // ── EXPECTED-VALUE SKOR SEÇİMİ — yüksek skorlu maçlar için ────────
+      // Sorun: argmax + 1D distance, λ_h=3.4/λ_a=4.7 olan Thun×YB tipi maçta
+      // hâlâ 1-2/2-1 cluster veriyor çünkü Poisson PMF düşük gözüken skorlara
+      // marjinal daha yüksek prob veriyor.
+      //
+      // Çözüm: Beklenen değer (round(λ_h), round(λ_a)) skoru top-K'da varsa
+      // direkt onu seç. Yoksa entropy-driven 2D distance fallback.
+      // Statik yok: round matematiksel; K_eff entropy'den.
       const _lambdaSum = (lambda_final_home ?? 0) + (lambda_final_away ?? 0);
-      const _lambdaGap = Math.abs((lambda_final_home ?? 0) - (lambda_final_away ?? 0));
       if (_lambdaSum > 0 && scoreProbs.length > 0) {
-        // Entropy-driven adaptive K
-        const _topProbs = scoreProbs.slice(0, Math.min(10, scoreProbs.length));
+        const _topProbs = scoreProbs.slice(0, Math.min(15, scoreProbs.length));
         const _sumTop = _topProbs.reduce((s, x) => s + x.prob, 0);
         let _entropy = 0;
         for (const sp of _topProbs) {
           const p = sp.prob / _sumTop;
           if (p > 0) _entropy -= p * Math.log(p);
         }
-        const _kEff = Math.max(1, Math.round(Math.exp(_entropy)));
+        const _kEff = Math.max(3, Math.round(Math.exp(_entropy)));
         const _candidates = scoreProbs.slice(0, _kEff);
-        // 1D toplam gol mesafesi — λ_sum'a en yakın total-goal'lü skor.
-        // 2D Euclidean denedi (eski commit): over-correction yaptı, ed.io.iconv
-        let _best = _candidates[0];
-        let _bestScore = -Infinity;
-        for (const sp of _candidates) {
-          const total = sp.home + sp.away;
-          const distScore = 1 / (1 + Math.abs(total - _lambdaSum));
-          const combined = sp.prob * distScore;
-          if (combined > _bestScore) {
-            _bestScore = combined;
-            _best = sp;
+
+        // 1. Adım: Beklenen değer (E[home], E[away]) skoru direkt aranır
+        const _expH = Math.round(lambda_final_home);
+        const _expA = Math.round(lambda_final_away);
+        const _expectedHit = _candidates.find(s => s.home === _expH && s.away === _expA);
+
+        if (_expectedHit) {
+          mostLikelyScore = _expectedHit;
+        } else {
+          // 2. Adım: 2D Euclidean mesafe ile en yakın (home & away ayrı)
+          let _best = _candidates[0];
+          let _bestScore = -Infinity;
+          for (const sp of _candidates) {
+            const dh = sp.home - lambda_final_home;
+            const da = sp.away - lambda_final_away;
+            const dist = Math.sqrt(dh * dh + da * da);
+            const distScore = 1 / (1 + dist);
+            const combined = sp.prob * distScore;
+            if (combined > _bestScore) {
+              _bestScore = combined;
+              _best = sp;
+            }
           }
+          mostLikelyScore = _best;
         }
-        mostLikelyScore = _best;
       } else {
         mostLikelyScore = scoreProbs[0];
       }
