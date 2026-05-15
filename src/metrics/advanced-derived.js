@@ -1753,49 +1753,72 @@ function calculateAdvancedMetrics(allMetrics) {
         const _kEff = Math.max(3, Math.round(Math.exp(_entropy)));
         const _candidates = scoreProbs.slice(0, _kEff);
 
+        // Ağırlık öncelik mantığı (sıfır statik):
+        //   1) homeScoreProfile (sadece EV maçları, tournament-filtered) — ana sinyal
+        //   2) awayScoreProfile (sadece DEP maçları, tournament-filtered) — perspektif çevrilir
+        //   3) matchScoreProfile (H2H) — bu iki takımın birlikte geçmişi
+        //   4) leagueFingerprint — lig genel, AMA home/away ayırımı yapmıyor.
+        //      Bu yüzden ağırlığı takım toplamından FAZLA OLAMAZ (clamp).
+        //      Aksi halde n=4 takım profili n=60 lig pool tarafından ezilir.
+        const _teamWeightSum =
+          (homeScoreProfile?.n || 0) +
+          (awayScoreProfile?.n || 0) +
+          (matchScoreProfile?.n || 0) * 2;
+
         const _empFreqFor = (key) => {
           const srcs = [];
-          // Takım profile jointDist'i jointDist[`s-c`] formatında (scored-conceded perspektifi).
-          // homeScoreProfile: home perspektifi → key 'h-a' = scored=h conceded=a
+          const [h, a] = key.split('-').map(Number);
+
+          // 1. homeScoreProfile: home perspektifi (scored=h, conceded=a) — direkt key
           if (homeScoreProfile?.jointDist?.[key] != null && homeScoreProfile.n > 0) {
-            srcs.push({ f: homeScoreProfile.jointDist[key], w: homeScoreProfile.n });
+            srcs.push({ f: homeScoreProfile.jointDist[key], w: homeScoreProfile.n, src: 'home' });
           }
-          // awayScoreProfile: away perspektifi → scored=a, conceded=h, key 'a-h' aranır
+          // 2. awayScoreProfile: away perspektifi (scored=a, conceded=h) → çevrilir
           if (awayScoreProfile?.jointDist && awayScoreProfile.n > 0) {
-            const [h, a] = key.split('-').map(Number);
             const awayKey = `${a}-${h}`;
             if (awayScoreProfile.jointDist[awayKey] != null) {
-              srcs.push({ f: awayScoreProfile.jointDist[awayKey], w: awayScoreProfile.n });
+              srcs.push({ f: awayScoreProfile.jointDist[awayKey], w: awayScoreProfile.n, src: 'away' });
             }
           }
-          // matchScoreProfile (H2H): bu maçın home perspektifi key 'h-a'
+          // 3. matchScoreProfile (H2H): direkt key (home perspektifi)
           if (matchScoreProfile?.jointDist?.[key] != null && matchScoreProfile.n > 0) {
-            // H2H direkt sinyal — 2× ağırlık (her iki takımın birlikte geçmişi)
-            srcs.push({ f: matchScoreProfile.jointDist[key], w: matchScoreProfile.n * 2 });
+            srcs.push({ f: matchScoreProfile.jointDist[key], w: matchScoreProfile.n * 2, src: 'h2h' });
           }
-          // leagueFingerprint: lig genel skor sıklığı
+          // 4. leagueFingerprint: lig genel — ağırlığı takım toplamıyla SINIRLI.
+          //    Takım+H2H verisi yoksa lig kendi ağırlığında girer; varsa onların gölgesinde.
           if (leagueFingerprint?.jointDist?.[key] != null && leagueFingerprint.poolSize > 0) {
-            srcs.push({ f: leagueFingerprint.jointDist[key], w: leagueFingerprint.poolSize });
+            const lgW = _teamWeightSum > 0
+              ? Math.min(leagueFingerprint.poolSize, _teamWeightSum)
+              : leagueFingerprint.poolSize;
+            srcs.push({ f: leagueFingerprint.jointDist[key], w: lgW, src: 'league' });
           }
-          if (srcs.length === 0) return 0;
+          if (srcs.length === 0) return { freq: 0, sources: [] };
           const totalW = srcs.reduce((s, x) => s + x.w, 0);
-          return srcs.reduce((s, x) => s + x.f * x.w, 0) / totalW;
+          const freq = srcs.reduce((s, x) => s + x.f * x.w, 0) / totalW;
+          return { freq, sources: srcs };
         };
 
         let _best = _candidates[0];
         let _bestScore = -Infinity;
+        const _scoreDebug = [];
         for (const sp of _candidates) {
           const key = `${sp.home}-${sp.away}`;
-          const empFreq = _empFreqFor(key);
+          const ef = _empFreqFor(key);
           // combined = blended_prob × (1 + empFreq)
-          // empFreq ∈ [0, 1] → boost faktörü [1, 2]. Empirik veri yoksa boost=1 (pure blend).
-          const combined = sp.prob * (1 + empFreq);
+          const combined = sp.prob * (1 + ef.freq);
+          _scoreDebug.push({ key, prob: sp.prob, empFreq: ef.freq, combined, sources: ef.sources });
           if (combined > _bestScore) {
             _bestScore = combined;
             _best = sp;
           }
         }
         mostLikelyScore = _best;
+        // Skor seçim trace'i (kaynaklar görünür kıl)
+        _ldDiag.scoreSelection = {
+          chosen: `${_best.home}-${_best.away}`,
+          teamWeightSum: _teamWeightSum,
+          topCandidates: _scoreDebug.sort((a, b) => b.combined - a.combined).slice(0, 5),
+        };
       } else {
         mostLikelyScore = scoreProbs[0];
       }
