@@ -620,9 +620,13 @@ function generatePrediction(metricsResult, data, baseline, audit, rng) {
         _bttsSources.push({ val: _matchBTTSRate * 100, w: matchScoreProfile.n * 2 });
       }
       if (_bttsTeamSignal != null) {
-        // Takım çifti gol atma kapasitesi — scoring rate geometrik ortalaması
+        // Takım çifti gol atma kapasitesi — scoring rate geometrik ortalaması.
+        // Ağırlık: Bayesian shrinkage n/(n+sqrt(n+1)) — eski statik 0.5 kaldırıldı.
         const _teamN = Math.min(homeScoreProfile?.n || 0, awayScoreProfile?.n || 0);
-        if (_teamN >= 3) _bttsSources.push({ val: _bttsTeamSignal, w: _teamN * 0.5 });
+        if (_teamN >= 3) {
+          const _teamW = _teamN / (_teamN + Math.sqrt(_teamN + 1));
+          _bttsSources.push({ val: _bttsTeamSignal, w: _teamN * _teamW });
+        }
       }
       // BTTS eşik default: league fingerprint btts oranı varsa ondan
       let bttsDynamicThreshold = (leagueFingerprint?.bttsRate != null)
@@ -747,26 +751,29 @@ function generatePrediction(metricsResult, data, baseline, audit, rng) {
       const aGkMod = computeBlockZoneModifier('GK_REFLEKS', aZQR, aLQR, aDynW);
       const aOverallMod = Math.sqrt(aAtkMod * aDefMod);
 
+      // null × mod = null (0 değil!) — eksik veri 0 olarak gösterilmez.
+      // Sıfır gerçek bir değer; null "veri yok" demektir → UI ayırt edebilsin.
+      const _mul = (v, m) => (v != null && isFinite(v)) ? round2(v * m) : null;
       return {
         home: {
-          attackPower: round2((home.compositeScores.M156 ?? 0) * hAtkMod),
-          defensePower: round2((home.compositeScores.M157 ?? 0) * hDefMod),
-          form: round2(home.compositeScores.M158),  // Form kadrodan etkilenmez
-          playerQuality: round2((home.compositeScores.M159 ?? 0) * hLQR), // Direkt LQR (tam etki)
-          goalkeeperPower: round2((home.compositeScores.M160 ?? 0) * hGkMod),
-          momentum: round2(home.compositeScores.M164),  // Momentum kadrodan etkilenmez
-          overallPower: round2((home.compositeScores.M166 ?? 0) * hOverallMod),
+          attackPower:    _mul(home.compositeScores.M156, hAtkMod),
+          defensePower:   _mul(home.compositeScores.M157, hDefMod),
+          form:           round2(home.compositeScores.M158),
+          playerQuality:  _mul(home.compositeScores.M159, hLQR),
+          goalkeeperPower:_mul(home.compositeScores.M160, hGkMod),
+          momentum:       round2(home.compositeScores.M164),
+          overallPower:   _mul(home.compositeScores.M166, hOverallMod),
           lineupQualityRatio: round2(hLQR * 100) / 100,
           zoneQualityRatios: hZQR,
         },
         away: {
-          attackPower: round2((away.compositeScores.M156 ?? 0) * aAtkMod),
-          defensePower: round2((away.compositeScores.M157 ?? 0) * aDefMod),
-          form: round2(away.compositeScores.M158),
-          playerQuality: round2((away.compositeScores.M159 ?? 0) * aLQR),
-          goalkeeperPower: round2((away.compositeScores.M160 ?? 0) * aGkMod),
-          momentum: round2(away.compositeScores.M164),
-          overallPower: round2((away.compositeScores.M166 ?? 0) * aOverallMod),
+          attackPower:    _mul(away.compositeScores.M156, aAtkMod),
+          defensePower:   _mul(away.compositeScores.M157, aDefMod),
+          form:           round2(away.compositeScores.M158),
+          playerQuality:  _mul(away.compositeScores.M159, aLQR),
+          goalkeeperPower:_mul(away.compositeScores.M160, aGkMod),
+          momentum:       round2(away.compositeScores.M164),
+          overallPower:   _mul(away.compositeScores.M166, aOverallMod),
           lineupQualityRatio: round2(aLQR * 100) / 100,
           zoneQualityRatios: aZQR,
         },

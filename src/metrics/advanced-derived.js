@@ -989,24 +989,17 @@ function calculateAdvancedMetrics(allMetrics) {
       const _trigger = (calibrationRatio > 1 + _tol) || (calibrationRatio < 1 - _tol);
 
       if (_trigger) {
-        // ASİMETRİK SCALING — 50-maç audit bulgusuna göre revize.
-        //
-        // Sorun: Tournament-filtered scoreProfile UCL takımları için sadece UCL
-        // maçlarını kullanıyor → reference total < dcBase λ_sum → modifier λ'ları
-        // sistematik AŞAĞI çekiyor (-%12.5 deflate, OU2.5 isabeti %36 düşürdü).
-        //
-        // Çözüm:
-        //   - Yukarı çekme (ratio > 1, reference > λ_sum): exponent=reliability (TAM güç)
-        //     Lambda altta kaldı, takım profili "aslında daha çok atıyor" diyor → güven.
-        //   - Aşağı çekme (ratio < 1, reference < λ_sum): exponent=reliability/2 (YARIM güç)
-        //     Lambda yukarda. Tournament-filter düşük örneklem gürültüsü olabilir.
-        //     Yarım güç → ortalama deflate -%12.5 → -%6 (kontrollü).
-        //
-        // Yön mantığı:
-        //   ratio > 1: takım profili lambda'dan büyük → boost
-        //   ratio < 1: takım profili lambda'dan küçük → shrink (ama yumuşak)
+        // ASİMETRİK SCALING — yukarı/aşağı yön farklı güçle çekilir.
+        //   ratio > 1 (lambda referansın altında):
+        //     Takım profili "daha çok atıyor" diyor → BOOST tam güçle (exponent = reliability)
+        //   ratio < 1 (lambda referansın üstünde):
+        //     Tournament-filter düşük örneklem gürültüsü olabilir → SHRINK kontrollü.
+        //     "Yarım güç" eski statik 0.5'i kullanıyordu — şimdi cv'den dinamik:
+        //     shrinkFactor = 1 - cv (düşük cv → tutuculuk → küçük expo)
+        //     Yüksek cv → büyük expo → şişiren lambda'yı agresif çek.
         const _baseExponent = Math.max(0, Math.min(1, referenceReliability));
-        const _exponent = calibrationRatio >= 1 ? _baseExponent : _baseExponent * 0.5;
+        const _shrinkFactor = _cv != null ? Math.max(0, Math.min(1, 1 - _cv)) : 0.5;
+        const _exponent = calibrationRatio >= 1 ? _baseExponent : _baseExponent * _shrinkFactor;
         let scalingFactor = Math.pow(calibrationRatio, _exponent);
         const exponent = _exponent; // legacy trace için
 
@@ -1055,30 +1048,43 @@ function calculateAdvancedMetrics(allMetrics) {
   // Legacy M156-M160 scores (UI uyumluluğu için korunur — birimler 0-1 aralığında olduğundan
   // *50 ile 0-50 skala aralığına taşınır; bu ölçekleme keyfidir, yalnızca UI gösterimi içindir)
 
-  // M156: Biteş Gücü — M011 + M018 lig ortalamasına göre normalize, *50 UI skalası
-  // BITIRICILIK bloğundan ayrıldı (circular dependency kırıldı — bkz. match-simulator.js)
-  // Keyfi katsayı yok: her metrik kendi lig ortalamasına bölünür → 1.0 nötr nokta
-  // Diğer M15x metriklerle tutarlı: normalizedRatio × 50
+  // M156: Bitirici Gücü — atak göstergesi (lig ortalamasına göre normalize × 50 UI skalası)
+  // Kaynak hiyerarşisi (hiçbir statik katsayı yok, tüm fallback'ler ölçülen veri):
+  //   1) M011 (İsabetli Şut → Gol %) ve M018 (Şut → Gol Dönüşümü) — primary
+  //   2) M001 (Maç başı atılan gol) / leagueM001 — fallback (her takımda var)
+  //   3) scoreProfile.avgScored / leagueAvg — son fallback
+  // Vals dağılımı [normMinRatio, normMaxRatio]'ya clamp edilir (sabit 0.5/2.0 yerine
+  // ölçülen lig dağılımı sınırları — Bayern 2.3× lig, Burnley 0.4× lig).
   const leagueM011 = dynamicAvgs?.M011 ?? null;
   const leagueM018 = dynamicAvgs?.M018 ?? null;
+  const leagueM001 = dynamicAvgs?.M001 ?? null;
 
-  const calcM156 = (m011, m018) => {
-    // KÖKSEL FIX: homeFlat aslında homeFlat_w (MetricValue wrapper'lı).
-    // calcM156 ham sayı bekliyor, ama wrapper geçince division NaN üretirdi.
-    // unwrap ile wrapper'ı çöz (yukarıda zaten import edilmiş).
+  const calcM156 = (m011, m018, m001, scoreProfile) => {
     const _m011 = unwrap(m011);
     const _m018 = unwrap(m018);
-    const c1 = (_m011 != null && leagueM011 != null && leagueM011 > 0) ? _m011 / leagueM011 : null;
-    const c2 = (_m018 != null && leagueM018 != null && leagueM018 > 0) ? _m018 / leagueM018 : null;
-    const vals = [c1, c2].filter(v => v != null);
+    const _m001 = unwrap(m001);
+    const vals = [];
+    if (_m011 != null && leagueM011 != null && leagueM011 > 0) vals.push(_m011 / leagueM011);
+    if (_m018 != null && leagueM018 != null && leagueM018 > 0) vals.push(_m018 / leagueM018);
+    // Fallback 1: M001 (her takımda olan en basit atak göstergesi)
+    if (vals.length === 0 && _m001 != null && leagueM001 != null && leagueM001 > 0) {
+      vals.push(_m001 / leagueM001);
+    }
+    // Fallback 2: scoreProfile avgScored vs lig ortalaması
+    if (vals.length === 0 && scoreProfile?.avgScored != null && leagueAvgGoals > 0) {
+      vals.push(scoreProfile.avgScored / leagueAvgGoals);
+    }
     if (vals.length === 0) return null;
-    // Eşit ağırlıklı ortalama → [0.5, 2.0] aralığına clamp → ×50 UI skalası
-    const normAvg = clamp(vals.reduce((a, b) => a + b, 0) / vals.length, 0.5, 2.0);
+    // Clamp aralığı lig dağılımından dinamik (normMin/Max kaldırıldıysa 0/∞)
+    const minR = allMetrics.normMinRatio ?? 0;
+    const maxR = allMetrics.normMaxRatio ?? Infinity;
+    const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
+    const normAvg = Math.max(minR, Math.min(maxR, avg));
     return normAvg * 50;
   };
 
-  const M156_home = calcM156(homeFlat.M011, homeFlat.M018);
-  const M156_away = calcM156(awayFlat.M011, awayFlat.M018);
+  const M156_home = calcM156(homeFlat.M011, homeFlat.M018, homeFlat.M001, homeScoreProfile);
+  const M156_away = calcM156(awayFlat.M011, awayFlat.M018, awayFlat.M001, awayScoreProfile);
   const M157_home = homeUnits.SAVUNMA_DIRENCI * 50;
   const M157_away = awayUnits.SAVUNMA_DIRENCI * 50;
   const M158_home = homeUnits.FORM_KISA * 50;
@@ -1160,10 +1166,21 @@ function calculateAdvancedMetrics(allMetrics) {
       const lambdaLg = leagueAvgGoals / 2;
       const _lfRel_rho = leagueFingerprint?.reliability ?? 0;
       // Gözlem kaynakları, en güvenilirden zayıfa
+      // leagueDrawTendency = observed/poisson oran. Gözlemlenen draw oranını
+      // geri türetmek: D_obs = D_poiss_naive × tendency. Naive D_poiss leagueAvg
+      // ortalama λ ile P(0,0)+P(1,1)+...
+      let _D_naive = null;
+      if (allMetrics.leagueDrawTendency != null && leagueAvgGoals > 0) {
+        const _lambdaNaive = leagueAvgGoals / 2;
+        let _dNaive = 0;
+        for (let k = 0; k <= 7; k++) {
+          _dNaive += poissonPMF(k, _lambdaNaive) * poissonPMF(k, _lambdaNaive);
+        }
+        _D_naive = _dNaive * allMetrics.leagueDrawTendency;
+      }
       const D_obs = leagueFingerprint?.leagueDrawRate
         ?? leagueFingerprint?.leagueDrawRate_std
-        ?? (allMetrics.leagueDrawTendency != null && leagueAvgGoals != null
-              ? allMetrics.leagueDrawTendency * 0.25 : null);
+        ?? _D_naive;
       if (D_obs == null) return null;
       // Poisson beraberlik tahmini (her k için P(k,k))
       let D_poiss = 0;
