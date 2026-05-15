@@ -23,7 +23,8 @@ function calculateAdvancedMetrics(allMetrics) {
     homeMVBreakdown, awayMVBreakdown,
     homeScoreProfile, awayScoreProfile, matchScoreProfile,
     leagueFingerprint,
-    homeTeamId, awayTeamId } = allMetrics;
+    homeTeamId, awayTeamId,
+    homeLineup, awayLineup } = allMetrics;
 
   // leagueAvgGoals çözüm hiyerarşisi (statik sabit yasak — yalnızca API verisinden türetme):
   //   1. standings'ten doğrudan hesaplanan değer (_leagueAvgGoals)
@@ -1039,6 +1040,72 @@ function calculateAdvancedMetrics(allMetrics) {
   // Motivation damping + magnitude shrinkage kaldırıldı — her ikisi over-correction
   // (10-13 draw tahmin) yaratıyordu. α/β Bayesian shrinkage + temperature scaling
   // reliability sinyalini yeterli ölçüde kapsıyor.
+
+  // ── LINEUP STRENGTH STAGE ─────────────────────────────────────────────
+  // Player verisi DİREKT λ'ya yansıtılır. Sıfır statik, tam dinamik.
+  // Sinyal: starter XI'in maç başına gol katkısı (goals + xG ortalaması, appearances'a normalize).
+  // Reliability: (avg_appearances Bayesian) × (lineup_coverage = validPlayers / 11).
+  // Modifier: lineup_rate / current_λ; pow(rel) ile uygulanır.
+  //   rel=1 ve lineup_rate=2×λ → λ doubled
+  //   rel=0.1 → minimal etki (data güvensiz)
+  // dcBase α/β ile çift sayım yok: α/β takım-output (gol/maç), lineup player-input
+  // (kim sahada). Bağımsız sinyaller, farklı eksen.
+  const _lineupGoalContrib = (lineup) => {
+    if (!lineup?.players) return null;
+    const starters = lineup.players.filter(p => !p.substitute && !p.isReserve).slice(0, 11);
+    if (starters.length < 5) return null;
+    let teamPerMatchGoals = 0;
+    let totalApps = 0;
+    let validCount = 0;
+    for (const p of starters) {
+      const stats = p.player?.statistics || p.player?.seasonStats?.statistics;
+      if (!stats?.appearances || stats.appearances < 1) continue;
+      const apps = stats.appearances;
+      // İki eşdeğer kaynak (goals + xG) — her ikisi de oyuncudan, eşit ağırlık.
+      // xG kaynak yoksa sadece goals; goals yoksa sadece xG. Hiçbiri yoksa skip.
+      const _g = stats.goals;
+      const _xg = stats.expectedGoals;
+      const _sources = [];
+      if (_g != null) _sources.push(_g / apps);
+      if (_xg != null) _sources.push(_xg / apps);
+      if (_sources.length === 0) continue;
+      const playerRate = _sources.reduce((s, v) => s + v, 0) / _sources.length;
+      teamPerMatchGoals += playerRate;
+      totalApps += apps;
+      validCount++;
+    }
+    if (validCount < 5 || totalApps === 0) return null;
+    const avgApps = totalApps / validCount;
+    const playerRel = avgApps / (avgApps + Math.sqrt(avgApps + 1));
+    const coverage = validCount / 11;
+    return { rate: teamPerMatchGoals, reliability: playerRel * coverage, validCount, avgApps };
+  };
+
+  const _lineupH = _lineupGoalContrib(homeLineup);
+  const _lineupA = _lineupGoalContrib(awayLineup);
+
+  if (_lineupH && lambda_home != null && lambda_home > 0) {
+    const _hBeforeL = lambda_home;
+    const _ratio_h = _lineupH.rate / lambda_home;
+    const _mod_h = Math.pow(_ratio_h, _lineupH.reliability);
+    lambda_home = lambda_home * _mod_h;
+    _pushTrace('lineupStrength_h', _hBeforeL, lambda_home, lambda_away, lambda_away, {
+      lineupRate: _lineupH.rate, reliability: _lineupH.reliability,
+      ratio: _ratio_h, modifier: _mod_h,
+      validStarters: _lineupH.validCount, avgApps: _lineupH.avgApps,
+    });
+  }
+  if (_lineupA && lambda_away != null && lambda_away > 0) {
+    const _aBeforeL = lambda_away;
+    const _ratio_a = _lineupA.rate / lambda_away;
+    const _mod_a = Math.pow(_ratio_a, _lineupA.reliability);
+    lambda_away = lambda_away * _mod_a;
+    _pushTrace('lineupStrength_a', lambda_home, lambda_home, _aBeforeL, lambda_away, {
+      lineupRate: _lineupA.rate, reliability: _lineupA.reliability,
+      ratio: _ratio_a, modifier: _mod_a,
+      validStarters: _lineupA.validCount, avgApps: _lineupA.avgApps,
+    });
+  }
 
   // M167: lambda dinamik sınırlar içinde kalibre edildi.
   const M167_home = lambda_home != null ? round2(lambda_home) : null;

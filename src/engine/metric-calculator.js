@@ -287,6 +287,9 @@ function calculateAllMetrics(data) {
     // Takım kimlikleri — urgency fingerprint fallback için
     homeTeamId: data.homeTeamId ?? data.event?.event?.homeTeam?.id ?? null,
     awayTeamId: data.awayTeamId ?? data.event?.event?.awayTeam?.id ?? null,
+    // Lineup'lar — Lineup Strength λ stage'i için (player seasonStats kullanır)
+    homeLineup: data.lineups?.home ?? null,
+    awayLineup: data.lineups?.away ?? null,
     leagueAvgGoals,
     homeFormation, awayFormation,
     homeMatchCount: data.homeLastEvents?.length || 0,
