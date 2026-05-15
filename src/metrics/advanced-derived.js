@@ -1049,42 +1049,64 @@ function calculateAdvancedMetrics(allMetrics) {
   // *50 ile 0-50 skala aralığına taşınır; bu ölçekleme keyfidir, yalnızca UI gösterimi içindir)
 
   // M156: Bitirici Gücü — atak göstergesi (lig ortalamasına göre normalize × 50 UI skalası)
-  // Kaynak hiyerarşisi (hiçbir statik katsayı yok, tüm fallback'ler ölçülen veri):
-  //   1) M011 (İsabetli Şut → Gol %) ve M018 (Şut → Gol Dönüşümü) — primary
-  //   2) M001 (Maç başı atılan gol) / leagueM001 — fallback (her takımda var)
-  //   3) scoreProfile.avgScored / leagueAvg — son fallback
-  // Vals dağılımı [normMinRatio, normMaxRatio]'ya clamp edilir (sabit 0.5/2.0 yerine
-  // ölçülen lig dağılımı sınırları — Bayern 2.3× lig, Burnley 0.4× lig).
+  //
+  // Tüm kaynaklar VERİDEN hesaplanır — "fallback" YOK, eşdeğer dört veri yolu:
+  //   M011 (İsabetli Şut → Gol %): recent matches shot stats
+  //   M018 (Şut → Gol Dönüşümü):    recent matches shot/goal ratio
+  //   M001 (Maç başı atılan gol):   genel istatistik (her takımda var)
+  //   scoreProfile.avgScored:       tournament-filtered son N maç
+  //
+  // Bayesian reliability-weighted blend:
+  //   her kaynak kendi örnekleminden türeyen ağırlıkla karılır
+  //   w_i = n_i / (n_i + sqrt(n_i + 1))    Bayesian shrinkage
+  //   w_total = Σ w_i
+  //   M156 = Σ (val_i × w_i) / w_total
+  //
+  // Clamp: normMin/Max (lig dağılımından dinamik, sabit aralık yok).
   const leagueM011 = dynamicAvgs?.M011 ?? null;
   const leagueM018 = dynamicAvgs?.M018 ?? null;
   const leagueM001 = dynamicAvgs?.M001 ?? null;
 
-  const calcM156 = (m011, m018, m001, scoreProfile) => {
+  const calcM156 = (m011, m018, m001, scoreProfile, matchCount) => {
     const _m011 = unwrap(m011);
     const _m018 = unwrap(m018);
     const _m001 = unwrap(m001);
-    const vals = [];
-    if (_m011 != null && leagueM011 != null && leagueM011 > 0) vals.push(_m011 / leagueM011);
-    if (_m018 != null && leagueM018 != null && leagueM018 > 0) vals.push(_m018 / leagueM018);
-    // Fallback 1: M001 (her takımda olan en basit atak göstergesi)
-    if (vals.length === 0 && _m001 != null && leagueM001 != null && leagueM001 > 0) {
-      vals.push(_m001 / leagueM001);
+    const sources = [];
+
+    // Bayesian weight from sample size
+    const _w = (n) => n > 0 ? n / (n + Math.sqrt(n + 1)) : 0;
+
+    // M011 kaynak — son maçların shot verisinden (matchCount ≈ örneklem)
+    if (_m011 != null && leagueM011 != null && leagueM011 > 0) {
+      sources.push({ val: _m011 / leagueM011, w: _w(matchCount || 5) });
     }
-    // Fallback 2: scoreProfile avgScored vs lig ortalaması
-    if (vals.length === 0 && scoreProfile?.avgScored != null && leagueAvgGoals > 0) {
-      vals.push(scoreProfile.avgScored / leagueAvgGoals);
+    // M018 kaynak — aynı tabanlı (shot/goal conversion)
+    if (_m018 != null && leagueM018 != null && leagueM018 > 0) {
+      sources.push({ val: _m018 / leagueM018, w: _w(matchCount || 5) });
     }
-    if (vals.length === 0) return null;
-    // Clamp aralığı lig dağılımından dinamik (normMin/Max kaldırıldıysa 0/∞)
+    // M001 kaynak — sezon ortalaması (yüksek örneklem)
+    if (_m001 != null && leagueM001 != null && leagueM001 > 0) {
+      sources.push({ val: _m001 / leagueM001, w: _w(matchCount || 10) });
+    }
+    // scoreProfile kaynak — kendi N'i var
+    if (scoreProfile?.avgScored != null && leagueAvgGoals > 0 && scoreProfile.n > 0) {
+      sources.push({ val: scoreProfile.avgScored / leagueAvgGoals, w: _w(scoreProfile.n) });
+    }
+
+    if (sources.length === 0) return null;
+    const totalW = sources.reduce((s, x) => s + x.w, 0);
+    if (totalW <= 0) return null;
+    const blendedRatio = sources.reduce((s, x) => s + x.val * x.w, 0) / totalW;
+
+    // Lig dağılımına göre clamp (sabit 0.5/2.0 KALDIRILDI)
     const minR = allMetrics.normMinRatio ?? 0;
     const maxR = allMetrics.normMaxRatio ?? Infinity;
-    const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
-    const normAvg = Math.max(minR, Math.min(maxR, avg));
-    return normAvg * 50;
+    const normR = Math.max(minR, Math.min(maxR, blendedRatio));
+    return normR * 50;
   };
 
-  const M156_home = calcM156(homeFlat.M011, homeFlat.M018, homeFlat.M001, homeScoreProfile);
-  const M156_away = calcM156(awayFlat.M011, awayFlat.M018, awayFlat.M001, awayScoreProfile);
+  const M156_home = calcM156(homeFlat.M011, homeFlat.M018, homeFlat.M001, homeScoreProfile, homeMatchCount);
+  const M156_away = calcM156(awayFlat.M011, awayFlat.M018, awayFlat.M001, awayScoreProfile, awayMatchCount);
   const M157_home = homeUnits.SAVUNMA_DIRENCI * 50;
   const M157_away = awayUnits.SAVUNMA_DIRENCI * 50;
   const M158_home = homeUnits.FORM_KISA * 50;

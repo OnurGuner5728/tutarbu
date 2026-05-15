@@ -220,14 +220,17 @@ async function fetchAllMatchData(eventId) {
   const awayLastEvents0 = awayLastEvents0Res.status === 'fulfilled' ? awayLastEvents0Res.value.value : null;
   const awayLastEvents1 = awayLastEvents1Res.status === 'fulfilled' ? awayLastEvents1Res.value.value : null;
 
+  // mergeAndSortEvents tek hesap — eskiden 3 kez yapılıyordu (cache save +
+  // fetchRecentMatchDetails + return). Şimdi tek sonuç downstream'de re-use edilir.
+  const mergedHomeLastEvents = mergeAndSortEvents(homeLastEvents0, homeLastEvents1);
+  const mergedAwayLastEvents = mergeAndSortEvents(awayLastEvents0, awayLastEvents1);
+
   // API'den geldiyse DB'ye kaydet (bir sonraki maç için hazır)
-  if (!homeLastEventsCached) {
-    const merged = mergeAndSortEvents(homeLastEvents0, homeLastEvents1);
-    if (merged.length > 0) matchDB.saveTeamLastEvents(homeTeamId, merged);
+  if (!homeLastEventsCached && mergedHomeLastEvents.length > 0) {
+    matchDB.saveTeamLastEvents(homeTeamId, mergedHomeLastEvents);
   }
-  if (!awayLastEventsCached) {
-    const merged = mergeAndSortEvents(awayLastEvents0, awayLastEvents1);
-    if (merged.length > 0) matchDB.saveTeamLastEvents(awayTeamId, merged);
+  if (!awayLastEventsCached && mergedAwayLastEvents.length > 0) {
+    matchDB.saveTeamLastEvents(awayTeamId, mergedAwayLastEvents);
   }
 
   // 5. Lig/Turnuva verileri
@@ -289,12 +292,17 @@ async function fetchAllMatchData(eventId) {
     actualAwayManagerId ? cachedManagerLastEvents(actualAwayManagerId) : Promise.resolve(null),
   ]);
 
-  // 8. Derinlemesine Detaylar (H2H & Son Maçlar - Paralel)
-  const [h2hMatchDetails, homeRecentMatchDetails, awayRecentMatchDetails] = await Promise.all([
-    fetchH2HMatchDetails(h2hEvents),
-    fetchRecentMatchDetails(mergeAndSortEvents(homeLastEvents0, homeLastEvents1), 5),
-    fetchRecentMatchDetails(mergeAndSortEvents(awayLastEvents0, awayLastEvents1), 5),
-  ]);
+  // 8. Derinlemesine Detaylar — DUPLICATE FETCH ÖNLEME
+  // Eskiden Promise.all([h2h, homeRecent, awayRecent]) PARALEL başlıyordu.
+  // Eğer iki takım birbirine karşı oynamış veya H2H/recent event'leri çakışıyorsa,
+  // aynı eventId için 2 paralel cache miss tetikleniyor — API çağrısı 2× olur
+  // (cache yazılmadan ikincisi başlıyor).
+  //
+  // ÇÖZÜM: SIRALI çalıştır. fetchRecentMatchDetails kalıcı cache'e yazıyor,
+  // ikinci ve üçüncü çağrı cache'ten okur. SIRALI olduğunda cache hit garanti.
+  const homeRecentMatchDetails = await fetchRecentMatchDetails(mergedHomeLastEvents, 5);
+  const awayRecentMatchDetails = await fetchRecentMatchDetails(mergedAwayLastEvents, 5);
+  const h2hMatchDetails = await fetchH2HMatchDetails(h2hEvents);
 
   // --- FALLBACK LINEUP GENERATOR ---
   function buildFallbackLineup(squadPlayers, recentMatchDetails, teamId) {
@@ -599,8 +607,8 @@ async function fetchAllMatchData(eventId) {
     awayTeam,
     homePlayers,
     awayPlayers,
-    homeLastEvents: mergeAndSortEvents(homeLastEvents0, homeLastEvents1),
-    awayLastEvents: mergeAndSortEvents(awayLastEvents0, awayLastEvents1),
+    homeLastEvents: mergedHomeLastEvents,
+    awayLastEvents: mergedAwayLastEvents,
 
     // Lig
     standingsTotal,
