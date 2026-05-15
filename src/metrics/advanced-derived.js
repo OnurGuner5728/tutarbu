@@ -1755,11 +1755,16 @@ function calculateAdvancedMetrics(allMetrics) {
 
         // Ağırlık öncelik mantığı (sıfır statik):
         //   1) homeScoreProfile (sadece EV maçları, tournament-filtered) — ana sinyal
-        //   2) awayScoreProfile (sadece DEP maçları, tournament-filtered) — perspektif çevrilir
+        //   2) awayScoreProfile (sadece DEP maçları) — perspektif çevrilir
         //   3) matchScoreProfile (H2H) — bu iki takımın birlikte geçmişi
-        //   4) leagueFingerprint — lig genel, AMA home/away ayırımı yapmıyor.
-        //      Bu yüzden ağırlığı takım toplamından FAZLA OLAMAZ (clamp).
-        //      Aksi halde n=4 takım profili n=60 lig pool tarafından ezilir.
+        //
+        // LIG FINGERPRINT KALDIRILDI — blendScoreDistribution zaten leagueProfile
+        // jointDist'i Poisson/NegBinom blend'inde kullanıyor (sp.prob'a baked in).
+        // Skor seçim aşamasında tekrar kullanmak ÇİFT SAYIM olur — lig genel 1-0/0-1
+        // skoru cluster yaratır.
+        //
+        // Specificity hierarchy:
+        //   h2h > team home/away > [lig: blendScoreDistribution'da kullanılıyor]
         const _teamWeightSum =
           (homeScoreProfile?.n || 0) +
           (awayScoreProfile?.n || 0) +
@@ -1784,35 +1789,55 @@ function calculateAdvancedMetrics(allMetrics) {
           if (matchScoreProfile?.jointDist?.[key] != null && matchScoreProfile.n > 0) {
             srcs.push({ f: matchScoreProfile.jointDist[key], w: matchScoreProfile.n * 2, src: 'h2h' });
           }
-          // 4. leagueFingerprint: lig genel — ağırlığı takım toplamıyla SINIRLI.
-          //    Takım+H2H verisi yoksa lig kendi ağırlığında girer; varsa onların gölgesinde.
-          if (leagueFingerprint?.jointDist?.[key] != null && leagueFingerprint.poolSize > 0) {
-            const lgW = _teamWeightSum > 0
-              ? Math.min(leagueFingerprint.poolSize, _teamWeightSum)
-              : leagueFingerprint.poolSize;
-            srcs.push({ f: leagueFingerprint.jointDist[key], w: lgW, src: 'league' });
-          }
+          // leagueFingerprint KASITLI ÇIKARILDI — çift sayım (blendScoreDistribution'da).
+
           if (srcs.length === 0) return { freq: 0, sources: [] };
           const totalW = srcs.reduce((s, x) => s + x.w, 0);
           const freq = srcs.reduce((s, x) => s + x.f * x.w, 0) / totalW;
           return { freq, sources: srcs };
         };
 
+        // empFreq + prob — PROBABILITY-SPACE BLEND (statik (1+f) boost değil)
+        // Eski: combined = prob × (1 + empFreq) — empFreq=0.05 boost sadece %5
+        //       (cluster sorununa neden oluyordu — Poisson PMF mode'u kazanıyor)
+        //
+        // Yeni: empFreq'i candidate'lar arasında olasılık olarak değerlendir.
+        //   Σ empFreq across candidates → normalize → empProb
+        //   combined = (1-w) × prob_normalized + w × empProb
+        //   w = teamWeightSum / (teamWeightSum + 1/_kEff)
+        //     yüksek team data → w → 1 → empirik domine
+        //     veri yoksa → w → 0 → pure Poisson argmax
+        //
+        // Sıfır statik: w formülü Bayesian, scaling power kullanıcı verisinden.
+        const _candidateData = _candidates.map(sp => {
+          const key = `${sp.home}-${sp.away}`;
+          const ef = _empFreqFor(key);
+          return { sp, key, prob: sp.prob, empFreq: ef.freq, sources: ef.sources };
+        });
+        // Normalize prob ve empFreq candidate set'i içinde
+        const _sumProb = _candidateData.reduce((s, c) => s + c.prob, 0) || 1;
+        const _sumEmpFreq = _candidateData.reduce((s, c) => s + c.empFreq, 0);
+        // Blend ağırlığı — team data güveniyle dinamik
+        const _empBlendW = _teamWeightSum > 0
+          ? _teamWeightSum / (_teamWeightSum + Math.max(1, _kEff))
+          : 0;
+
         let _best = _candidates[0];
         let _bestScore = -Infinity;
         const _scoreDebug = [];
-        for (const sp of _candidates) {
-          const key = `${sp.home}-${sp.away}`;
-          const ef = _empFreqFor(key);
-          // combined = blended_prob × (1 + empFreq)
-          const combined = sp.prob * (1 + ef.freq);
-          _scoreDebug.push({ key, prob: sp.prob, empFreq: ef.freq, combined, sources: ef.sources });
+        for (const cd of _candidateData) {
+          const probN = cd.prob / _sumProb;
+          const empN = _sumEmpFreq > 0 ? cd.empFreq / _sumEmpFreq : probN; // empFreq yoksa prob'a düş
+          const combined = (1 - _empBlendW) * probN + _empBlendW * empN;
+          _scoreDebug.push({ key: cd.key, prob: cd.prob, empFreq: cd.empFreq, probN, empN, combined, sources: cd.sources });
           if (combined > _bestScore) {
             _bestScore = combined;
-            _best = sp;
+            _best = cd.sp;
           }
         }
         mostLikelyScore = _best;
+        // _empBlendW görünür kıl
+        _ldDiag.empBlendW = _empBlendW;
         // Skor seçim trace'i (kaynaklar görünür kıl)
         _ldDiag.scoreSelection = {
           chosen: `${_best.home}-${_best.away}`,
