@@ -1,0 +1,4663 @@
+{
+  "date": "2026-05-13",
+  "summary": {
+    "total": 10,
+    "hits1X2": 6,
+    "hitsOU25": 3,
+    "hitsBTTS": 4,
+    "hitsScore": 1,
+    "accuracy1X2": 60,
+    "accuracyOU25": 30,
+    "accuracyBTTS": 40,
+    "accuracyScore": 10,
+    "avgBrierScore": 0.5637,
+    "avgLogLoss": 0.9047,
+    "highConfidenceCount": 10,
+    "highConfidenceAccuracy1X2": 60
+  },
+  "results": [
+    {
+      "matchId": 15999228,
+      "match": "Manchester City vs Crystal Palace",
+      "matchDate": "2026-05-13",
+      "tournament": "Premier League",
+      "tournamentId": 17,
+      "actual": "3-0",
+      "actualResult": "1",
+      "actualOU25": "Over",
+      "actualBTTS": "No",
+      "predicted": "1-0",
+      "predictedResult": "1",
+      "predictedOU25": "Under",
+      "predictedBTTS": "No",
+      "probHome": 46.74,
+      "probDraw": 20.05,
+      "probAway": 33.21,
+      "probOU25": 35.96,
+      "probBTTS": 26.91,
+      "hit1X2": true,
+      "hitOU25": false,
+      "hitBTTS": true,
+      "hitScore": false,
+      "confidence": 60,
+      "avgGoals": 0,
+      "brierScore": 0.4342,
+      "logLoss": 0.7606,
+      "confidenceTier": "HIGH",
+      "maxProbability": 99.6,
+      "isHighConfidence": true,
+      "poisson": {
+        "homeWin": 46.74,
+        "draw": 20.05,
+        "awayWin": 33.21,
+        "predicted": "1",
+        "lambdaHome": 1.28,
+        "lambdaAway": 1.05
+      },
+      "simulation": {
+        "homeWin": 0.2,
+        "draw": 99.6,
+        "awayWin": 0.2,
+        "predicted": "X"
+      },
+      "restDays": {
+        "home": null,
+        "away": null
+      },
+      "lambdaAudit": {
+        "diag": {
+          "sources": {
+            "hAtk": {
+              "n": 4,
+              "agreement": 0.7476109158341195,
+              "rate": 2.284711987317237
+            },
+            "aDef": {
+              "n": 4,
+              "agreement": 0.7320476276751866,
+              "rate": 1.6062075580382282
+            },
+            "aAtk": {
+              "n": 4,
+              "agreement": 0.7052700347680764,
+              "rate": 1.0560403795798055
+            },
+            "hDef": {
+              "n": 4,
+              "agreement": 0.7418821094629892,
+              "rate": 0.7149387308772381
+            }
+          },
+          "agreementHome": 0.7320476276751866,
+          "agreementAway": 0.7052700347680764,
+          "kMatchHome": 1.2574790186364229,
+          "kMatchAway": 1.248060685617485,
+          "alphaHome": 1.4984078495700175,
+          "betaHome": 1.1329922103227217,
+          "alphaAway": 0.8426675140217714,
+          "betaAway": 0.6656833712822406,
+          "cvLocal": 0.3517244082247989,
+          "leagueAvgGoals": 1.3592673779478381,
+          "dynamicLambdaMin": 0.01,
+          "dynamicLambdaMax": 5.377493577084264,
+          "lambdaHomeMin": 0.3002077418993431,
+          "lambdaHomeMax": 5.377493577084264,
+          "lambdaAwayMin": 0.01,
+          "lambdaAwayMax": 3.691663730662855,
+          "clampHomeMinHit": false,
+          "clampHomeMaxHit": false,
+          "clampAwayMinHit": false,
+          "clampAwayMaxHit": false,
+          "empWeight": 0.7977530129718415,
+          "probGap": 0.16561916150833253,
+          "dataRel": 0.9561017896982881,
+          "scoreSelection": {
+            "chosen": "1-0",
+            "teamWeightSum": 60,
+            "topCandidates": [
+              {
+                "key": "1-0",
+                "prob": 0.06490317854791057,
+                "empFreq": 0.06417232297176953,
+                "combined": 0.06822581006303284,
+                "sources": [
+                  {
+                    "f": 0.028344645943539047,
+                    "w": 20,
+                    "src": "away"
+                  },
+                  {
+                    "f": 0.1,
+                    "w": 20,
+                    "src": "h2h"
+                  }
+                ]
+              },
+              {
+                "key": "0-1",
+                "prob": 0.054153968537580026,
+                "empFreq": 0.09782640685896513,
+                "combined": 0.05838021522835503,
+                "sources": [
+                  {
+                    "f": 0.09565281371793026,
+                    "w": 20,
+                    "src": "away"
+                  },
+                  {
+                    "f": 0.1,
+                    "w": 20,
+                    "src": "h2h"
+                  }
+                ]
+              },
+              {
+                "key": "2-0",
+                "prob": 0.04668466897200986,
+                "empFreq": 0.08117182911995689,
+                "combined": 0.04970773803752279,
+                "sources": [
+                  {
+                    "f": 0.1162759691948915,
+                    "w": 20,
+                    "src": "home"
+                  },
+                  {
+                    "f": 0.0460676890450223,
+                    "w": 20,
+                    "src": "away"
+                  }
+                ]
+              },
+              {
+                "key": "2-1",
+                "prob": 0.043698907210490454,
+                "empFreq": 0.15074205181867664,
+                "combined": 0.04895391606423875,
+                "sources": [
+                  {
+                    "f": 0.1586678058147788,
+                    "w": 20,
+                    "src": "home"
+                  },
+                  {
+                    "f": 0.1428162978225745,
+                    "w": 20,
+                    "src": "away"
+                  }
+                ]
+              },
+              {
+                "key": "1-1",
+                "prob": 0.04232793659837094,
+                "empFreq": 0.07315758394140967,
+                "combined": 0.04479826621663476,
+                "sources": [
+                  {
+                    "f": 0.09039210929288091,
+                    "w": 20,
+                    "src": "home"
+                  },
+                  {
+                    "f": 0.05592305858993845,
+                    "w": 20,
+                    "src": "away"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "trace": [
+          {
+            "stage": "dcBase",
+            "hBefore": null,
+            "hAfter": 2.64451,
+            "aBefore": null,
+            "aAfter": 0.660612,
+            "dLogH": null,
+            "dLogA": null,
+            "meta": {
+              "kMatchHome": 1.2574790186364229,
+              "kMatchAway": 1.248060685617485,
+              "agreementHome": 0.7320476276751866,
+              "agreementAway": 0.7052700347680764
+            }
+          },
+          {
+            "stage": "behavMod",
+            "hBefore": 2.64451,
+            "hAfter": 2.730909,
+            "aBefore": 0.660612,
+            "aAfter": 0.609691,
+            "dLogH": 0.032149,
+            "dLogA": -0.080216,
+            "meta": {
+              "behavModHome": 1.0326711501853187,
+              "behavModAway": 0.9229171315972787,
+              "BEHAV_SENS": 0.1758098983965572
+            }
+          },
+          {
+            "stage": "urgencyMod",
+            "hBefore": 2.730909,
+            "hAfter": 2.99399,
+            "aBefore": 0.609691,
+            "aAfter": 0.626477,
+            "dLogH": 0.091972,
+            "dLogA": 0.02716,
+            "meta": {
+              "lambdaModHome": 1.0963344568164075,
+              "lambdaModAway": 1.0275323818648798,
+              "URGENCY_SENS": 0.43454968754609546
+            }
+          },
+          {
+            "stage": "initialClamp",
+            "hBefore": 2.99399,
+            "hAfter": 2.99399,
+            "aBefore": 0.626477,
+            "aAfter": 0.626477,
+            "dLogH": 0,
+            "dLogA": 0,
+            "meta": {
+              "lambdaHomeMin": 0.3002077418993431,
+              "lambdaHomeMax": 5.377493577084264,
+              "lambdaAwayMin": 0.01,
+              "lambdaAwayMax": 3.691663730662855,
+              "clampHomeMinHit": false,
+              "clampHomeMaxHit": false,
+              "clampAwayMinHit": false,
+              "clampAwayMaxHit": false
+            }
+          },
+          {
+            "stage": "lqr",
+            "hBefore": 2.99399,
+            "hAfter": 3.040556,
+            "aBefore": 0.626477,
+            "aAfter": 0.617395,
+            "dLogH": 0.015433,
+            "dLogA": -0.014603,
+            "meta": {
+              "hLQR": 1.0313482416135147,
+              "aLQR": 0.9712171001112836,
+              "hLQRfromMV": 1.0891272851143132,
+              "aLQRfromMV": 0.9181663279100032,
+              "hMV": 1293284.6331602999,
+              "aMV": 1090276.9757040795,
+              "lqrSens": 0.3517244082247989
+            }
+          },
+          {
+            "stage": "xgOverPerf",
+            "hBefore": 3.040556,
+            "hAfter": 3.239493,
+            "aBefore": 0.617395,
+            "aAfter": 0.616748,
+            "dLogH": 0.063377,
+            "dLogA": -0.001049,
+            "meta": {
+              "xgModHome": 1.0742539282464938,
+              "xgModAway": 0.9988148135232781,
+              "xgOverPerfHome": 1.3086645145086186,
+              "xgOverPerfAway": 0.9950733245085006,
+              "xgSens": 0.2405651597648111,
+              "homeXGScored": null,
+              "awayXGScored": null,
+              "homeActualGoals": 2.15,
+              "awayActualGoals": 1.35,
+              "reliabilityHome": 0.8848219891058494,
+              "reliabilityAway": 0.8848219891058494
+            }
+          },
+          {
+            "stage": "refMod",
+            "hBefore": 3.239493,
+            "hAfter": 3.424859,
+            "aBefore": 0.616748,
+            "aAfter": 0.652038,
+            "dLogH": 0.055643,
+            "dLogA": 0.055643,
+            "meta": {
+              "refMod": 1.0572206101365484,
+              "refRatio": 1.2684317736202202,
+              "refSens": 0.2131663080150296,
+              "refGoalsPerMatch": 3.4482758620689653
+            }
+          },
+          {
+            "stage": "cleanSheet",
+            "hBefore": 3.424859,
+            "hAfter": 3.424859,
+            "aBefore": 0.652038,
+            "aAfter": 0.605411,
+            "dLogH": 0,
+            "dLogA": -0.074196,
+            "meta": {
+              "csModHome": 1,
+              "csModAway": 0.912838528026372,
+              "homeCSR": 0.5249497974093167,
+              "awayCSR": 0.19551748848726577,
+              "lgCSR": 0.29163057320379066,
+              "floor": 0.6482755917752011,
+              "homeScoringRate": 0.9830614224595962,
+              "awayScoringRate": 0.690254806360534,
+              "relHome": 0.8135843960445467,
+              "relAway": 0.8135843960445467
+            }
+          },
+          {
+            "stage": "referenceScaling",
+            "hBefore": 3.424859,
+            "hAfter": 3.424859,
+            "aBefore": 0.605411,
+            "aAfter": 0.605411,
+            "dLogH": 0,
+            "dLogA": 0,
+            "meta": {
+              "skipped": true,
+              "reason": "within_tolerance",
+              "calibrationRatio": 0.9395403786999362,
+              "referenceTotalGoals": 3.786601382662294,
+              "referenceReliability": 0.8135843960445467,
+              "tolerance": 0.07864796861365364
+            }
+          },
+          {
+            "stage": "lineupAttack_h",
+            "hBefore": 3.424859,
+            "hAfter": 1.572011,
+            "aBefore": 0.605411,
+            "aAfter": 0.605411,
+            "dLogH": -0.778705,
+            "dLogA": 0,
+            "meta": {
+              "lineupRate": 1.2270913754377797,
+              "reliability": 0.7586653588151875,
+              "ratio": 0.35828959141610645,
+              "modifier": 0.4590002511281987,
+              "validStarters": 10,
+              "isFallback": false
+            }
+          },
+          {
+            "stage": "lineupAttack_a",
+            "hBefore": 1.572011,
+            "hAfter": 1.572011,
+            "aBefore": 0.605411,
+            "aAfter": 0.86628,
+            "dLogH": 0,
+            "dLogA": 0.3583,
+            "meta": {
+              "lineupRate": 0.9657789009087426,
+              "reliability": 0.76719327859695,
+              "ratio": 1.5952454254797628,
+              "modifier": 1.4308954436973544,
+              "validStarters": 10,
+              "isFallback": false
+            }
+          },
+          {
+            "stage": "lineupDefense_a",
+            "hBefore": 1.572011,
+            "hAfter": 1.572011,
+            "aBefore": 0.86628,
+            "aAfter": 1.070156,
+            "dLogH": 0,
+            "dLogA": 0.211352,
+            "meta": {
+              "homeDefRate": 13.726471042436618,
+              "peerDef": 18.13619828740055,
+              "reliability": 0.7586653588151875,
+              "ratio": 1.3212571702756568,
+              "modifier": 1.2353468630286184
+            }
+          },
+          {
+            "stage": "lineupDefense_h",
+            "hBefore": 1.572011,
+            "hAfter": 1.269507,
+            "aBefore": 1.070156,
+            "aAfter": 1.070156,
+            "dLogH": -0.213728,
+            "dLogA": 0,
+            "meta": {
+              "awayDefRate": 18.13619828740055,
+              "peerDef": 13.726471042436618,
+              "reliability": 0.76719327859695,
+              "ratio": 0.7568549276378707,
+              "modifier": 0.8075683926298245
+            }
+          },
+          {
+            "stage": "benchAttack_h",
+            "hBefore": 1.269507,
+            "hAfter": 1.278547,
+            "aBefore": 1.070156,
+            "aAfter": 1.070156,
+            "dLogH": 0.007096,
+            "dLogA": 0,
+            "meta": {
+              "benchRate": 1.3928347911647776,
+              "starterRate": 1.2270913754377797,
+              "benchRatio": 1.1350701496600992,
+              "effect": 0.007120942900852446,
+              "reliability": 0.5272033027854139,
+              "validBench": 7
+            }
+          },
+          {
+            "stage": "benchAttack_a",
+            "hBefore": 1.278547,
+            "hAfter": 1.278547,
+            "aBefore": 1.070156,
+            "aAfter": 1.054042,
+            "dLogH": 0,
+            "dLogA": -0.015172,
+            "meta": {
+              "benchRate": 0.6442218868328559,
+              "starterRate": 0.9657789009087426,
+              "benchRatio": 0.6670490380631425,
+              "effect": -0.015057437746348776,
+              "reliability": 0.452241905497313,
+              "validBench": 6
+            }
+          },
+          {
+            "stage": "finalM167",
+            "hBefore": null,
+            "hAfter": 1.278547,
+            "aBefore": null,
+            "aAfter": 1.054042,
+            "dLogH": null,
+            "dLogA": null,
+            "meta": {}
+          }
+        ]
+      }
+    },
+    {
+      "matchId": 14083613,
+      "match": "Celta Vigo vs Levante UD",
+      "matchDate": "2026-05-12",
+      "tournament": "LaLiga",
+      "tournamentId": 8,
+      "actual": "2-3",
+      "actualResult": "2",
+      "actualOU25": "Over",
+      "actualBTTS": "Yes",
+      "predicted": "1-0",
+      "predictedResult": "1",
+      "predictedOU25": "Under",
+      "predictedBTTS": "No",
+      "probHome": 45.44,
+      "probDraw": 18.49,
+      "probAway": 36.08,
+      "probOU25": 30.435,
+      "probBTTS": 29.445,
+      "hit1X2": false,
+      "hitOU25": false,
+      "hitBTTS": false,
+      "hitScore": false,
+      "confidence": 54,
+      "avgGoals": 0,
+      "brierScore": 0.6492,
+      "logLoss": 1.0194,
+      "confidenceTier": "HIGH",
+      "maxProbability": 99.8,
+      "isHighConfidence": true,
+      "poisson": {
+        "homeWin": 45.44,
+        "draw": 18.49,
+        "awayWin": 36.08,
+        "predicted": "1",
+        "lambdaHome": 1.12,
+        "lambdaAway": 0.67
+      },
+      "simulation": {
+        "homeWin": 0.2,
+        "draw": 99.8,
+        "awayWin": 0,
+        "predicted": "X"
+      },
+      "restDays": {
+        "home": null,
+        "away": null
+      },
+      "lambdaAudit": {
+        "diag": {
+          "sources": {
+            "hAtk": {
+              "n": 4,
+              "agreement": 0.7428484488724115,
+              "rate": 1.6291354021198345
+            },
+            "aDef": {
+              "n": 4,
+              "agreement": 0.7412744182783217,
+              "rate": 1.8211631185845905
+            },
+            "aAtk": {
+              "n": 4,
+              "agreement": 0.7332952160162829,
+              "rate": 1.3600145923214104
+            },
+            "hDef": {
+              "n": 4,
+              "agreement": 0.7466398293042906,
+              "rate": 1.7169457638606054
+            }
+          },
+          "agreementHome": 0.7412744182783217,
+          "agreementAway": 0.7332952160162829,
+          "kMatchHome": 1.317842687066813,
+          "kMatchAway": 1.3144213750329963,
+          "alphaHome": 1.1122617821642629,
+          "betaHome": 1.212868893935159,
+          "alphaAway": 0.9715733950831944,
+          "betaAway": 1.1565637478054422,
+          "cvLocal": 0.42877870762764464,
+          "leagueAvgGoals": 1.4148625411280782,
+          "dynamicLambdaMin": 0.01,
+          "dynamicLambdaMax": 4.974750476043527,
+          "lambdaHomeMin": 0.01,
+          "lambdaHomeMax": 4.974750476043527,
+          "lambdaAwayMin": 0.01,
+          "lambdaAwayMax": 4.29847995675382,
+          "clampHomeMinHit": false,
+          "clampHomeMaxHit": false,
+          "clampAwayMinHit": false,
+          "clampAwayMaxHit": false,
+          "empWeight": 0.662241986262531,
+          "probGap": 0.30595750380181697,
+          "dataRel": 0.954180745257173,
+          "scoreSelection": {
+            "chosen": "1-0",
+            "teamWeightSum": 56,
+            "topCandidates": [
+              {
+                "key": "1-0",
+                "prob": 0.09477714391373152,
+                "empFreq": 0.03634808957623589,
+                "combined": 0.09705854644198317,
+                "sources": [
+                  {
+                    "f": 0.03634808957623589,
+                    "w": 18,
+                    "src": "away"
+                  }
+                ]
+              },
+              {
+                "key": "0-1",
+                "prob": 0.06577936554442065,
+                "empFreq": 0.03935691587648467,
+                "combined": 0.06749382591307634,
+                "sources": [
+                  {
+                    "f": 0.03935691587648467,
+                    "w": 18,
+                    "src": "home"
+                  }
+                ]
+              },
+              {
+                "key": "2-0",
+                "prob": 0.050745485472424884,
+                "empFreq": 0.1747048252903848,
+                "combined": 0.05661657933409272,
+                "sources": [
+                  {
+                    "f": 0.11452858815863781,
+                    "w": 18,
+                    "src": "home"
+                  },
+                  {
+                    "f": 0.20677531274478161,
+                    "w": 18,
+                    "src": "away"
+                  },
+                  {
+                    "f": 0.2,
+                    "w": 20,
+                    "src": "h2h"
+                  }
+                ]
+              },
+              {
+                "key": "0-0",
+                "prob": 0.05044380729341225,
+                "empFreq": 0.10781312612941783,
+                "combined": 0.05404541335431438,
+                "sources": [
+                  {
+                    "f": 0.10781312612941783,
+                    "w": 18,
+                    "src": "away"
+                  }
+                ]
+              },
+              {
+                "key": "1-1",
+                "prob": 0.04162108258815366,
+                "empFreq": 0.15345856181204284,
+                "combined": 0.04585089597786324,
+                "sources": [
+                  {
+                    "f": 0.11951266907739476,
+                    "w": 18,
+                    "src": "home"
+                  },
+                  {
+                    "f": 0.1356917454489608,
+                    "w": 18,
+                    "src": "away"
+                  },
+                  {
+                    "f": 0.2,
+                    "w": 20,
+                    "src": "h2h"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "trace": [
+          {
+            "stage": "dcBase",
+            "hBefore": null,
+            "hAfter": 2.099236,
+            "aBefore": null,
+            "aAfter": 1.649238,
+            "dLogH": null,
+            "dLogA": null,
+            "meta": {
+              "kMatchHome": 1.317842687066813,
+              "kMatchAway": 1.3144213750329963,
+              "agreementHome": 0.7412744182783217,
+              "agreementAway": 0.7332952160162829
+            }
+          },
+          {
+            "stage": "behavMod",
+            "hBefore": 2.099236,
+            "hAfter": 2.090621,
+            "aBefore": 1.649238,
+            "aAfter": 1.623057,
+            "dLogH": -0.004112,
+            "dLogA": -0.016002,
+            "meta": {
+              "behavModHome": 0.9958960252502491,
+              "behavModAway": 0.9841252694720505,
+              "BEHAV_SENS": 0.21179265560180474
+            }
+          },
+          {
+            "stage": "urgencyMod",
+            "hBefore": 2.090621,
+            "hAfter": 2.092668,
+            "aBefore": 1.623057,
+            "aAfter": 1.640726,
+            "dLogH": 0.000978,
+            "dLogA": 0.010828,
+            "meta": {
+              "lambdaModHome": 1.000978978123038,
+              "lambdaModAway": 1.0108864728386773,
+              "URGENCY_SENS": 0.4148186693634556
+            }
+          },
+          {
+            "stage": "initialClamp",
+            "hBefore": 2.092668,
+            "hAfter": 2.092668,
+            "aBefore": 1.640726,
+            "aAfter": 1.640726,
+            "dLogH": 0,
+            "dLogA": 0,
+            "meta": {
+              "lambdaHomeMin": 0.01,
+              "lambdaHomeMax": 4.974750476043527,
+              "lambdaAwayMin": 0.01,
+              "lambdaAwayMax": 4.29847995675382,
+              "clampHomeMinHit": false,
+              "clampHomeMaxHit": false,
+              "clampAwayMinHit": false,
+              "clampAwayMaxHit": false
+            }
+          },
+          {
+            "stage": "lqr",
+            "hBefore": 2.092668,
+            "hAfter": 2.124703,
+            "aBefore": 1.640726,
+            "aAfter": 1.616944,
+            "dLogH": 0.015192,
+            "dLogA": -0.014601,
+            "meta": {
+              "hLQR": 1.0308510042921997,
+              "aLQR": 0.9712197592836836,
+              "hLQRfromMV": 1.0719508775584792,
+              "aLQRfromMV": 0.9328785683516043,
+              "hMV": 976211.9534040184,
+              "aMV": 849560.5802137908,
+              "lqrSens": 0.42877870762764464
+            }
+          },
+          {
+            "stage": "xgOverPerf",
+            "hBefore": 2.124703,
+            "hAfter": 2.170708,
+            "aBefore": 1.616944,
+            "aAfter": 1.604452,
+            "dLogH": 0.021421,
+            "dLogA": -0.007755,
+            "meta": {
+              "xgModHome": 1.0245050876426107,
+              "xgModAway": 0.9912734159681541,
+              "xgOverPerfHome": 1.0992367324891776,
+              "xgOverPerfAway": 0.9646604942719411,
+              "xgSens": 0.24693565606145948,
+              "homeXGScored": null,
+              "awayXGScored": null,
+              "homeActualGoals": 1.45,
+              "awayActualGoals": 1.35,
+              "reliabilityHome": 0.8848219891058494,
+              "reliabilityAway": 0.8848219891058494
+            }
+          },
+          {
+            "stage": "refMod",
+            "hBefore": 2.170708,
+            "hAfter": 2.10872,
+            "aBefore": 1.604452,
+            "aAfter": 1.558635,
+            "dLogH": -0.028972,
+            "dLogA": -0.028972,
+            "meta": {
+              "refMod": 0.971443696869696,
+              "refRatio": 0.8895710028846101,
+              "refSens": 0.2585942449560128,
+              "refGoalsPerMatch": 2.5172413793103448
+            }
+          },
+          {
+            "stage": "cleanSheet",
+            "hBefore": 2.10872,
+            "hAfter": 2.10872,
+            "aBefore": 1.558635,
+            "aAfter": 1.558635,
+            "dLogH": 0,
+            "dLogA": 0,
+            "meta": {
+              "csModHome": 1,
+              "csModAway": 1,
+              "homeCSR": 0.1701093909688984,
+              "awayCSR": 0.20662275414920464,
+              "lgCSR": 0.26505283412832104,
+              "floor": 0.5712212923723554,
+              "homeScoringRate": 0.84146280726546,
+              "awayScoringRate": 0.5799336610355019,
+              "relHome": 0.8050485869385832,
+              "relAway": 0.8050485869385832
+            }
+          },
+          {
+            "stage": "referenceScaling",
+            "hBefore": 2.10872,
+            "hAfter": 1.880168,
+            "aBefore": 1.558635,
+            "aAfter": 1.389703,
+            "dLogH": -0.11472,
+            "dLogA": -0.11472,
+            "meta": {
+              "scalingFactor": 0.8916156285294918,
+              "calibrationRatio": 0.7792159415234172,
+              "referenceTotalGoals": 2.857661649658489,
+              "referenceReliability": 0.8050485869385832,
+              "tolerance": 0.10106411059730386,
+              "exponent": 0.459860894253596
+            }
+          },
+          {
+            "stage": "lineupAttack_h",
+            "hBefore": 1.880168,
+            "hAfter": 1.038982,
+            "aBefore": 1.389703,
+            "aAfter": 1.389703,
+            "dLogH": -0.59312,
+            "dLogA": 0,
+            "meta": {
+              "lineupRate": 0.8561920960645099,
+              "reliability": 0.7540089210243704,
+              "ratio": 0.4553806503036682,
+              "modifier": 0.5526006359209343,
+              "validStarters": 10,
+              "isFallback": false
+            }
+          },
+          {
+            "stage": "lineupAttack_a",
+            "hBefore": 1.038982,
+            "hAfter": 1.038982,
+            "aBefore": 1.389703,
+            "aAfter": 0.71194,
+            "dLogH": 0,
+            "dLogA": -0.668852,
+            "meta": {
+              "lineupRate": 0.3964580294508151,
+              "reliability": 0.533257942055922,
+              "ratio": 0.2852824993668108,
+              "modifier": 0.5122962032373015,
+              "validStarters": 7,
+              "isFallback": false
+            }
+          },
+          {
+            "stage": "lineupDefense_a",
+            "hBefore": 1.038982,
+            "hAfter": 1.038982,
+            "aBefore": 0.71194,
+            "aAfter": 0.634384,
+            "dLogH": 0,
+            "dLogA": -0.115338,
+            "meta": {
+              "homeDefRate": 12.214386232579972,
+              "peerDef": 10.481874356356446,
+              "reliability": 0.7540089210243704,
+              "ratio": 0.8581580897120872,
+              "modifier": 0.8910645214959976
+            }
+          },
+          {
+            "stage": "lineupDefense_h",
+            "hBefore": 1.038982,
+            "hAfter": 1.127285,
+            "aBefore": 0.634384,
+            "aAfter": 0.634384,
+            "dLogH": 0.081571,
+            "dLogA": 0,
+            "meta": {
+              "awayDefRate": 10.481874356356446,
+              "peerDef": 12.214386232579972,
+              "reliability": 0.533257942055922,
+              "ratio": 1.1652864571089705,
+              "modifier": 1.0849900723894814
+            }
+          },
+          {
+            "stage": "benchAttack_h",
+            "hBefore": 1.127285,
+            "hAfter": 1.1246,
+            "aBefore": 0.634384,
+            "aAfter": 0.634384,
+            "dLogH": -0.002385,
+            "dLogA": 0,
+            "meta": {
+              "benchRate": 0.8257756816047155,
+              "starterRate": 0.8561920960645099,
+              "benchRatio": 0.9644747777985764,
+              "effect": -0.0023818282341489397,
+              "reliability": 0.6704611784394389,
+              "validBench": 9
+            }
+          },
+          {
+            "stage": "benchAttack_a",
+            "hBefore": 1.1246,
+            "hAfter": 1.1246,
+            "aBefore": 0.634384,
+            "aAfter": 0.674629,
+            "dLogH": 0,
+            "dLogA": 0.061508,
+            "meta": {
+              "benchRate": 0.6612331875484309,
+              "starterRate": 0.3964580294508151,
+              "benchRatio": 1.6678516726332666,
+              "effect": 0.06343943975644313,
+              "reliability": 0.6649321945158243,
+              "validBench": 9
+            }
+          },
+          {
+            "stage": "finalM167",
+            "hBefore": null,
+            "hAfter": 1.1246,
+            "aBefore": null,
+            "aAfter": 0.674629,
+            "dLogH": null,
+            "dLogA": null,
+            "meta": {}
+          }
+        ]
+      }
+    },
+    {
+      "matchId": 14083608,
+      "match": "Real Betis vs Elche",
+      "matchDate": "2026-05-12",
+      "tournament": "LaLiga",
+      "tournamentId": 8,
+      "actual": "2-1",
+      "actualResult": "1",
+      "actualOU25": "Over",
+      "actualBTTS": "Yes",
+      "predicted": "1-0",
+      "predictedResult": "1",
+      "predictedOU25": "Under",
+      "predictedBTTS": "No",
+      "probHome": 51.59,
+      "probDraw": 24.68,
+      "probAway": 23.73,
+      "probOU25": 33.35,
+      "probBTTS": 33.435,
+      "hit1X2": true,
+      "hitOU25": false,
+      "hitBTTS": false,
+      "hitScore": false,
+      "confidence": 74,
+      "avgGoals": 0.01,
+      "brierScore": 0.3516,
+      "logLoss": 0.6618,
+      "confidenceTier": "HIGH",
+      "maxProbability": 99,
+      "isHighConfidence": true,
+      "poisson": {
+        "homeWin": 51.59,
+        "draw": 24.68,
+        "awayWin": 23.73,
+        "predicted": "1",
+        "lambdaHome": 1.81,
+        "lambdaAway": 0.7
+      },
+      "simulation": {
+        "homeWin": 0.2,
+        "draw": 99,
+        "awayWin": 0.8,
+        "predicted": "X"
+      },
+      "restDays": {
+        "home": null,
+        "away": null
+      },
+      "lambdaAudit": {
+        "diag": {
+          "sources": {
+            "hAtk": {
+              "n": 4,
+              "agreement": 0.7412169507436723,
+              "rate": 1.7435356664070483
+            },
+            "aDef": {
+              "n": 4,
+              "agreement": 0.7458735355533479,
+              "rate": 2.032181585095501
+            },
+            "aAtk": {
+              "n": 4,
+              "agreement": 0.7414219465375891,
+              "rate": 1.0855572527971988
+            },
+            "hDef": {
+              "n": 4,
+              "agreement": 0.7341534569630385,
+              "rate": 1.1992026960409254
+            }
+          },
+          "agreementHome": 0.7412169507436723,
+          "agreementAway": 0.7341534569630385,
+          "kMatchHome": 1.3529117044880579,
+          "kMatchAway": 1.349548600571906,
+          "alphaHome": 1.1576136794691236,
+          "betaHome": 1.3064169405677257,
+          "alphaAway": 0.8201419332295978,
+          "betaAway": 0.878170328456178,
+          "cvLocal": 0.47612470833806103,
+          "leagueAvgGoals": 1.4377994548996524,
+          "dynamicLambdaMin": 0.01,
+          "dynamicLambdaMax": 4.249849232978187,
+          "lambdaHomeMin": 0.01,
+          "lambdaHomeMax": 4.249849232978187,
+          "lambdaAwayMin": 0.01,
+          "lambdaAwayMax": 2.8358601839742392,
+          "clampHomeMinHit": false,
+          "clampHomeMaxHit": false,
+          "clampAwayMinHit": false,
+          "clampAwayMaxHit": false,
+          "empWeight": 0.794359212323472,
+          "probGap": 0.16724920511381883,
+          "dataRel": 0.9538978734112689,
+          "scoreSelection": {
+            "chosen": "1-0",
+            "teamWeightSum": 57,
+            "topCandidates": [
+              {
+                "key": "1-0",
+                "prob": 0.07006577827140982,
+                "empFreq": 0.08083295627641139,
+                "combined": 0.07456473016418264,
+                "sources": [
+                  {
+                    "f": 0.018529913138259562,
+                    "w": 19,
+                    "src": "home"
+                  },
+                  {
+                    "f": 0.146597279588905,
+                    "w": 18,
+                    "src": "away"
+                  }
+                ]
+              },
+              {
+                "key": "1-1",
+                "prob": 0.05822448421294165,
+                "empFreq": 0.19055288760879582,
+                "combined": 0.06703777543295761,
+                "sources": [
+                  {
+                    "f": 0.28767387928519295,
+                    "w": 19,
+                    "src": "home"
+                  },
+                  {
+                    "f": 0.07753949373792753,
+                    "w": 18,
+                    "src": "away"
+                  },
+                  {
+                    "f": 0.2,
+                    "w": 20,
+                    "src": "h2h"
+                  }
+                ]
+              },
+              {
+                "key": "2-0",
+                "prob": 0.05834733254983545,
+                "empFreq": 0.07545777375685722,
+                "combined": 0.061844705371595775,
+                "sources": [
+                  {
+                    "f": 0.07545777375685722,
+                    "w": 19,
+                    "src": "home"
+                  }
+                ]
+              },
+              {
+                "key": "2-1",
+                "prob": 0.050460841303613065,
+                "empFreq": 0.17567927389469795,
+                "combined": 0.057502775318051716,
+                "sources": [
+                  {
+                    "f": 0.17109512842817234,
+                    "w": 19,
+                    "src": "home"
+                  },
+                  {
+                    "f": 0.26460617621458377,
+                    "w": 18,
+                    "src": "away"
+                  },
+                  {
+                    "f": 0.1,
+                    "w": 20,
+                    "src": "h2h"
+                  }
+                ]
+              },
+              {
+                "key": "3-0",
+                "prob": 0.040373613726783664,
+                "empFreq": 0.16958584593951814,
+                "combined": 0.04581242716873129,
+                "sources": [
+                  {
+                    "f": 0.1375709469284846,
+                    "w": 19,
+                    "src": "home"
+                  },
+                  {
+                    "f": 0.2,
+                    "w": 20,
+                    "src": "h2h"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "trace": [
+          {
+            "stage": "dcBase",
+            "hBefore": null,
+            "hAfter": 2.516186,
+            "aBefore": null,
+            "aAfter": 0.923303,
+            "dLogH": null,
+            "dLogA": null,
+            "meta": {
+              "kMatchHome": 1.3529117044880579,
+              "kMatchAway": 1.349548600571906,
+              "agreementHome": 0.7412169507436723,
+              "agreementAway": 0.7341534569630385
+            }
+          },
+          {
+            "stage": "behavMod",
+            "hBefore": 2.516186,
+            "hAfter": 2.627333,
+            "aBefore": 0.923303,
+            "aAfter": 0.871781,
+            "dLogH": 0.043225,
+            "dLogA": -0.057419,
+            "meta": {
+              "behavModHome": 1.044172713689779,
+              "behavModAway": 0.9441982655617188,
+              "BEHAV_SENS": 0.22775295448241248
+            }
+          },
+          {
+            "stage": "urgencyMod",
+            "hBefore": 2.627333,
+            "hAfter": 2.735454,
+            "aBefore": 0.871781,
+            "aAfter": 0.904769,
+            "dLogH": 0.040328,
+            "dLogA": 0.037141,
+            "meta": {
+              "lambdaModHome": 1.0411522693777988,
+              "lambdaModAway": 1.0378398155105168,
+              "URGENCY_SENS": 0.4132275720410936
+            }
+          },
+          {
+            "stage": "initialClamp",
+            "hBefore": 2.735454,
+            "hAfter": 2.735454,
+            "aBefore": 0.904769,
+            "aAfter": 0.904769,
+            "dLogH": 0,
+            "dLogA": 0,
+            "meta": {
+              "lambdaHomeMin": 0.01,
+              "lambdaHomeMax": 4.249849232978187,
+              "lambdaAwayMin": 0.01,
+              "lambdaAwayMax": 2.8358601839742392,
+              "clampHomeMinHit": false,
+              "clampHomeMaxHit": false,
+              "clampAwayMinHit": false,
+              "clampAwayMaxHit": false
+            }
+          },
+          {
+            "stage": "lqr",
+            "hBefore": 2.735454,
+            "hAfter": 2.795856,
+            "aBefore": 0.904769,
+            "aAfter": 0.886109,
+            "dLogH": 0.021841,
+            "dLogA": -0.020839,
+            "meta": {
+              "hLQR": 1.0446502553575017,
+              "aLQR": 0.9591779726535814,
+              "hLQRfromMV": 1.0937784882312782,
+              "aLQRfromMV": 0.9142619010701838,
+              "hMV": 1033098.3063452939,
+              "aMV": 863540.8647312118,
+              "lqrSens": 0.47612470833806103
+            }
+          },
+          {
+            "stage": "xgOverPerf",
+            "hBefore": 2.795856,
+            "hAfter": 2.886916,
+            "aBefore": 0.886109,
+            "aAfter": 0.814538,
+            "dLogH": 0.032051,
+            "dLogA": -0.084219,
+            "meta": {
+              "xgModHome": 1.0368866633264884,
+              "xgModAway": 0.9092071944402209,
+              "xgOverPerfHome": 1.1237092880050055,
+              "xgOverPerfAway": 0.6955020509076101,
+              "xgSens": 0.2981721414886474,
+              "homeXGScored": null,
+              "awayXGScored": null,
+              "homeActualGoals": 1.45,
+              "awayActualGoals": 1.3,
+              "reliabilityHome": 0.8848219891058494,
+              "reliabilityAway": 0.8848219891058494
+            }
+          },
+          {
+            "stage": "refMod",
+            "hBefore": 2.886916,
+            "hAfter": 2.883014,
+            "aBefore": 0.814538,
+            "aAfter": 0.813437,
+            "dLogH": -0.001353,
+            "dLogA": -0.001353,
+            "meta": {
+              "refMod": 0.9986482315803982,
+              "refRatio": 0.9952949125707494,
+              "refSens": 0.28729932013551623,
+              "refGoalsPerMatch": 2.8620689655172415
+            }
+          },
+          {
+            "stage": "cleanSheet",
+            "hBefore": 2.883014,
+            "hAfter": 2.883014,
+            "aBefore": 0.813437,
+            "aAfter": 0.762623,
+            "dLogH": 0,
+            "dLogA": -0.064505,
+            "meta": {
+              "csModHome": 1,
+              "csModAway": 0.9234049029676232,
+              "homeCSR": 0.3619652646214562,
+              "awayCSR": 0,
+              "lgCSR": 0.17258028704085876,
+              "floor": 0.5238752916619389,
+              "homeScoringRate": 0.8831136767365542,
+              "awayScoringRate": 0.8534027204110952,
+              "relHome": 0.8094704306598475,
+              "relAway": 0.8050485869385832
+            }
+          },
+          {
+            "stage": "referenceScaling",
+            "hBefore": 2.883014,
+            "hAfter": 2.562093,
+            "aBefore": 0.762623,
+            "aAfter": 0.677732,
+            "dLogH": -0.118012,
+            "dLogA": -0.118012,
+            "meta": {
+              "scalingFactor": 0.8886855381315967,
+              "calibrationRatio": 0.7559213580341808,
+              "referenceTotalGoals": 2.7558146096678966,
+              "referenceReliability": 0.8050485869385832,
+              "tolerance": 0.1122236699854367,
+              "exponent": 0.421745063284482
+            }
+          },
+          {
+            "stage": "lineupAttack_h",
+            "hBefore": 2.562093,
+            "hAfter": 1.70796,
+            "aBefore": 0.677732,
+            "aAfter": 0.677732,
+            "dLogH": -0.405525,
+            "dLogA": 0,
+            "meta": {
+              "lineupRate": 1.4948336594335854,
+              "reliability": 0.7526313438814582,
+              "ratio": 0.5834424569248511,
+              "modifier": 0.6666268200243912,
+              "validStarters": 10,
+              "isFallback": false
+            }
+          },
+          {
+            "stage": "lineupAttack_a",
+            "hBefore": 1.70796,
+            "hAfter": 1.70796,
+            "aBefore": 0.677732,
+            "aAfter": 0.787983,
+            "dLogH": 0,
+            "dLogA": 0.150725,
+            "meta": {
+              "lineupRate": 0.8275808097941826,
+              "reliability": 0.7545491928214666,
+              "ratio": 1.2211035731406161,
+              "modifier": 1.1626768635641738,
+              "validStarters": 10,
+              "isFallback": false
+            }
+          },
+          {
+            "stage": "lineupDefense_a",
+            "hBefore": 1.70796,
+            "hAfter": 1.70796,
+            "aBefore": 0.787983,
+            "aAfter": 0.71367,
+            "dLogH": 0,
+            "dLogA": -0.099056,
+            "meta": {
+              "homeDefRate": 14.12985697002667,
+              "peerDef": 12.387362447674937,
+              "reliability": 0.7526313438814582,
+              "ratio": 0.8766799603104231,
+              "modifier": 0.9056917352984126
+            }
+          },
+          {
+            "stage": "lineupDefense_h",
+            "hBefore": 1.70796,
+            "hAfter": 1.886283,
+            "aBefore": 0.71367,
+            "aAfter": 0.71367,
+            "dLogH": 0.099309,
+            "dLogA": 0,
+            "meta": {
+              "awayDefRate": 12.387362447674937,
+              "peerDef": 14.12985697002667,
+              "reliability": 0.7545491928214666,
+              "ratio": 1.1406671137388729,
+              "modifier": 1.104407169970197
+            }
+          },
+          {
+            "stage": "benchAttack_h",
+            "hBefore": 1.886283,
+            "hAfter": 1.812324,
+            "aBefore": 0.71367,
+            "aAfter": 0.71367,
+            "dLogH": -0.039998,
+            "dLogA": 0,
+            "meta": {
+              "benchRate": 0.3673655889750903,
+              "starterRate": 1.4948336594335854,
+              "benchRatio": 0.24575683498743972,
+              "effect": -0.03920861728408383,
+              "reliability": 0.5198405382093306,
+              "validBench": 7
+            }
+          },
+          {
+            "stage": "benchAttack_a",
+            "hBefore": 1.812324,
+            "hAfter": 1.812324,
+            "aBefore": 0.71367,
+            "aAfter": 0.699215,
+            "dLogH": 0,
+            "dLogA": -0.020461,
+            "meta": {
+              "benchRate": 0.6015013817140347,
+              "starterRate": 0.8275808097941826,
+              "benchRatio": 0.726818909519696,
+              "effect": -0.020253573516795666,
+              "reliability": 0.7413973449328448,
+              "validBench": 10
+            }
+          },
+          {
+            "stage": "finalM167",
+            "hBefore": null,
+            "hAfter": 1.812324,
+            "aBefore": null,
+            "aAfter": 0.699215,
+            "dLogH": null,
+            "dLogA": null,
+            "meta": {}
+          }
+        ]
+      }
+    },
+    {
+      "matchId": 14083634,
+      "match": "Osasuna vs Atlético Madrid",
+      "matchDate": "2026-05-12",
+      "tournament": "LaLiga",
+      "tournamentId": 8,
+      "actual": "1-2",
+      "actualResult": "2",
+      "actualOU25": "Over",
+      "actualBTTS": "Yes",
+      "predicted": "0-1",
+      "predictedResult": "2",
+      "predictedOU25": "Under",
+      "predictedBTTS": "No",
+      "probHome": 51.98,
+      "probDraw": 17.4,
+      "probAway": 30.63,
+      "probOU25": 30.08,
+      "probBTTS": 28.425,
+      "hit1X2": true,
+      "hitOU25": false,
+      "hitBTTS": false,
+      "hitScore": false,
+      "confidence": 68,
+      "avgGoals": 0,
+      "brierScore": 0.7817,
+      "logLoss": 1.1832,
+      "confidenceTier": "HIGH",
+      "maxProbability": 99.9,
+      "isHighConfidence": true,
+      "poisson": {
+        "homeWin": 51.98,
+        "draw": 17.4,
+        "awayWin": 30.63,
+        "predicted": "1",
+        "lambdaHome": 1.09,
+        "lambdaAway": 0.88
+      },
+      "simulation": {
+        "homeWin": 0.1,
+        "draw": 99.9,
+        "awayWin": 0,
+        "predicted": "X"
+      },
+      "restDays": {
+        "home": null,
+        "away": null
+      },
+      "lambdaAudit": {
+        "diag": {
+          "sources": {
+            "hAtk": {
+              "n": 4,
+              "agreement": 0.7471900745521741,
+              "rate": 1.5350616688976615
+            },
+            "aDef": {
+              "n": 4,
+              "agreement": 0.7415708923681602,
+              "rate": 1.4870034400218646
+            },
+            "aAtk": {
+              "n": 4,
+              "agreement": 0.7341916614715597,
+              "rate": 1.4874025179490897
+            },
+            "hDef": {
+              "n": 4,
+              "agreement": 0.7432967593848475,
+              "rate": 1.4058741635125225
+            }
+          },
+          "agreementHome": 0.7415708923681602,
+          "agreementAway": 0.7341916614715597,
+          "kMatchHome": 1.304646192308757,
+          "kMatchAway": 1.3016147159954976,
+          "alphaHome": 1.1084614458301147,
+          "betaHome": 1.0818494539547023,
+          "alphaAway": 1.08125377391079,
+          "betaAway": 1.0365571140105485,
+          "cvLocal": 0.4108119607228491,
+          "leagueAvgGoals": 1.3391926406675927,
+          "dynamicLambdaMin": 0.01,
+          "dynamicLambdaMax": 3.6148980406595257,
+          "lambdaHomeMin": 0.04435084124728794,
+          "lambdaHomeMax": 3.6148980406595257,
+          "lambdaAwayMin": 0.01,
+          "lambdaAwayMax": 3.2510467965015915,
+          "clampHomeMinHit": false,
+          "clampHomeMaxHit": false,
+          "clampAwayMinHit": false,
+          "clampAwayMaxHit": false,
+          "empWeight": 0.9296873478111054,
+          "probGap": 0.027208974497824216,
+          "dataRel": 0.9556907120223284,
+          "scoreSelection": {
+            "chosen": "0-1",
+            "teamWeightSum": 58,
+            "topCandidates": [
+              {
+                "key": "0-1",
+                "prob": 0.09799581372828552,
+                "empFreq": 0.2596401632029394,
+                "combined": 0.12165045235045416,
+                "sources": [
+                  {
+                    "f": 0.10368478898398314,
+                    "w": 18,
+                    "src": "away"
+                  },
+                  {
+                    "f": 0.4,
+                    "w": 20,
+                    "src": "h2h"
+                  }
+                ]
+              },
+              {
+                "key": "1-0",
+                "prob": 0.1007367575967284,
+                "empFreq": 0.06753383139730382,
+                "combined": 0.10706155003920034,
+                "sources": [
+                  {
+                    "f": 0.09436225197363858,
+                    "w": 20,
+                    "src": "home"
+                  },
+                  {
+                    "f": 0.03772447520137629,
+                    "w": 18,
+                    "src": "away"
+                  }
+                ]
+              },
+              {
+                "key": "1-1",
+                "prob": 0.047730924258177564,
+                "empFreq": 0.13472962507833175,
+                "combined": 0.05370952932685801,
+                "sources": [
+                  {
+                    "f": 0.1562547792699542,
+                    "w": 20,
+                    "src": "home"
+                  },
+                  {
+                    "f": 0.11081278708764009,
+                    "w": 18,
+                    "src": "away"
+                  }
+                ]
+              },
+              {
+                "key": "2-1",
+                "prob": 0.04460605107110649,
+                "empFreq": 0.1504699996472123,
+                "combined": 0.05084599400418886,
+                "sources": [
+                  {
+                    "f": 0.18606155710157204,
+                    "w": 20,
+                    "src": "home"
+                  },
+                  {
+                    "f": 0.1109238246979237,
+                    "w": 18,
+                    "src": "away"
+                  }
+                ]
+              },
+              {
+                "key": "0-0",
+                "prob": 0.044387515437920404,
+                "empFreq": 0.05658567812270828,
+                "combined": 0.046722608975099104,
+                "sources": [
+                  {
+                    "f": 0.056585678122708274,
+                    "w": 18,
+                    "src": "away"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "trace": [
+          {
+            "stage": "dcBase",
+            "hBefore": null,
+            "hAfter": 1.697318,
+            "aBefore": null,
+            "aAfter": 1.55346,
+            "dLogH": null,
+            "dLogA": null,
+            "meta": {
+              "kMatchHome": 1.304646192308757,
+              "kMatchAway": 1.3016147159954976,
+              "agreementHome": 0.7415708923681602,
+              "agreementAway": 0.7341916614715597
+            }
+          },
+          {
+            "stage": "behavMod",
+            "hBefore": 1.697318,
+            "hAfter": 1.571384,
+            "aBefore": 1.55346,
+            "aAfter": 1.578011,
+            "dLogH": -0.077093,
+            "dLogA": 0.01568,
+            "meta": {
+              "behavModHome": 0.9258041775326267,
+              "behavModAway": 1.0158037827472037,
+              "BEHAV_SENS": 0.20943862987908296
+            }
+          },
+          {
+            "stage": "urgencyMod",
+            "hBefore": 1.571384,
+            "hAfter": 1.598489,
+            "aBefore": 1.578011,
+            "aAfter": 1.646918,
+            "dLogH": 0.017102,
+            "dLogA": 0.042741,
+            "meta": {
+              "lambdaModHome": 1.017249132091622,
+              "lambdaModAway": 1.0436673511553867,
+              "URGENCY_SENS": 0.3070448630322481
+            }
+          },
+          {
+            "stage": "initialClamp",
+            "hBefore": 1.598489,
+            "hAfter": 1.598489,
+            "aBefore": 1.646918,
+            "aAfter": 1.646918,
+            "dLogH": 0,
+            "dLogA": 0,
+            "meta": {
+              "lambdaHomeMin": 0.04435084124728794,
+              "lambdaHomeMax": 3.6148980406595257,
+              "lambdaAwayMin": 0.01,
+              "lambdaAwayMax": 3.2510467965015915,
+              "clampHomeMinHit": false,
+              "clampHomeMaxHit": false,
+              "clampAwayMinHit": false,
+              "clampAwayMaxHit": false
+            }
+          },
+          {
+            "stage": "lqr",
+            "hBefore": 1.598489,
+            "hAfter": 1.537373,
+            "aBefore": 1.646918,
+            "aAfter": 1.720819,
+            "dLogH": -0.038984,
+            "dLogA": 0.043895,
+            "meta": {
+              "hLQR": 0.9249948417210738,
+              "aLQR": 1.091758165447047,
+              "hLQRfromMV": 0.8174221652481832,
+              "aLQRfromMV": 1.223358066998811,
+              "hMV": 791093.5410804007,
+              "aMV": 1183954.517476934,
+              "lqrSens": 0.4108119607228491
+            }
+          },
+          {
+            "stage": "xgOverPerf",
+            "hBefore": 1.537373,
+            "hAfter": 1.490973,
+            "aBefore": 1.720819,
+            "aAfter": 1.67773,
+            "dLogH": -0.030647,
+            "dLogA": -0.025359,
+            "meta": {
+              "xgModHome": 0.9659570152914231,
+              "xgModAway": 0.9717469831358052,
+              "xgOverPerfHome": 0.8962374850323178,
+              "xgOverPerfAway": 0.91388522157064,
+              "xgSens": 0.32808557810284267,
+              "homeXGScored": null,
+              "awayXGScored": null,
+              "homeActualGoals": 1.55,
+              "awayActualGoals": 1.9,
+              "reliabilityHome": 0.8848219891058494,
+              "reliabilityAway": 0.8848219891058494
+            }
+          },
+          {
+            "stage": "refMod",
+            "hBefore": 1.490973,
+            "hAfter": 1.555662,
+            "aBefore": 1.67773,
+            "aAfter": 1.750522,
+            "dLogH": 0.042472,
+            "dLogA": 0.042472,
+            "meta": {
+              "refMod": 1.0433871210564962,
+              "refRatio": 1.171575671487594,
+              "refSens": 0.25287455197069364,
+              "refGoalsPerMatch": 3.1379310344827585
+            }
+          },
+          {
+            "stage": "cleanSheet",
+            "hBefore": 1.555662,
+            "hAfter": 1.555662,
+            "aBefore": 1.750522,
+            "aAfter": 1.750522,
+            "dLogH": 0,
+            "dLogA": 0,
+            "meta": {
+              "csModHome": 1,
+              "csModAway": 1,
+              "homeCSR": 0.20796522035970572,
+              "awayCSR": 0.3398487055117757,
+              "lgCSR": 0.24458603783798413,
+              "floor": 0.5891880392771509,
+              "homeScoringRate": 1,
+              "awayScoringRate": 0.8426428702206922,
+              "relHome": 0.8135843960445467,
+              "relAway": 0.8050485869385832
+            }
+          },
+          {
+            "stage": "referenceScaling",
+            "hBefore": 1.555662,
+            "hAfter": 1.474739,
+            "aBefore": 1.750522,
+            "aAfter": 1.659463,
+            "dLogH": -0.05342,
+            "dLogA": -0.05342,
+            "meta": {
+              "scalingFactor": 0.9479819450756833,
+              "calibrationRatio": 0.8934875960733198,
+              "referenceTotalGoals": 2.9540340876802835,
+              "referenceReliability": 0.8050485869385832,
+              "tolerance": 0.09682930773988942,
+              "exponent": 0.47432499846118475
+            }
+          },
+          {
+            "stage": "lineupAttack_h",
+            "hBefore": 1.474739,
+            "hAfter": 0.939401,
+            "aBefore": 1.659463,
+            "aAfter": 1.659463,
+            "dLogH": -0.450994,
+            "dLogA": 0,
+            "meta": {
+              "lineupRate": 0.8168280951448709,
+              "reliability": 0.7633506872982667,
+              "ratio": 0.5538797008143447,
+              "modifier": 0.6369949753332526,
+              "validStarters": 10,
+              "isFallback": false
+            }
+          },
+          {
+            "stage": "lineupAttack_a",
+            "hBefore": 0.939401,
+            "hAfter": 0.939401,
+            "aBefore": 1.659463,
+            "aAfter": 1.023686,
+            "dLogH": 0,
+            "dLogA": -0.483085,
+            "meta": {
+              "lineupRate": 0.871246865489571,
+              "reliability": 0.7497543193410885,
+              "ratio": 0.5250172749580735,
+              "modifier": 0.6168775184463572,
+              "validStarters": 10,
+              "isFallback": false
+            }
+          },
+          {
+            "stage": "lineupDefense_a",
+            "hBefore": 0.939401,
+            "hAfter": 0.939401,
+            "aBefore": 1.023686,
+            "aAfter": 0.848743,
+            "dLogH": 0,
+            "dLogA": -0.187409,
+            "meta": {
+              "homeDefRate": 14.876872322525983,
+              "peerDef": 11.6382841668037,
+              "reliability": 0.7633506872982667,
+              "ratio": 0.7823071889365792,
+              "modifier": 0.8291049439224697
+            }
+          },
+          {
+            "stage": "lineupDefense_h",
+            "hBefore": 0.939401,
+            "hAfter": 1.129255,
+            "aBefore": 0.848743,
+            "aAfter": 0.848743,
+            "dLogH": 0.184071,
+            "dLogA": 0,
+            "meta": {
+              "awayDefRate": 11.6382841668037,
+              "peerDef": 14.876872322525983,
+              "reliability": 0.7497543193410885,
+              "ratio": 1.2782702423575312,
+              "modifier": 1.202100600196644
+            }
+          },
+          {
+            "stage": "benchAttack_h",
+            "hBefore": 1.129255,
+            "hAfter": 1.094936,
+            "aBefore": 0.848743,
+            "aAfter": 0.848743,
+            "dLogH": -0.030862,
+            "dLogA": 0,
+            "meta": {
+              "benchRate": 0.40237647400294657,
+              "starterRate": 0.8168280951448709,
+              "benchRatio": 0.49260851382882703,
+              "effect": -0.03039098601377792,
+              "reliability": 0.598965233790408,
+              "validBench": 8
+            }
+          },
+          {
+            "stage": "benchAttack_a",
+            "hBefore": 1.094936,
+            "hAfter": 1.094936,
+            "aBefore": 0.848743,
+            "aAfter": 0.882275,
+            "dLogH": 0,
+            "dLogA": 0.038747,
+            "meta": {
+              "benchRate": 1.493580672940399,
+              "starterRate": 0.871246865489571,
+              "benchRatio": 1.7143024923264731,
+              "effect": 0.03950760365670566,
+              "reliability": 0.5530934594394309,
+              "validBench": 8
+            }
+          },
+          {
+            "stage": "finalM167",
+            "hBefore": null,
+            "hAfter": 1.094936,
+            "aBefore": null,
+            "aAfter": 0.882275,
+            "dLogH": null,
+            "dLogA": null,
+            "meta": {}
+          }
+        ]
+      }
+    },
+    {
+      "matchId": 14083629,
+      "match": "Espanyol vs Athletic Club",
+      "matchDate": "2026-05-13",
+      "tournament": "LaLiga",
+      "tournamentId": 8,
+      "actual": "2-0",
+      "actualResult": "1",
+      "actualOU25": "Under",
+      "actualBTTS": "No",
+      "predicted": "1-0",
+      "predictedResult": "1",
+      "predictedOU25": "Under",
+      "predictedBTTS": "No",
+      "probHome": 46,
+      "probDraw": 19.06,
+      "probAway": 34.95,
+      "probOU25": 23.92,
+      "probBTTS": 24.655,
+      "hit1X2": true,
+      "hitOU25": true,
+      "hitBTTS": true,
+      "hitScore": false,
+      "confidence": 56,
+      "avgGoals": 0.01,
+      "brierScore": 0.4501,
+      "logLoss": 0.7765,
+      "confidenceTier": "HIGH",
+      "maxProbability": 99.1,
+      "isHighConfidence": true,
+      "poisson": {
+        "homeWin": 46,
+        "draw": 19.06,
+        "awayWin": 34.95,
+        "predicted": "1",
+        "lambdaHome": 0.77,
+        "lambdaAway": 0.66
+      },
+      "simulation": {
+        "homeWin": 0.2,
+        "draw": 99.1,
+        "awayWin": 0.7,
+        "predicted": "X"
+      },
+      "restDays": {
+        "home": null,
+        "away": null
+      },
+      "lambdaAudit": {
+        "diag": {
+          "sources": {
+            "hAtk": {
+              "n": 4,
+              "agreement": 0.6973650083454617,
+              "rate": 1.2450630057305914
+            },
+            "aDef": {
+              "n": 4,
+              "agreement": 0.7453599050111805,
+              "rate": 1.7796084488337764
+            },
+            "aAtk": {
+              "n": 4,
+              "agreement": 0.7479631565976482,
+              "rate": 1.18044015433403
+            },
+            "hDef": {
+              "n": 4,
+              "agreement": 0.7364927996291328,
+              "rate": 1.473564945287705
+            }
+          },
+          "agreementHome": 0.6973650083454617,
+          "agreementAway": 0.7364927996291328,
+          "kMatchHome": 1.3348644883882204,
+          "kMatchAway": 1.353653082099072,
+          "alphaHome": 0.9874489478759036,
+          "betaHome": 1.2814615223293482,
+          "alphaAway": 0.9492063340522674,
+          "betaAway": 1.119477918324892,
+          "cvLocal": 0.48018538983294484,
+          "leagueAvgGoals": 1.2678821240338074,
+          "dynamicLambdaMin": 0.01,
+          "dynamicLambdaMax": 3.739109257236604,
+          "lambdaHomeMin": 0.01,
+          "lambdaHomeMax": 3.5341088279764516,
+          "lambdaAwayMin": 0.01,
+          "lambdaAwayMax": 3.739109257236604,
+          "clampHomeMinHit": false,
+          "clampHomeMaxHit": false,
+          "clampAwayMinHit": false,
+          "clampAwayMaxHit": false,
+          "empWeight": 0.8276004642808645,
+          "probGap": 0.13672798528437294,
+          "dataRel": 0.958678666947737,
+          "scoreSelection": {
+            "chosen": "1-0",
+            "teamWeightSum": 59,
+            "topCandidates": [
+              {
+                "key": "1-0",
+                "prob": 0.13261063571939946,
+                "empFreq": 0.07431201972182518,
+                "combined": 0.1407662776074906,
+                "sources": [
+                  {
+                    "f": 0.09903540277367186,
+                    "w": 20,
+                    "src": "home"
+                  },
+                  {
+                    "f": 0.021247426742855163,
+                    "w": 19,
+                    "src": "away"
+                  },
+                  {
+                    "f": 0.1,
+                    "w": 20,
+                    "src": "h2h"
+                  }
+                ]
+              },
+              {
+                "key": "0-1",
+                "prob": 0.11447905067020607,
+                "empFreq": 0.05508522104669349,
+                "combined": 0.11969798511231072,
+                "sources": [
+                  {
+                    "f": 0.007806506359002432,
+                    "w": 19,
+                    "src": "away"
+                  },
+                  {
+                    "f": 0.1,
+                    "w": 20,
+                    "src": "h2h"
+                  }
+                ]
+              },
+              {
+                "key": "0-0",
+                "prob": 0.09444801075189342,
+                "empFreq": 0.06353617576967188,
+                "combined": 0.09941432975314043,
+                "sources": [
+                  {
+                    "f": 0.10009981882389637,
+                    "w": 20,
+                    "src": "home"
+                  },
+                  {
+                    "f": 0.02504813044943557,
+                    "w": 19,
+                    "src": "away"
+                  }
+                ]
+              },
+              {
+                "key": "2-0",
+                "prob": 0.04677310427056105,
+                "empFreq": 0.19351598456733982,
+                "combined": 0.05426400020802493,
+                "sources": [
+                  {
+                    "f": 0.1231604974537714,
+                    "w": 20,
+                    "src": "home"
+                  },
+                  {
+                    "f": 0.2675743920553066,
+                    "w": 19,
+                    "src": "away"
+                  }
+                ]
+              },
+              {
+                "key": "1-1",
+                "prob": 0.04039691190716566,
+                "empFreq": 0.16324091326653173,
+                "combined": 0.04585446423781476,
+                "sources": [
+                  {
+                    "f": 0.07443553427261713,
+                    "w": 20,
+                    "src": "home"
+                  },
+                  {
+                    "f": 0.11276332617226476,
+                    "w": 19,
+                    "src": "away"
+                  },
+                  {
+                    "f": 0.3,
+                    "w": 20,
+                    "src": "h2h"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "trace": [
+          {
+            "stage": "dcBase",
+            "hBefore": null,
+            "hAfter": 1.735917,
+            "aBefore": null,
+            "aAfter": 1.376522,
+            "dLogH": null,
+            "dLogA": null,
+            "meta": {
+              "kMatchHome": 1.3348644883882204,
+              "kMatchAway": 1.353653082099072,
+              "agreementHome": 0.6973650083454617,
+              "agreementAway": 0.7364927996291328
+            }
+          },
+          {
+            "stage": "behavMod",
+            "hBefore": 1.735917,
+            "hAfter": 1.638597,
+            "aBefore": 1.376522,
+            "aAfter": 1.420633,
+            "dLogH": -0.057696,
+            "dLogA": 0.031543,
+            "meta": {
+              "behavModHome": 0.9439369841117787,
+              "behavModAway": 1.0320458191132276,
+              "BEHAV_SENS": 0.2514283410607311
+            }
+          },
+          {
+            "stage": "urgencyMod",
+            "hBefore": 1.638597,
+            "hAfter": 1.681236,
+            "aBefore": 1.420633,
+            "aAfter": 1.443297,
+            "dLogH": 0.025689,
+            "dLogA": 0.015827,
+            "meta": {
+              "lambdaModHome": 1.0260217803654677,
+              "lambdaModAway": 1.0159533531291332,
+              "URGENCY_SENS": 0.36133886995184583
+            }
+          },
+          {
+            "stage": "initialClamp",
+            "hBefore": 1.681236,
+            "hAfter": 1.681236,
+            "aBefore": 1.443297,
+            "aAfter": 1.443297,
+            "dLogH": 0,
+            "dLogA": 0,
+            "meta": {
+              "lambdaHomeMin": 0.01,
+              "lambdaHomeMax": 3.5341088279764516,
+              "lambdaAwayMin": 0.01,
+              "lambdaAwayMax": 3.739109257236604,
+              "clampHomeMinHit": false,
+              "clampHomeMaxHit": false,
+              "clampAwayMinHit": false,
+              "clampAwayMaxHit": false
+            }
+          },
+          {
+            "stage": "lqr",
+            "hBefore": 1.681236,
+            "hAfter": 1.653155,
+            "aBefore": 1.443297,
+            "aAfter": 1.468749,
+            "dLogH": -0.016843,
+            "dLogA": 0.017481,
+            "meta": {
+              "hLQR": 0.9668746869258464,
+              "aLQR": 1.035579762539237,
+              "hLQRfromMV": 0.9310155748685363,
+              "aLQRfromMV": 1.0740958873230502,
+              "hMV": 840715.6146691183,
+              "aMV": 969918.4508829289,
+              "lqrSens": 0.48018538983294484
+            }
+          },
+          {
+            "stage": "xgOverPerf",
+            "hBefore": 1.653155,
+            "hAfter": 1.596318,
+            "aBefore": 1.468749,
+            "aAfter": 1.556869,
+            "dLogH": -0.034986,
+            "dLogA": 0.058266,
+            "meta": {
+              "xgModHome": 0.9612314250639691,
+              "xgModAway": 1.068066607531159,
+              "xgOverPerfHome": 0.8790244528018802,
+              "xgOverPerfAway": 1.212398704507157,
+              "xgSens": 0.3204662085350212,
+              "homeXGScored": null,
+              "awayXGScored": null,
+              "homeActualGoals": 1,
+              "awayActualGoals": 1.25,
+              "reliabilityHome": 0.8848219891058494,
+              "reliabilityAway": 0.8848219891058494
+            }
+          },
+          {
+            "stage": "refMod",
+            "hBefore": 1.596318,
+            "hAfter": 1.677037,
+            "aBefore": 1.556869,
+            "aAfter": 1.635593,
+            "dLogH": 0.049329,
+            "dLogA": 0.049329,
+            "meta": {
+              "refMod": 1.050565618063796,
+              "refRatio": 1.1694767144221667,
+              "refSens": 0.29836321901920293,
+              "refGoalsPerMatch": 2.9655172413793105
+            }
+          },
+          {
+            "stage": "cleanSheet",
+            "hBefore": 1.677037,
+            "hAfter": 1.677037,
+            "aBefore": 1.635593,
+            "aAfter": 1.572596,
+            "dLogH": 0,
+            "dLogA": -0.039277,
+            "meta": {
+              "csModHome": 1,
+              "csModAway": 0.9528697199629521,
+              "homeCSR": 0.3222957190513397,
+              "awayCSR": 0.06709288217063841,
+              "lgCSR": 0.2614915379794681,
+              "floor": 0.5198146101670551,
+              "homeScoringRate": 0.6434678693748265,
+              "awayScoringRate": 0.5779000759950476,
+              "relHome": 0.8135843960445467,
+              "relAway": 0.8094704306598475
+            }
+          },
+          {
+            "stage": "referenceScaling",
+            "hBefore": 1.677037,
+            "hAfter": 1.416061,
+            "aBefore": 1.572596,
+            "aAfter": 1.327872,
+            "dLogH": -0.16915,
+            "dLogA": -0.16915,
+            "meta": {
+              "scalingFactor": 0.8443823120427778,
+              "calibrationRatio": 0.6689830686030688,
+              "referenceTotalGoals": 2.17394963797699,
+              "referenceReliability": 0.8094704306598475,
+              "tolerance": 0.11016208360244682,
+              "exponent": 0.42077455635520683
+            }
+          },
+          {
+            "stage": "lineupAttack_h",
+            "hBefore": 1.416061,
+            "hAfter": 0.688929,
+            "aBefore": 1.327872,
+            "aAfter": 1.327872,
+            "dLogH": -0.720496,
+            "dLogA": 0,
+            "meta": {
+              "lineupRate": 0.5516227339128514,
+              "reliability": 0.7642332190204054,
+              "ratio": 0.38954742978483653,
+              "modifier": 0.4865109428889674,
+              "validStarters": 10,
+              "isFallback": false
+            }
+          },
+          {
+            "stage": "lineupAttack_a",
+            "hBefore": 0.688929,
+            "hAfter": 0.688929,
+            "aBefore": 1.327872,
+            "aAfter": 0.73264,
+            "dLogH": 0,
+            "dLogA": -0.594679,
+            "meta": {
+              "lineupRate": 0.6063661913303888,
+              "reliability": 0.7586653588151875,
+              "ratio": 0.4566449445332279,
+              "modifier": 0.551739551325647,
+              "validStarters": 10,
+              "isFallback": false
+            }
+          },
+          {
+            "stage": "lineupDefense_a",
+            "hBefore": 0.688929,
+            "hAfter": 0.688929,
+            "aBefore": 0.73264,
+            "aAfter": 0.660451,
+            "dLogH": 0,
+            "dLogA": -0.103731,
+            "meta": {
+              "homeDefRate": 14.307960069322874,
+              "peerDef": 12.49193908502377,
+              "reliability": 0.7642332190204054,
+              "ratio": 0.8730761774913838,
+              "modifier": 0.9014675247404262
+            }
+          },
+          {
+            "stage": "lineupDefense_h",
+            "hBefore": 0.688929,
+            "hAfter": 0.763653,
+            "aBefore": 0.660451,
+            "aAfter": 0.660451,
+            "dLogH": 0.102976,
+            "dLogA": 0,
+            "meta": {
+              "awayDefRate": 12.49193908502377,
+              "peerDef": 14.307960069322874,
+              "reliability": 0.7586653588151875,
+              "ratio": 1.14537542746076,
+              "modifier": 1.1084642748305618
+            }
+          },
+          {
+            "stage": "benchAttack_h",
+            "hBefore": 0.763653,
+            "hAfter": 0.772835,
+            "aBefore": 0.660451,
+            "aAfter": 0.660451,
+            "dLogH": 0.011951,
+            "dLogA": 0,
+            "meta": {
+              "benchRate": 0.6777603206638597,
+              "starterRate": 0.5516227339128514,
+              "benchRatio": 1.228666403678236,
+              "effect": 0.0120230988023421,
+              "reliability": 0.5257920975247504,
+              "validBench": 7
+            }
+          },
+          {
+            "stage": "benchAttack_a",
+            "hBefore": 0.772835,
+            "hAfter": 0.772835,
+            "aBefore": 0.660451,
+            "aAfter": 0.65783,
+            "dLogH": 0,
+            "dLogA": -0.003976,
+            "meta": {
+              "benchRate": 0.5658273010862788,
+              "starterRate": 0.6063661913303888,
+              "benchRatio": 0.9331445406691189,
+              "effect": -0.003967640848942769,
+              "reliability": 0.5934654983531138,
+              "validBench": 8
+            }
+          },
+          {
+            "stage": "finalM167",
+            "hBefore": null,
+            "hAfter": 0.772835,
+            "aBefore": null,
+            "aAfter": 0.65783,
+            "dLogH": null,
+            "dLogA": null,
+            "meta": {}
+          }
+        ]
+      }
+    },
+    {
+      "matchId": 14083644,
+      "match": "Villarreal vs Sevilla",
+      "matchDate": "2026-05-13",
+      "tournament": "LaLiga",
+      "tournamentId": 8,
+      "actual": "2-3",
+      "actualResult": "2",
+      "actualOU25": "Over",
+      "actualBTTS": "Yes",
+      "predicted": "1-0",
+      "predictedResult": "1",
+      "predictedOU25": "Under",
+      "predictedBTTS": "No",
+      "probHome": 53.57,
+      "probDraw": 15.15,
+      "probAway": 31.28,
+      "probOU25": 34.52,
+      "probBTTS": 32.9,
+      "hit1X2": false,
+      "hitOU25": false,
+      "hitBTTS": false,
+      "hitScore": false,
+      "confidence": 68,
+      "avgGoals": 0,
+      "brierScore": 0.7822,
+      "logLoss": 1.1622,
+      "confidenceTier": "HIGH",
+      "maxProbability": 99.7,
+      "isHighConfidence": true,
+      "poisson": {
+        "homeWin": 53.57,
+        "draw": 15.15,
+        "awayWin": 31.28,
+        "predicted": "1",
+        "lambdaHome": 1.59,
+        "lambdaAway": 0.9
+      },
+      "simulation": {
+        "homeWin": 0.2,
+        "draw": 99.7,
+        "awayWin": 0.1,
+        "predicted": "X"
+      },
+      "restDays": {
+        "home": null,
+        "away": null
+      },
+      "lambdaAudit": {
+        "diag": {
+          "sources": {
+            "hAtk": {
+              "n": 4,
+              "agreement": 0.7349406711844606,
+              "rate": 2.0475391347950374
+            },
+            "aDef": {
+              "n": 4,
+              "agreement": 0.7447067477833872,
+              "rate": 1.9574362719108267
+            },
+            "aAtk": {
+              "n": 4,
+              "agreement": 0.7480259785012273,
+              "rate": 1.1820442010693692
+            },
+            "hDef": {
+              "n": 4,
+              "agreement": 0.7385904962833493,
+              "rate": 1.304858508668769
+            }
+          },
+          "agreementHome": 0.7349406711844606,
+          "agreementAway": 0.7385904962833493,
+          "kMatchHome": 1.3120875001314074,
+          "kMatchAway": 1.3136373732513604,
+          "alphaHome": 1.2983026277302823,
+          "betaHome": 1.2528343005534912,
+          "alphaAway": 0.860863053578953,
+          "betaAway": 0.923146234358265,
+          "cvLocal": 0.42464312068678195,
+          "leagueAvgGoals": 1.4564041088708608,
+          "dynamicLambdaMin": 0.01,
+          "dynamicLambdaMax": 5.293382384647218,
+          "lambdaHomeMin": 0.01,
+          "lambdaHomeMax": 5.293382384647218,
+          "lambdaAwayMin": 0.01,
+          "lambdaAwayMax": 3.2875263285711727,
+          "clampHomeMinHit": false,
+          "clampHomeMaxHit": false,
+          "clampAwayMinHit": false,
+          "clampAwayMaxHit": false,
+          "empWeight": 0.743349932152488,
+          "probGap": 0.2225200913105048,
+          "dataRel": 0.9561017896982881,
+          "scoreSelection": {
+            "chosen": "1-0",
+            "teamWeightSum": 60,
+            "topCandidates": [
+              {
+                "key": "1-0",
+                "prob": 0.08198008476012139,
+                "empFreq": 0.05580112308272123,
+                "combined": 0.08538059908745084,
+                "sources": [
+                  {
+                    "f": 0.02539319036434839,
+                    "w": 20,
+                    "src": "home"
+                  },
+                  {
+                    "f": 0.08620905580109406,
+                    "w": 20,
+                    "src": "away"
+                  }
+                ]
+              },
+              {
+                "key": "2-1",
+                "prob": 0.06373786881365626,
+                "empFreq": 0.2224916616794895,
+                "combined": 0.07427942149980635,
+                "sources": [
+                  {
+                    "f": 0.3026609542588701,
+                    "w": 20,
+                    "src": "home"
+                  },
+                  {
+                    "f": 0.16481403077959839,
+                    "w": 20,
+                    "src": "away"
+                  },
+                  {
+                    "f": 0.2,
+                    "w": 20,
+                    "src": "h2h"
+                  }
+                ]
+              },
+              {
+                "key": "0-1",
+                "prob": 0.05818129203526088,
+                "empFreq": 0.09513334494820642,
+                "combined": 0.062295719730118895,
+                "sources": [
+                  {
+                    "f": 0.09026668989641286,
+                    "w": 20,
+                    "src": "away"
+                  },
+                  {
+                    "f": 0.1,
+                    "w": 20,
+                    "src": "h2h"
+                  }
+                ]
+              },
+              {
+                "key": "2-0",
+                "prob": 0.05513477076366058,
+                "empFreq": 0.09967101163500625,
+                "combined": 0.05921973017430865,
+                "sources": [
+                  {
+                    "f": 0.05927921892305784,
+                    "w": 20,
+                    "src": "home"
+                  },
+                  {
+                    "f": 0.14006280434695464,
+                    "w": 20,
+                    "src": "away"
+                  }
+                ]
+              },
+              {
+                "key": "1-1",
+                "prob": 0.03995687367780373,
+                "empFreq": 0.16972754709303287,
+                "combined": 0.04499811098545025,
+                "sources": [
+                  {
+                    "f": 0.039455094186065715,
+                    "w": 20,
+                    "src": "away"
+                  },
+                  {
+                    "f": 0.3,
+                    "w": 20,
+                    "src": "h2h"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "trace": [
+          {
+            "stage": "dcBase",
+            "hBefore": null,
+            "hAfter": 2.757313,
+            "aBefore": null,
+            "aAfter": 1.076929,
+            "dLogH": null,
+            "dLogA": null,
+            "meta": {
+              "kMatchHome": 1.3120875001314074,
+              "kMatchAway": 1.3136373732513604,
+              "agreementHome": 0.7349406711844606,
+              "agreementAway": 0.7385904962833493
+            }
+          },
+          {
+            "stage": "behavMod",
+            "hBefore": 2.757313,
+            "hAfter": 2.890257,
+            "aBefore": 1.076929,
+            "aAfter": 1.023169,
+            "dLogH": 0.047089,
+            "dLogA": -0.051209,
+            "meta": {
+              "behavModHome": 1.0482152017985154,
+              "behavModAway": 0.9500803064093514,
+              "BEHAV_SENS": 0.208191454171671
+            }
+          },
+          {
+            "stage": "urgencyMod",
+            "hBefore": 2.890257,
+            "hAfter": 3.060508,
+            "aBefore": 1.023169,
+            "aAfter": 1.051603,
+            "dLogH": 0.057235,
+            "dLogA": 0.027411,
+            "meta": {
+              "lambdaModHome": 1.058904961014615,
+              "lambdaModAway": 1.0277901966583594,
+              "URGENCY_SENS": 0.38901577523778713
+            }
+          },
+          {
+            "stage": "initialClamp",
+            "hBefore": 3.060508,
+            "hAfter": 3.060508,
+            "aBefore": 1.051603,
+            "aAfter": 1.051603,
+            "dLogH": 0,
+            "dLogA": 0,
+            "meta": {
+              "lambdaHomeMin": 0.01,
+              "lambdaHomeMax": 5.293382384647218,
+              "lambdaAwayMin": 0.01,
+              "lambdaAwayMax": 3.2875263285711727,
+              "clampHomeMinHit": false,
+              "clampHomeMaxHit": false,
+              "clampAwayMinHit": false,
+              "clampAwayMaxHit": false
+            }
+          },
+          {
+            "stage": "lqr",
+            "hBefore": 3.060508,
+            "hAfter": 3.089513,
+            "aBefore": 1.051603,
+            "aAfter": 1.041975,
+            "dLogH": 0.009432,
+            "dLogA": -0.009197,
+            "meta": {
+              "hLQR": 1.0190439759660253,
+              "aLQR": 0.9817734312187465,
+              "hLQRfromMV": 1.0448470139707555,
+              "aLQRfromMV": 0.9570779134446464,
+              "hMV": 1056476.8031664852,
+              "aMV": 967730.7786281818,
+              "lqrSens": 0.42464312068678195
+            }
+          },
+          {
+            "stage": "xgOverPerf",
+            "hBefore": 3.089513,
+            "hAfter": 3.461187,
+            "aBefore": 1.041975,
+            "aAfter": 1.028191,
+            "dLogH": 0.113598,
+            "dLogA": -0.013317,
+            "meta": {
+              "xgModHome": 1.136991098723647,
+              "xgModAway": 0.9850623169551095,
+              "xgOverPerfHome": 1.557870544393089,
+              "xgOverPerfAway": 0.9391690887227988,
+              "xgSens": 0.24556073107010962,
+              "homeXGScored": null,
+              "awayXGScored": null,
+              "homeActualGoals": 1.55,
+              "awayActualGoals": 1.1,
+              "reliabilityHome": 0.8848219891058494,
+              "reliabilityAway": 0.8848219891058494
+            }
+          },
+          {
+            "stage": "refMod",
+            "hBefore": 3.461187,
+            "hAfter": 3.509511,
+            "aBefore": 1.028191,
+            "aAfter": 1.042546,
+            "dLogH": 0.013865,
+            "dLogA": 0.013865,
+            "meta": {
+              "refMod": 1.0139616959376094,
+              "refRatio": 1.053610566788611,
+              "refSens": 0.2604280606220965,
+              "refGoalsPerMatch": 3.0689655172413794
+            }
+          },
+          {
+            "stage": "cleanSheet",
+            "hBefore": 3.509511,
+            "hAfter": 3.509511,
+            "aBefore": 1.042546,
+            "aAfter": 1.042546,
+            "dLogH": 0,
+            "dLogA": 0,
+            "meta": {
+              "csModHome": 1,
+              "csModAway": 1,
+              "homeCSR": 0.1472761317968613,
+              "awayCSR": 0.11087747425171114,
+              "lgCSR": 0.18340879387265313,
+              "floor": 0.575356879313218,
+              "homeScoringRate": 0.9002618818403804,
+              "awayScoringRate": 0.7425781927910015,
+              "relHome": 0.8135843960445467,
+              "relAway": 0.8135843960445467
+            }
+          },
+          {
+            "stage": "referenceScaling",
+            "hBefore": 3.509511,
+            "hAfter": 3.203194,
+            "aBefore": 1.042546,
+            "aAfter": 0.951551,
+            "dLogH": -0.091328,
+            "dLogA": -0.091328,
+            "meta": {
+              "scalingFactor": 0.9127181360325967,
+              "calibrationRatio": 0.8227495843604311,
+              "referenceTotalGoals": 3.7452032098931123,
+              "referenceReliability": 0.8135843960445467,
+              "tolerance": 0.09495308840332915,
+              "exponent": 0.4681013791661196
+            }
+          },
+          {
+            "stage": "lineupAttack_h",
+            "hBefore": 3.203194,
+            "hAfter": 1.794556,
+            "aBefore": 0.951551,
+            "aAfter": 0.951551,
+            "dLogH": -0.579391,
+            "dLogA": 0,
+            "meta": {
+              "lineupRate": 1.494323466695235,
+              "reliability": 0.7598816486054296,
+              "ratio": 0.4665104231042901,
+              "modifier": 0.5602396188359176,
+              "validStarters": 10,
+              "isFallback": false
+            }
+          },
+          {
+            "stage": "lineupAttack_a",
+            "hBefore": 1.794556,
+            "hAfter": 1.794556,
+            "aBefore": 0.951551,
+            "aAfter": 0.846921,
+            "dLogH": 0,
+            "dLogA": -0.116486,
+            "meta": {
+              "lineupRate": 0.8021278836187407,
+              "reliability": 0.6819022738600151,
+              "ratio": 0.8429688480047692,
+              "modifier": 0.8900424295648003,
+              "validStarters": 9,
+              "isFallback": false
+            }
+          },
+          {
+            "stage": "lineupDefense_a",
+            "hBefore": 1.794556,
+            "hAfter": 1.794556,
+            "aBefore": 0.846921,
+            "aAfter": 0.932094,
+            "dLogH": 0,
+            "dLogA": 0.095827,
+            "meta": {
+              "homeDefRate": 12.740508300702842,
+              "peerDef": 14.452887819876453,
+              "reliability": 0.7598816486054296,
+              "ratio": 1.1344043329165403,
+              "modifier": 1.1005685657332145
+            }
+          },
+          {
+            "stage": "lineupDefense_h",
+            "hBefore": 1.794556,
+            "hAfter": 1.646686,
+            "aBefore": 0.932094,
+            "aAfter": 0.932094,
+            "dLogH": -0.085993,
+            "dLogA": 0,
+            "meta": {
+              "awayDefRate": 14.452887819876453,
+              "peerDef": 12.740508300702842,
+              "reliability": 0.6819022738600151,
+              "ratio": 0.8815199051902523,
+              "modifier": 0.9176005397977367
+            }
+          },
+          {
+            "stage": "benchAttack_h",
+            "hBefore": 1.646686,
+            "hAfter": 1.590187,
+            "aBefore": 0.932094,
+            "aAfter": 0.932094,
+            "dLogH": -0.034913,
+            "dLogA": 0,
+            "meta": {
+              "benchRate": 0.6484599074401955,
+              "starterRate": 1.494323466695235,
+              "benchRatio": 0.43394882158566006,
+              "effect": -0.034310363171722626,
+              "reliability": 0.6061353545422357,
+              "validBench": 8
+            }
+          },
+          {
+            "stage": "benchAttack_a",
+            "hBefore": 1.590187,
+            "hAfter": 1.590187,
+            "aBefore": 0.932094,
+            "aAfter": 0.901322,
+            "dLogH": 0,
+            "dLogA": -0.033572,
+            "meta": {
+              "benchRate": 0.3502883829271125,
+              "starterRate": 0.8021278836187407,
+              "benchRatio": 0.4366989230530328,
+              "effect": -0.033014368391867374,
+              "reliability": 0.5274786924555801,
+              "validBench": 7
+            }
+          },
+          {
+            "stage": "finalM167",
+            "hBefore": null,
+            "hAfter": 1.590187,
+            "aBefore": null,
+            "aAfter": 0.901322,
+            "dLogH": null,
+            "dLogA": null,
+            "meta": {}
+          }
+        ]
+      }
+    },
+    {
+      "matchId": 14083603,
+      "match": "Deportivo Alavés vs FC Barcelona",
+      "matchDate": "2026-05-13",
+      "tournament": "LaLiga",
+      "tournamentId": 8,
+      "actual": "1-0",
+      "actualResult": "1",
+      "actualOU25": "Under",
+      "actualBTTS": "No",
+      "predicted": "1-0",
+      "predictedResult": "1",
+      "predictedOU25": "Under",
+      "predictedBTTS": "No",
+      "probHome": 49.41,
+      "probDraw": 14.42,
+      "probAway": 36.17,
+      "probOU25": 30.975,
+      "probBTTS": 31.725,
+      "hit1X2": true,
+      "hitOU25": true,
+      "hitBTTS": true,
+      "hitScore": true,
+      "confidence": 59,
+      "avgGoals": 0.01,
+      "brierScore": 0.4076,
+      "logLoss": 0.705,
+      "confidenceTier": "HIGH",
+      "maxProbability": 99.2,
+      "isHighConfidence": true,
+      "poisson": {
+        "homeWin": 49.41,
+        "draw": 14.42,
+        "awayWin": 36.17,
+        "predicted": "1",
+        "lambdaHome": 1.23,
+        "lambdaAway": 1.03
+      },
+      "simulation": {
+        "homeWin": 0.5,
+        "draw": 99.2,
+        "awayWin": 0.3,
+        "predicted": "X"
+      },
+      "restDays": {
+        "home": null,
+        "away": null
+      },
+      "lambdaAudit": {
+        "diag": {
+          "sources": {
+            "hAtk": {
+              "n": 4,
+              "agreement": 0.7390997834281666,
+              "rate": 1.381776766180591
+            },
+            "aDef": {
+              "n": 4,
+              "agreement": 0.7436041710171599,
+              "rate": 1.1225795105952663
+            },
+            "aAtk": {
+              "n": 4,
+              "agreement": 0.7252709018679815,
+              "rate": 1.7121791362170102
+            },
+            "hDef": {
+              "n": 4,
+              "agreement": 0.7424976744115048,
+              "rate": 1.529638298330534
+            }
+          },
+          "agreementHome": 0.7390997834281666,
+          "agreementAway": 0.7252709018679815,
+          "kMatchHome": 1.2214828645048774,
+          "kMatchAway": 1.2173388228348312,
+          "alphaHome": 0.942492270231897,
+          "betaHome": 0.8146374719305884,
+          "alphaAway": 1.1034971706734236,
+          "betaAway": 1.0151395828631178,
+          "cvLocal": 0.29966571425251065,
+          "leagueAvgGoals": 1.4983609376694622,
+          "dynamicLambdaMin": 0.01,
+          "dynamicLambdaMax": 4.2211327022997835,
+          "lambdaHomeMin": 0.01,
+          "lambdaHomeMax": 3.1677680831780872,
+          "lambdaAwayMin": 0.01,
+          "lambdaAwayMax": 4.2211327022997835,
+          "clampHomeMinHit": false,
+          "clampHomeMaxHit": false,
+          "clampAwayMinHit": false,
+          "clampAwayMaxHit": false,
+          "empWeight": 0.83480510337276,
+          "probGap": 0.1271463139991541,
+          "dataRel": 0.9564089798343947,
+          "scoreSelection": {
+            "chosen": "1-0",
+            "teamWeightSum": 59,
+            "topCandidates": [
+              {
+                "key": "1-0",
+                "prob": 0.08876814902231378,
+                "empFreq": 0.14115894387086445,
+                "combined": 0.09922860605415214,
+                "sources": [
+                  {
+                    "f": 0.16150031741945428,
+                    "w": 20,
+                    "src": "home"
+                  },
+                  {
+                    "f": 0.11974697171445409,
+                    "w": 19,
+                    "src": "away"
+                  }
+                ]
+              },
+              {
+                "key": "0-1",
+                "prob": 0.07748160607359897,
+                "empFreq": 0.10450776553255209,
+                "combined": 0.08424138156161816,
+                "sources": [
+                  {
+                    "f": 0.036640784666045985,
+                    "w": 20,
+                    "src": "home"
+                  },
+                  {
+                    "f": 0.07542855121577122,
+                    "w": 19,
+                    "src": "away"
+                  },
+                  {
+                    "f": 0.2,
+                    "w": 20,
+                    "src": "h2h"
+                  }
+                ]
+              },
+              {
+                "key": "2-1",
+                "prob": 0.047077381449348345,
+                "empFreq": 0.17880724686270977,
+                "combined": 0.05410458462000582,
+                "sources": [
+                  {
+                    "f": 0.20559028862485712,
+                    "w": 20,
+                    "src": "home"
+                  },
+                  {
+                    "f": 0.1506145713236073,
+                    "w": 19,
+                    "src": "away"
+                  }
+                ]
+              },
+              {
+                "key": "1-1",
+                "prob": 0.04552994273470833,
+                "empFreq": 0.1273092380967305,
+                "combined": 0.050368792276663764,
+                "sources": [
+                  {
+                    "f": 0.15598359981727244,
+                    "w": 20,
+                    "src": "home"
+                  },
+                  {
+                    "f": 0.02060910796640265,
+                    "w": 19,
+                    "src": "away"
+                  },
+                  {
+                    "f": 0.2,
+                    "w": 20,
+                    "src": "h2h"
+                  }
+                ]
+              },
+              {
+                "key": "1-2",
+                "prob": 0.04082060769929644,
+                "empFreq": 0.12172500241411068,
+                "combined": 0.04496866123624271,
+                "sources": [
+                  {
+                    "f": 0.0667542845295825,
+                    "w": 20,
+                    "src": "home"
+                  },
+                  {
+                    "f": 0.2024573395705726,
+                    "w": 19,
+                    "src": "away"
+                  },
+                  {
+                    "f": 0.1,
+                    "w": 20,
+                    "src": "h2h"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "trace": [
+          {
+            "stage": "dcBase",
+            "hBefore": null,
+            "hAfter": 1.08503,
+            "aBefore": null,
+            "aAfter": 1.720393,
+            "dLogH": null,
+            "dLogA": null,
+            "meta": {
+              "kMatchHome": 1.2214828645048774,
+              "kMatchAway": 1.2173388228348312,
+              "agreementHome": 0.7390997834281666,
+              "agreementAway": 0.7252709018679815
+            }
+          },
+          {
+            "stage": "behavMod",
+            "hBefore": 1.08503,
+            "hAfter": 1.041067,
+            "aBefore": 1.720393,
+            "aAfter": 1.762746,
+            "dLogH": -0.041361,
+            "dLogA": 0.02432,
+            "meta": {
+              "behavModHome": 0.9594825405203464,
+              "behavModAway": 1.0246186180921553,
+              "BEHAV_SENS": 0.14544476375280949
+            }
+          },
+          {
+            "stage": "urgencyMod",
+            "hBefore": 1.041067,
+            "hAfter": 1.061953,
+            "aBefore": 1.762746,
+            "aAfter": 1.916519,
+            "dLogH": 0.019863,
+            "dLogA": 0.083638,
+            "meta": {
+              "lambdaModHome": 1.020061712859849,
+              "lambdaModAway": 1.0872347419952741,
+              "URGENCY_SENS": 0.2017106132839946
+            }
+          },
+          {
+            "stage": "initialClamp",
+            "hBefore": 1.061953,
+            "hAfter": 1.061953,
+            "aBefore": 1.916519,
+            "aAfter": 1.916519,
+            "dLogH": 0,
+            "dLogA": 0,
+            "meta": {
+              "lambdaHomeMin": 0.01,
+              "lambdaHomeMax": 3.1677680831780872,
+              "lambdaAwayMin": 0.01,
+              "lambdaAwayMax": 4.2211327022997835,
+              "clampHomeMinHit": false,
+              "clampHomeMaxHit": false,
+              "clampAwayMinHit": false,
+              "clampAwayMaxHit": false
+            }
+          },
+          {
+            "stage": "lqr",
+            "hBefore": 1.061953,
+            "hAfter": 1.030286,
+            "aBefore": 1.916519,
+            "aAfter": 1.98531,
+            "dLogH": -0.030273,
+            "dLogA": 0.035265,
+            "meta": {
+              "hLQR": 0.9412507314348252,
+              "aLQR": 1.0730757150105221,
+              "hLQRfromMV": 0.8039506497707966,
+              "aLQRfromMV": 1.24385744359445,
+              "hMV": 801360.4257212976,
+              "aMV": 1239849.8972786842,
+              "lqrSens": 0.29966571425251065
+            }
+          },
+          {
+            "stage": "xgOverPerf",
+            "hBefore": 1.030286,
+            "hAfter": 1.00305,
+            "aBefore": 1.98531,
+            "aAfter": 2.009602,
+            "dLogH": -0.026792,
+            "dLogA": 0.012162,
+            "meta": {
+              "xgModHome": 0.9701746399656901,
+              "xgModAway": 1.0138398358611873,
+              "xgOverPerfHome": 0.8343114187974733,
+              "xgOverPerfAway": 1.0768843281448428,
+              "xgSens": 0.18000854263972127,
+              "homeXGScored": null,
+              "awayXGScored": null,
+              "homeActualGoals": 1.55,
+              "awayActualGoals": 2.2,
+              "reliabilityHome": 0.8848219891058494,
+              "reliabilityAway": 0.8848219891058494
+            }
+          },
+          {
+            "stage": "refMod",
+            "hBefore": 1.00305,
+            "hAfter": 0.961099,
+            "aBefore": 2.009602,
+            "aAfter": 1.925555,
+            "dLogH": -0.042723,
+            "dLogA": -0.042723,
+            "meta": {
+              "refMod": 0.9581769044632458,
+              "refRatio": 0.7709573739888392,
+              "refSens": 0.18259961591042997,
+              "refGoalsPerMatch": 2.310344827586207
+            }
+          },
+          {
+            "stage": "cleanSheet",
+            "hBefore": 0.961099,
+            "hAfter": 0.948752,
+            "aBefore": 1.925555,
+            "aAfter": 1.925555,
+            "dLogH": -0.01293,
+            "dLogA": 0,
+            "meta": {
+              "csModHome": 0.9841538623149417,
+              "csModAway": 1,
+              "homeCSR": 0.19119531769610867,
+              "awayCSR": 0.30349844387938124,
+              "lgCSR": 0.2141702569253007,
+              "floor": 0.7003342857474893,
+              "homeScoringRate": 0.8732181727853688,
+              "awayScoringRate": 0.8802530282855459,
+              "relHome": 0.8135843960445467,
+              "relAway": 0.8094704306598475
+            }
+          },
+          {
+            "stage": "referenceScaling",
+            "hBefore": 0.948752,
+            "hAfter": 1.033974,
+            "aBefore": 1.925555,
+            "aAfter": 2.098518,
+            "dLogH": 0.086017,
+            "dLogA": 0.086017,
+            "meta": {
+              "scalingFactor": 1.0898252188443462,
+              "calibrationRatio": 1.1121151172920185,
+              "referenceTotalGoals": 3.196560151025188,
+              "referenceReliability": 0.8094704306598475,
+              "tolerance": 0.06874802975108578,
+              "exponent": 0.8094704306598475
+            }
+          },
+          {
+            "stage": "lineupAttack_h",
+            "hBefore": 1.033974,
+            "hAfter": 0.944092,
+            "aBefore": 2.098518,
+            "aAfter": 2.098518,
+            "dLogH": -0.090942,
+            "dLogA": 0,
+            "meta": {
+              "lineupRate": 0.9161660759684991,
+              "reliability": 0.7517857480432278,
+              "ratio": 0.8860628189765278,
+              "modifier": 0.9130710425671176,
+              "validStarters": 10,
+              "isFallback": false
+            }
+          },
+          {
+            "stage": "lineupAttack_a",
+            "hBefore": 0.944092,
+            "hAfter": 0.944092,
+            "aBefore": 2.098518,
+            "aAfter": 1.486865,
+            "dLogH": 0,
+            "dLogA": -0.344562,
+            "meta": {
+              "lineupRate": 1.2672557039976688,
+              "reliability": 0.6831424318798826,
+              "ratio": 0.6038812754234498,
+              "modifier": 0.708530774875022,
+              "validStarters": 9,
+              "isFallback": false
+            }
+          },
+          {
+            "stage": "lineupDefense_a",
+            "hBefore": 0.944092,
+            "hAfter": 0.944092,
+            "aBefore": 1.486865,
+            "aAfter": 1.055495,
+            "dLogH": 0,
+            "dLogA": -0.342659,
+            "meta": {
+              "homeDefRate": 12.290039948553805,
+              "peerDef": 7.79120255375965,
+              "reliability": 0.7517857480432278,
+              "ratio": 0.6339444449630497,
+              "modifier": 0.7098799561180695
+            }
+          },
+          {
+            "stage": "lineupDefense_h",
+            "hBefore": 0.944092,
+            "hAfter": 1.288966,
+            "aBefore": 1.055495,
+            "aAfter": 1.055495,
+            "dLogH": 0.311372,
+            "dLogA": 0,
+            "meta": {
+              "awayDefRate": 7.79120255375965,
+              "peerDef": 12.290039948553805,
+              "reliability": 0.6831424318798826,
+              "ratio": 1.577425290095075,
+              "modifier": 1.3652972774449945
+            }
+          },
+          {
+            "stage": "benchAttack_h",
+            "hBefore": 1.288966,
+            "hAfter": 1.226766,
+            "aBefore": 1.055495,
+            "aAfter": 1.055495,
+            "dLogH": -0.049459,
+            "dLogA": 0,
+            "meta": {
+              "benchRate": 0.18524333037720622,
+              "starterRate": 0.9161660759684991,
+              "benchRatio": 0.2021940510964472,
+              "effect": -0.04825574510270087,
+              "reliability": 0.6048556690887064,
+              "validBench": 8
+            }
+          },
+          {
+            "stage": "benchAttack_a",
+            "hBefore": 1.226766,
+            "hAfter": 1.226766,
+            "aBefore": 1.055495,
+            "aAfter": 1.03032,
+            "dLogH": 0,
+            "dLogA": -0.024141,
+            "meta": {
+              "benchRate": 0.7512536940052487,
+              "starterRate": 1.2672557039976688,
+              "benchRatio": 0.5928193431170625,
+              "effect": -0.023851887459891002,
+              "reliability": 0.5272033027854139,
+              "validBench": 7
+            }
+          },
+          {
+            "stage": "finalM167",
+            "hBefore": null,
+            "hAfter": 1.226766,
+            "aBefore": null,
+            "aAfter": 1.03032,
+            "dLogH": null,
+            "dLogA": null,
+            "meta": {}
+          }
+        ]
+      }
+    },
+    {
+      "matchId": 14083618,
+      "match": "Getafe vs Mallorca",
+      "matchDate": "2026-05-13",
+      "tournament": "LaLiga",
+      "tournamentId": 8,
+      "actual": "3-1",
+      "actualResult": "1",
+      "actualOU25": "Over",
+      "actualBTTS": "Yes",
+      "predicted": "1-0",
+      "predictedResult": "1",
+      "predictedOU25": "Under",
+      "predictedBTTS": "No",
+      "probHome": 49.29,
+      "probDraw": 15.71,
+      "probAway": 35,
+      "probOU25": 27.015,
+      "probBTTS": 21.96,
+      "hit1X2": true,
+      "hitOU25": false,
+      "hitBTTS": false,
+      "hitScore": false,
+      "confidence": 60,
+      "avgGoals": 0.01,
+      "brierScore": 0.4043,
+      "logLoss": 0.7074,
+      "confidenceTier": "HIGH",
+      "maxProbability": 99.2,
+      "isHighConfidence": true,
+      "poisson": {
+        "homeWin": 49.29,
+        "draw": 15.71,
+        "awayWin": 35,
+        "predicted": "1",
+        "lambdaHome": 1.15,
+        "lambdaAway": 0.6
+      },
+      "simulation": {
+        "homeWin": 0.2,
+        "draw": 99.2,
+        "awayWin": 0.6,
+        "predicted": "X"
+      },
+      "restDays": {
+        "home": null,
+        "away": null
+      },
+      "lambdaAudit": {
+        "diag": {
+          "sources": {
+            "hAtk": {
+              "n": 4,
+              "agreement": 0.7055530935969461,
+              "rate": 1.235289184617835
+            },
+            "aDef": {
+              "n": 4,
+              "agreement": 0.7449323581513992,
+              "rate": 1.833007467298305
+            },
+            "aAtk": {
+              "n": 4,
+              "agreement": 0.7330039062921472,
+              "rate": 1.0108300944195765
+            },
+            "hDef": {
+              "n": 4,
+              "agreement": 0.7488445120620794,
+              "rate": 0.9602346815067608
+            }
+          },
+          "agreementHome": 0.7055530935969461,
+          "agreementAway": 0.7330039062921472,
+          "kMatchHome": 1.2722099930027542,
+          "kMatchAway": 1.2828008126015829,
+          "alphaHome": 1.0658828753973761,
+          "betaHome": 1.4391569138387332,
+          "alphaAway": 0.9228181178659879,
+          "betaAway": 0.8899920412653971,
+          "cvLocal": 0.3858107851458969,
+          "leagueAvgGoals": 1.1297918955349842,
+          "dynamicLambdaMin": 0.01,
+          "dynamicLambdaMax": 3.845874123127282,
+          "lambdaHomeMin": 0.01,
+          "lambdaHomeMax": 3.845874123127282,
+          "lambdaAwayMin": 0.01,
+          "lambdaAwayMax": 2.575236865760721,
+          "clampHomeMinHit": false,
+          "clampHomeMaxHit": false,
+          "clampAwayMinHit": false,
+          "clampAwayMaxHit": false,
+          "empWeight": 0.7290348975395898,
+          "probGap": 0.23914601733318513,
+          "dataRel": 0.9581797745006234,
+          "scoreSelection": {
+            "chosen": "1-0",
+            "teamWeightSum": 60,
+            "topCandidates": [
+              {
+                "key": "1-0",
+                "prob": 0.12014508237636234,
+                "empFreq": 0.08657330530467948,
+                "combined": 0.12772803453634904,
+                "sources": [
+                  {
+                    "f": 0.03475638934571491,
+                    "w": 20,
+                    "src": "home"
+                  },
+                  {
+                    "f": 0.024963526568323516,
+                    "w": 20,
+                    "src": "away"
+                  },
+                  {
+                    "f": 0.2,
+                    "w": 20,
+                    "src": "h2h"
+                  }
+                ]
+              },
+              {
+                "key": "0-1",
+                "prob": 0.09141286442388784,
+                "empFreq": 0.17213018706871422,
+                "combined": 0.10288416544145197,
+                "sources": [
+                  {
+                    "f": 0.21264211214491752,
+                    "w": 20,
+                    "src": "home"
+                  },
+                  {
+                    "f": 0.10374844906122507,
+                    "w": 20,
+                    "src": "away"
+                  },
+                  {
+                    "f": 0.2,
+                    "w": 20,
+                    "src": "h2h"
+                  }
+                ]
+              },
+              {
+                "key": "2-0",
+                "prob": 0.05654946321979371,
+                "empFreq": 0.11495217243765928,
+                "combined": 0.06128854264955997,
+                "sources": [
+                  {
+                    "f": 0.17822394983161047,
+                    "w": 20,
+                    "src": "home"
+                  },
+                  {
+                    "f": 0.06663256748136734,
+                    "w": 20,
+                    "src": "away"
+                  },
+                  {
+                    "f": 0.1,
+                    "w": 20,
+                    "src": "h2h"
+                  }
+                ]
+              },
+              {
+                "key": "0-0",
+                "prob": 0.049690042455914865,
+                "empFreq": 0.10216408041801328,
+                "combined": 0.0533910154473012,
+                "sources": [
+                  {
+                    "f": 0.055396123647278916,
+                    "w": 20,
+                    "src": "home"
+                  },
+                  {
+                    "f": 0.05109611760676091,
+                    "w": 20,
+                    "src": "away"
+                  },
+                  {
+                    "f": 0.2,
+                    "w": 20,
+                    "src": "h2h"
+                  }
+                ]
+              },
+              {
+                "key": "2-1",
+                "prob": 0.04523007022436371,
+                "empFreq": 0.1712510270444549,
+                "combined": 0.0508769528989436,
+                "sources": [
+                  {
+                    "f": 0.08920138836302621,
+                    "w": 20,
+                    "src": "home"
+                  },
+                  {
+                    "f": 0.3245516927703386,
+                    "w": 20,
+                    "src": "away"
+                  },
+                  {
+                    "f": 0.1,
+                    "w": 20,
+                    "src": "h2h"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "trace": [
+          {
+            "stage": "dcBase",
+            "hBefore": null,
+            "hAfter": 1.947141,
+            "aBefore": null,
+            "aAfter": 0.877651,
+            "dLogH": null,
+            "dLogA": null,
+            "meta": {
+              "kMatchHome": 1.2722099930027542,
+              "kMatchAway": 1.2828008126015829,
+              "agreementHome": 0.7055530935969461,
+              "agreementAway": 0.7330039062921472
+            }
+          },
+          {
+            "stage": "behavMod",
+            "hBefore": 1.947141,
+            "hAfter": 2.038465,
+            "aBefore": 0.877651,
+            "aAfter": 0.884551,
+            "dLogH": 0.045835,
+            "dLogA": 0.007832,
+            "meta": {
+              "behavModHome": 1.0469012145855492,
+              "behavModAway": 1.0078623441047292,
+              "BEHAV_SENS": 0.21330111787853218
+            }
+          },
+          {
+            "stage": "urgencyMod",
+            "hBefore": 2.038465,
+            "hAfter": 2.060917,
+            "aBefore": 0.884551,
+            "aAfter": 0.910012,
+            "dLogH": 0.010954,
+            "dLogA": 0.028378,
+            "meta": {
+              "lambdaModHome": 1.0110143139668675,
+              "lambdaModAway": 1.0287840739436407,
+              "URGENCY_SENS": 0.43656835938403404
+            }
+          },
+          {
+            "stage": "initialClamp",
+            "hBefore": 2.060917,
+            "hAfter": 2.060917,
+            "aBefore": 0.910012,
+            "aAfter": 0.910012,
+            "dLogH": 0,
+            "dLogA": 0,
+            "meta": {
+              "lambdaHomeMin": 0.01,
+              "lambdaHomeMax": 3.845874123127282,
+              "lambdaAwayMin": 0.01,
+              "lambdaAwayMax": 2.575236865760721,
+              "clampHomeMinHit": false,
+              "clampHomeMaxHit": false,
+              "clampAwayMinHit": false,
+              "clampAwayMaxHit": false
+            }
+          },
+          {
+            "stage": "lqr",
+            "hBefore": 2.060917,
+            "hAfter": 2.071011,
+            "aBefore": 0.910012,
+            "aAfter": 0.905645,
+            "dLogH": 0.004886,
+            "dLogA": -0.004811,
+            "meta": {
+              "hLQR": 1.009819756161078,
+              "aLQR": 0.9904239753029905,
+              "hLQRfromMV": 1.0254522593435658,
+              "aLQRfromMV": 0.9751794789941183,
+              "hMV": 814000.6758839891,
+              "aMV": 774094.3059772969,
+              "lqrSens": 0.3858107851458969
+            }
+          },
+          {
+            "stage": "xgOverPerf",
+            "hBefore": 2.071011,
+            "hAfter": 2.116625,
+            "aBefore": 0.905645,
+            "aAfter": 0.885788,
+            "dLogH": 0.021786,
+            "dLogA": -0.022169,
+            "meta": {
+              "xgModHome": 1.0249274845023588,
+              "xgModAway": 0.9752565812898412,
+              "xgOverPerfHome": 1.2349749316480099,
+              "xgOverPerfAway": 0.7667601349984801,
+              "xgSens": 0.10608571870849605,
+              "homeXGScored": null,
+              "awayXGScored": null,
+              "homeActualGoals": 0.9,
+              "awayActualGoals": 1.3,
+              "reliabilityHome": 0.8848219891058494,
+              "reliabilityAway": 0.8848219891058494
+            }
+          },
+          {
+            "stage": "refMod",
+            "hBefore": 2.116625,
+            "hAfter": 2.153997,
+            "aBefore": 0.885788,
+            "aAfter": 0.901428,
+            "dLogH": 0.017502,
+            "dLogA": 0.017502,
+            "meta": {
+              "refMod": 1.0176565231370596,
+              "refRatio": 1.0747870639581107,
+              "refSens": 0.23609060447872662,
+              "refGoalsPerMatch": 2.4285714285714284
+            }
+          },
+          {
+            "stage": "cleanSheet",
+            "hBefore": 2.153997,
+            "hAfter": 2.153997,
+            "aBefore": 0.901428,
+            "aAfter": 0.901428,
+            "dLogH": 0,
+            "dLogA": 0,
+            "meta": {
+              "csModHome": 1,
+              "csModAway": 1,
+              "homeCSR": 0.26837646282460426,
+              "awayCSR": 0.154844566667986,
+              "lgCSR": 0.28843246506263154,
+              "floor": 0.614189214854103,
+              "homeScoringRate": 0.5166654371183029,
+              "awayScoringRate": 0.7092607870594306,
+              "relHome": 0.8135843960445467,
+              "relAway": 0.8135843960445467
+            }
+          },
+          {
+            "stage": "referenceScaling",
+            "hBefore": 2.153997,
+            "hAfter": 1.688324,
+            "aBefore": 0.901428,
+            "aAfter": 0.706548,
+            "dLogH": -0.243589,
+            "dLogA": -0.243589,
+            "meta": {
+              "scalingFactor": 0.7838096344549459,
+              "calibrationRatio": 0.6141747418628827,
+              "referenceTotalGoals": 1.8765654191534202,
+              "referenceReliability": 0.8135843960445467,
+              "tolerance": 0.08626991420387915,
+              "exponent": 0.49969476142414976
+            }
+          },
+          {
+            "stage": "lineupAttack_h",
+            "hBefore": 1.688324,
+            "hAfter": 0.937261,
+            "aBefore": 0.706548,
+            "aAfter": 0.706548,
+            "dLogH": -0.58853,
+            "dLogA": 0,
+            "meta": {
+              "lineupRate": 0.7148678753491179,
+              "reliability": 0.684819700474551,
+              "ratio": 0.4234186602992163,
+              "modifier": 0.5551428349438465,
+              "validStarters": 9,
+              "isFallback": false
+            }
+          },
+          {
+            "stage": "lineupAttack_a",
+            "hBefore": 0.937261,
+            "hAfter": 0.937261,
+            "aBefore": 0.706548,
+            "aAfter": 0.810128,
+            "dLogH": 0,
+            "dLogA": 0.136801,
+            "meta": {
+              "lineupRate": 0.8836131480857663,
+              "reliability": 0.6117345215321169,
+              "ratio": 1.25060545695307,
+              "modifier": 1.1465997746968737,
+              "validStarters": 8,
+              "isFallback": false
+            }
+          },
+          {
+            "stage": "lineupDefense_a",
+            "hBefore": 0.937261,
+            "hAfter": 0.937261,
+            "aBefore": 0.810128,
+            "aAfter": 0.633762,
+            "dLogH": 0,
+            "dLogA": -0.24552,
+            "meta": {
+              "homeDefRate": 16.28630277987459,
+              "peerDef": 11.379430339723282,
+              "reliability": 0.684819700474551,
+              "ratio": 0.6987117023137469,
+              "modifier": 0.7822979905187758
+            }
+          },
+          {
+            "stage": "lineupDefense_h",
+            "hBefore": 0.937261,
+            "hAfter": 1.167102,
+            "aBefore": 0.633762,
+            "aAfter": 0.633762,
+            "dLogH": 0.219317,
+            "dLogA": 0,
+            "meta": {
+              "awayDefRate": 11.379430339723282,
+              "peerDef": 16.28630277987459,
+              "reliability": 0.6117345215321169,
+              "ratio": 1.4312054552522204,
+              "modifier": 1.2452262809118473
+            }
+          },
+          {
+            "stage": "benchAttack_h",
+            "hBefore": 1.167102,
+            "hAfter": 1.147391,
+            "aBefore": 0.633762,
+            "aAfter": 0.633762,
+            "dLogH": -0.017033,
+            "dLogA": 0,
+            "meta": {
+              "benchRate": 0.548447322571003,
+              "starterRate": 0.7148678753491179,
+              "benchRatio": 0.7672009632593428,
+              "effect": -0.01688917918701253,
+              "reliability": 0.6529348867214032,
+              "validBench": 9
+            }
+          },
+          {
+            "stage": "benchAttack_a",
+            "hBefore": 1.147391,
+            "hAfter": 1.147391,
+            "aBefore": 0.633762,
+            "aAfter": 0.60229,
+            "dLogH": 0,
+            "dLogA": -0.050933,
+            "meta": {
+              "benchRate": 0.21255707695605178,
+              "starterRate": 0.8836131480857663,
+              "benchRatio": 0.24055445238284334,
+              "effect": -0.04965799250693508,
+              "reliability": 0.5230973323919531,
+              "validBench": 7
+            }
+          },
+          {
+            "stage": "finalM167",
+            "hBefore": null,
+            "hAfter": 1.147391,
+            "aBefore": null,
+            "aAfter": 0.60229,
+            "dLogH": null,
+            "dLogA": null,
+            "meta": {}
+          }
+        ]
+      }
+    },
+    {
+      "matchId": 15889322,
+      "match": "Stade Brestois vs RC Strasbourg",
+      "matchDate": "2026-05-13",
+      "tournament": "Ligue 1",
+      "tournamentId": 34,
+      "actual": "1-2",
+      "actualResult": "2",
+      "actualOU25": "Over",
+      "actualBTTS": "Yes",
+      "predicted": "1-0",
+      "predictedResult": "1",
+      "predictedOU25": "Under",
+      "predictedBTTS": "No",
+      "probHome": 46.28,
+      "probDraw": 19.06,
+      "probAway": 34.66,
+      "probOU25": 32.57,
+      "probBTTS": 31.14,
+      "hit1X2": false,
+      "hitOU25": false,
+      "hitBTTS": false,
+      "hitScore": false,
+      "confidence": 58,
+      "avgGoals": 0.01,
+      "brierScore": 0.6774,
+      "logLoss": 1.0596,
+      "confidenceTier": "HIGH",
+      "maxProbability": 99.5,
+      "isHighConfidence": true,
+      "poisson": {
+        "homeWin": 46.28,
+        "draw": 19.06,
+        "awayWin": 34.66,
+        "predicted": "1",
+        "lambdaHome": 1.5,
+        "lambdaAway": 1.12
+      },
+      "simulation": {
+        "homeWin": 0.1,
+        "draw": 99.5,
+        "awayWin": 0.4,
+        "predicted": "X"
+      },
+      "restDays": {
+        "home": null,
+        "away": null
+      },
+      "lambdaAudit": {
+        "diag": {
+          "sources": {
+            "hAtk": {
+              "n": 4,
+              "agreement": 0.7450254269186856,
+              "rate": 1.5849660986856238
+            },
+            "aDef": {
+              "n": 4,
+              "agreement": 0.7450595472287976,
+              "rate": 1.421871022515463
+            },
+            "aAtk": {
+              "n": 4,
+              "agreement": 0.7480926230241761,
+              "rate": 1.4885632977111023
+            },
+            "hDef": {
+              "n": 4,
+              "agreement": 0.7386529941966307,
+              "rate": 1.4753738027082175
+            }
+          },
+          "agreementHome": 0.7450254269186856,
+          "agreementAway": 0.7386529941966307,
+          "kMatchHome": 1.3305966309168007,
+          "kMatchAway": 1.3277689357636724,
+          "alphaHome": 1.0534929172175924,
+          "betaHome": 0.9713243394365423,
+          "alphaAway": 1.0048823102662516,
+          "betaAway": 0.998294175789363,
+          "cvLocal": 0.44373872215891913,
+          "leagueAvgGoals": 1.4787888756671748,
+          "dynamicLambdaMin": 0.01,
+          "dynamicLambdaMax": 4.606251458482177,
+          "lambdaHomeMin": 0.01,
+          "lambdaHomeMax": 3.9020896381038654,
+          "lambdaAwayMin": 0.01,
+          "lambdaAwayMax": 4.606251458482177,
+          "clampHomeMinHit": false,
+          "clampHomeMaxHit": false,
+          "clampAwayMinHit": false,
+          "clampAwayMaxHit": false,
+          "empWeight": 0.7205850363569777,
+          "probGap": 0.2438091776425981,
+          "dataRel": 0.952914284400564,
+          "scoreSelection": {
+            "chosen": "1-0",
+            "teamWeightSum": 57,
+            "topCandidates": [
+              {
+                "key": "1-0",
+                "prob": 0.06273503034906111,
+                "empFreq": 0.07951062408930405,
+                "combined": 0.06632938158876836,
+                "sources": [
+                  {
+                    "f": 0.06276333800583993,
+                    "w": 20,
+                    "src": "home"
+                  },
+                  {
+                    "f": 0.07510816546903132,
+                    "w": 17,
+                    "src": "away"
+                  },
+                  {
+                    "f": 0.1,
+                    "w": 20,
+                    "src": "h2h"
+                  }
+                ]
+              },
+              {
+                "key": "2-0",
+                "prob": 0.04743965419027309,
+                "empFreq": 0.29232320036807646,
+                "combined": 0.057432519612534386,
+                "sources": [
+                  {
+                    "f": 0.29232320036807646,
+                    "w": 20,
+                    "src": "home"
+                  }
+                ]
+              },
+              {
+                "key": "1-1",
+                "prob": 0.044684033948981475,
+                "empFreq": 0.18951890850104747,
+                "combined": 0.05078628623726716,
+                "sources": [
+                  {
+                    "f": 0.17718821261992687,
+                    "w": 17,
+                    "src": "away"
+                  },
+                  {
+                    "f": 0.2,
+                    "w": 20,
+                    "src": "h2h"
+                  }
+                ]
+              },
+              {
+                "key": "0-1",
+                "prob": 0.04701750640786964,
+                "empFreq": 0.06187677142161184,
+                "combined": 0.04911389832687435,
+                "sources": [
+                  {
+                    "f": 0.01702591427056694,
+                    "w": 17,
+                    "src": "away"
+                  },
+                  {
+                    "f": 0.1,
+                    "w": 20,
+                    "src": "h2h"
+                  }
+                ]
+              },
+              {
+                "key": "1-2",
+                "prob": 0.03942825519117208,
+                "empFreq": 0.13848512673657853,
+                "combined": 0.04336281300278514,
+                "sources": [
+                  {
+                    "f": 0.1447314504147809,
+                    "w": 20,
+                    "src": "home"
+                  },
+                  {
+                    "f": 0.13113651064457582,
+                    "w": 17,
+                    "src": "away"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "trace": [
+          {
+            "stage": "dcBase",
+            "hBefore": null,
+            "hAfter": 1.524778,
+            "aBefore": null,
+            "aAfter": 1.485013,
+            "dLogH": null,
+            "dLogA": null,
+            "meta": {
+              "kMatchHome": 1.3305966309168007,
+              "kMatchAway": 1.3277689357636724,
+              "agreementHome": 0.7450254269186856,
+              "agreementAway": 0.7386529941966307
+            }
+          },
+          {
+            "stage": "behavMod",
+            "hBefore": 1.524778,
+            "hAfter": 1.472186,
+            "aBefore": 1.485013,
+            "aAfter": 1.558191,
+            "dLogH": -0.035101,
+            "dLogA": 0.048102,
+            "meta": {
+              "behavModHome": 0.9655081645548179,
+              "behavModAway": 1.0492775790820592,
+              "BEHAV_SENS": 0.21324467115913276
+            }
+          },
+          {
+            "stage": "urgencyMod",
+            "hBefore": 1.472186,
+            "hAfter": 1.512066,
+            "aBefore": 1.558191,
+            "aAfter": 1.579298,
+            "dLogH": 0.026729,
+            "dLogA": 0.013455,
+            "meta": {
+              "lambdaModHome": 1.0270892345230787,
+              "lambdaModAway": 1.0135460638494753,
+              "URGENCY_SENS": 0.2697394988379921
+            }
+          },
+          {
+            "stage": "initialClamp",
+            "hBefore": 1.512066,
+            "hAfter": 1.512066,
+            "aBefore": 1.579298,
+            "aAfter": 1.579298,
+            "dLogH": 0,
+            "dLogA": 0,
+            "meta": {
+              "lambdaHomeMin": 0.01,
+              "lambdaHomeMax": 3.9020896381038654,
+              "lambdaAwayMin": 0.01,
+              "lambdaAwayMax": 4.606251458482177,
+              "clampHomeMinHit": false,
+              "clampHomeMaxHit": false,
+              "clampAwayMinHit": false,
+              "clampAwayMaxHit": false
+            }
+          },
+          {
+            "stage": "lqr",
+            "hBefore": 1.512066,
+            "hAfter": 1.460599,
+            "aBefore": 1.579298,
+            "aAfter": 1.640342,
+            "dLogH": -0.03463,
+            "dLogA": 0.037924,
+            "meta": {
+              "hLQR": 0.9330838247024902,
+              "aLQR": 1.078799154577128,
+              "hLQRfromMV": 0.8491991526636599,
+              "aLQRfromMV": 1.1775800727818997,
+              "hMV": 701171.9763925012,
+              "aMV": 972311.553070917,
+              "lqrSens": 0.44373872215891913
+            }
+          },
+          {
+            "stage": "xgOverPerf",
+            "hBefore": 1.460599,
+            "hAfter": 1.479032,
+            "aBefore": 1.640342,
+            "aAfter": 1.649421,
+            "dLogH": 0.012541,
+            "dLogA": 0.00552,
+            "meta": {
+              "xgModHome": 1.0142745652673137,
+              "xgModAway": 1.0062576695177594,
+              "xgOverPerfHome": 1.063780952475335,
+              "xgOverPerfAway": 1.0279602295862895,
+              "xgSens": 0.22380608494101462,
+              "homeXGScored": null,
+              "awayXGScored": null,
+              "homeActualGoals": 1.4,
+              "awayActualGoals": 1.4,
+              "reliabilityHome": 0.8848219891058494,
+              "reliabilityAway": 0.8848219891058494
+            }
+          },
+          {
+            "stage": "refMod",
+            "hBefore": 1.479032,
+            "hAfter": 1.470818,
+            "aBefore": 1.649421,
+            "aAfter": 1.64026,
+            "dLogH": -0.00557,
+            "dLogA": -0.00557,
+            "meta": {
+              "refMod": 0.9944459283998281,
+              "refRatio": 0.9793662137305145,
+              "refSens": 0.26917365177837144,
+              "refGoalsPerMatch": 2.896551724137931
+            }
+          },
+          {
+            "stage": "cleanSheet",
+            "hBefore": 1.470818,
+            "hAfter": 1.470818,
+            "aBefore": 1.64026,
+            "aAfter": 1.581765,
+            "dLogH": 0,
+            "dLogA": -0.036314,
+            "meta": {
+              "csModHome": 1,
+              "csModAway": 0.9563474219014715,
+              "homeCSR": 0.42931530729770156,
+              "awayCSR": 0.09592853994250818,
+              "lgCSR": 0.2619771855648377,
+              "floor": 0.5562612778410809,
+              "homeScoringRate": 0.8241768283309301,
+              "awayScoringRate": 0.8459892088590274,
+              "relHome": 0.8135843960445467,
+              "relAway": 0.8002771524685319
+            }
+          },
+          {
+            "stage": "referenceScaling",
+            "hBefore": 1.470818,
+            "hAfter": 1.640676,
+            "aBefore": 1.581765,
+            "aAfter": 1.764436,
+            "dLogH": 0.10929,
+            "dLogA": 0.10929,
+            "meta": {
+              "scalingFactor": 1.115485608652775,
+              "calibrationRatio": 1.146329364172007,
+              "referenceTotalGoals": 3.4992651034891624,
+              "referenceReliability": 0.8002771524685319,
+              "tolerance": 0.10762244833163714,
+              "exponent": 0.8002771524685319
+            }
+          },
+          {
+            "stage": "lineupAttack_h",
+            "hBefore": 1.640676,
+            "hAfter": 1.267893,
+            "aBefore": 1.764436,
+            "aAfter": 1.764436,
+            "dLogH": -0.257752,
+            "dLogA": 0,
+            "meta": {
+              "lineupRate": 1.1267800636040946,
+              "reliability": 0.6859778987541217,
+              "ratio": 0.686777918797234,
+              "modifier": 0.7727866382432551,
+              "validStarters": 9,
+              "isFallback": false
+            }
+          },
+          {
+            "stage": "lineupAttack_a",
+            "hBefore": 1.267893,
+            "hAfter": 1.267893,
+            "aBefore": 1.764436,
+            "aAfter": 1.350168,
+            "dLogH": 0,
+            "dLogA": -0.267602,
+            "meta": {
+              "lineupRate": 1.2382246951123286,
+              "reliability": 0.755611927253521,
+              "ratio": 0.701767996413018,
+              "modifier": 0.765212434248064,
+              "validStarters": 10,
+              "isFallback": false
+            }
+          },
+          {
+            "stage": "lineupDefense_a",
+            "hBefore": 1.267893,
+            "hAfter": 1.267893,
+            "aBefore": 1.350168,
+            "aAfter": 1.159964,
+            "dLogH": 0,
+            "dLogA": -0.15184,
+            "meta": {
+              "homeDefRate": 14.318785690931215,
+              "peerDef": 11.475604094963348,
+              "reliability": 0.6859778987541217,
+              "ratio": 0.801436961392013,
+              "modifier": 0.8591253045674259
+            }
+          },
+          {
+            "stage": "lineupDefense_h",
+            "hBefore": 1.267893,
+            "hAfter": 1.498718,
+            "aBefore": 1.159964,
+            "aAfter": 1.159964,
+            "dLogH": 0.167254,
+            "dLogA": 0,
+            "meta": {
+              "awayDefRate": 11.475604094963348,
+              "peerDef": 14.318785690931215,
+              "reliability": 0.755611927253521,
+              "ratio": 1.247758773519883,
+              "modifier": 1.1820543683963454
+            }
+          },
+          {
+            "stage": "benchAttack_a",
+            "hBefore": 1.498718,
+            "hAfter": 1.498718,
+            "aBefore": 1.159964,
+            "aAfter": 1.117516,
+            "dLogH": 0,
+            "dLogA": -0.03728,
+            "meta": {
+              "benchRate": 0.184677800980055,
+              "starterRate": 1.2382246951123286,
+              "benchRatio": 0.1491472442029607,
+              "effect": -0.036593712979903166,
+              "reliability": 0.4300827931811054,
+              "validBench": 6
+            }
+          },
+          {
+            "stage": "finalM167",
+            "hBefore": null,
+            "hAfter": 1.498718,
+            "aBefore": null,
+            "aAfter": 1.117516,
+            "dLogH": null,
+            "dLogA": null,
+            "meta": {}
+          }
+        ]
+      }
+    },
+    {
+      "matchId": 15889331,
+      "match": "RC Lens vs Paris Saint-Germain",
+      "matchDate": "2026-05-13",
+      "tournament": "Ligue 1",
+      "tournamentId": 34,
+      "actual": "0-2",
+      "actualResult": "2",
+      "actualOU25": "Under",
+      "actualBTTS": "No",
+      "predicted": "1-0",
+      "predictedResult": "1",
+      "predictedOU25": "Under",
+      "predictedBTTS": "No",
+      "probHome": 53.25,
+      "probDraw": 10.36,
+      "probAway": 36.39,
+      "probOU25": 33.845,
+      "probBTTS": 29.035,
+      "hit1X2": false,
+      "hitOU25": true,
+      "hitBTTS": true,
+      "hitScore": false,
+      "confidence": 61,
+      "avgGoals": 0.01,
+      "brierScore": 0.6989,
+      "logLoss": 1.0109,
+      "confidenceTier": "HIGH",
+      "maxProbability": 99.4,
+      "isHighConfidence": true,
+      "poisson": {
+        "homeWin": 53.25,
+        "draw": 10.36,
+        "awayWin": 36.39,
+        "predicted": "1",
+        "lambdaHome": 2.33,
+        "lambdaAway": 1.23
+      },
+      "simulation": {
+        "homeWin": 0,
+        "draw": 99.4,
+        "awayWin": 0.6,
+        "predicted": "X"
+      },
+      "restDays": {
+        "home": null,
+        "away": null
+      },
+      "lambdaAudit": {
+        "diag": {
+          "sources": {
+            "hAtk": {
+              "n": 4,
+              "agreement": 0.6574341343661456,
+              "rate": 1.775980858879194
+            },
+            "aDef": {
+              "n": 4,
+              "agreement": 0.7322324478224519,
+              "rate": 0.8641999910360398
+            },
+            "aAtk": {
+              "n": 4,
+              "agreement": 0.691188401718736,
+              "rate": 1.8121569244072082
+            },
+            "hDef": {
+              "n": 4,
+              "agreement": 0.7173133317584728,
+              "rate": 1.097098008403435
+            }
+          },
+          "agreementHome": 0.6574341343661456,
+          "agreementAway": 0.691188401718736,
+          "kMatchHome": 1.2140974332907828,
+          "kMatchAway": 1.2250897162055845,
+          "alphaHome": 1.1220121766430469,
+          "betaHome": 0.7218478222042196,
+          "alphaAway": 1.1449687735341851,
+          "betaAway": 0.8150295528782718,
+          "cvLocal": 0.32565609556796343,
+          "leagueAvgGoals": 1.4979741671961249,
+          "dynamicLambdaMin": 0.01,
+          "dynamicLambdaMax": 4.223627275558723,
+          "lambdaHomeMin": 0.01,
+          "lambdaHomeMax": 4.186447696369069,
+          "lambdaAwayMin": 0.01,
+          "lambdaAwayMax": 4.223627275558723,
+          "clampHomeMinHit": false,
+          "clampHomeMaxHit": false,
+          "clampAwayMinHit": false,
+          "clampAwayMaxHit": false,
+          "empWeight": 0.7957205778501811,
+          "probGap": 0.16425889950528516,
+          "dataRel": 0.9521137316079781,
+          "scoreSelection": {
+            "chosen": "1-0",
+            "teamWeightSum": 56,
+            "topCandidates": [
+              {
+                "key": "1-0",
+                "prob": 0.06265264582973167,
+                "empFreq": 0.180793916803111,
+                "combined": 0.07166594567549735,
+                "sources": [
+                  {
+                    "f": 0.26143361451662567,
+                    "w": 20,
+                    "src": "home"
+                  },
+                  {
+                    "f": 0.07999429466121763,
+                    "w": 16,
+                    "src": "away"
+                  }
+                ]
+              },
+              {
+                "key": "2-1",
+                "prob": 0.05236139117464555,
+                "empFreq": 0.0642479298660186,
+                "combined": 0.05503828351387022,
+                "sources": [
+                  {
+                    "f": 0.0642479298660186,
+                    "w": 20,
+                    "src": "home"
+                  }
+                ]
+              },
+              {
+                "key": "0-1",
+                "prob": 0.04575815612194286,
+                "empFreq": 0.09448629897872445,
+                "combined": 0.04919846901578161,
+                "sources": [
+                  {
+                    "f": 0.02128080565890743,
+                    "w": 20,
+                    "src": "home"
+                  },
+                  {
+                    "f": 0.17910103935190128,
+                    "w": 16,
+                    "src": "away"
+                  },
+                  {
+                    "f": 0.1,
+                    "w": 20,
+                    "src": "h2h"
+                  }
+                ]
+              },
+              {
+                "key": "3-1",
+                "prob": 0.04040577644580211,
+                "empFreq": 0.08845949628106069,
+                "combined": 0.04324990032076828,
+                "sources": [
+                  {
+                    "f": 0.08540290578708457,
+                    "w": 20,
+                    "src": "home"
+                  },
+                  {
+                    "f": 0.07785460474985674,
+                    "w": 16,
+                    "src": "away"
+                  },
+                  {
+                    "f": 0.1,
+                    "w": 20,
+                    "src": "h2h"
+                  }
+                ]
+              },
+              {
+                "key": "2-0",
+                "prob": 0.03752024233426414,
+                "empFreq": 0.044472212043817315,
+                "combined": 0.03884798819390897,
+                "sources": [
+                  {
+                    "f": 0.044472212043817315,
+                    "w": 20,
+                    "src": "home"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "trace": [
+          {
+            "stage": "dcBase",
+            "hBefore": null,
+            "hAfter": 1.1597,
+            "aBefore": null,
+            "aAfter": 1.376294,
+            "dLogH": null,
+            "dLogA": null,
+            "meta": {
+              "kMatchHome": 1.2140974332907828,
+              "kMatchAway": 1.2250897162055845,
+              "agreementHome": 0.6574341343661456,
+              "agreementAway": 0.691188401718736
+            }
+          },
+          {
+            "stage": "behavMod",
+            "hBefore": 1.1597,
+            "hAfter": 1.111684,
+            "aBefore": 1.376294,
+            "aAfter": 1.402095,
+            "dLogH": -0.042285,
+            "dLogA": 0.018573,
+            "meta": {
+              "behavModHome": 0.9585967131466303,
+              "behavModAway": 1.018746595344295,
+              "BEHAV_SENS": 0.15957479886794604
+            }
+          },
+          {
+            "stage": "urgencyMod",
+            "hBefore": 1.111684,
+            "hAfter": 1.142138,
+            "aBefore": 1.402095,
+            "aAfter": 1.489181,
+            "dLogH": 0.027026,
+            "dLogA": 0.060259,
+            "meta": {
+              "lambdaModHome": 1.0273947788826956,
+              "lambdaModAway": 1.062111838594521,
+              "URGENCY_SENS": 0.12965145798484234
+            }
+          },
+          {
+            "stage": "initialClamp",
+            "hBefore": 1.142138,
+            "hAfter": 1.142138,
+            "aBefore": 1.489181,
+            "aAfter": 1.489181,
+            "dLogH": 0,
+            "dLogA": 0,
+            "meta": {
+              "lambdaHomeMin": 0.01,
+              "lambdaHomeMax": 4.186447696369069,
+              "lambdaAwayMin": 0.01,
+              "lambdaAwayMax": 4.223627275558723,
+              "clampHomeMinHit": false,
+              "clampHomeMaxHit": false,
+              "clampAwayMinHit": false,
+              "clampAwayMaxHit": false
+            }
+          },
+          {
+            "stage": "lqr",
+            "hBefore": 1.142138,
+            "hAfter": 1.12405,
+            "aBefore": 1.489181,
+            "aAfter": 1.514857,
+            "dLogH": -0.015964,
+            "dLogA": 0.017094,
+            "meta": {
+              "hLQR": 0.9685759743072017,
+              "aLQR": 1.0347801159760928,
+              "hLQRfromMV": 0.903505489009831,
+              "aLQRfromMV": 1.106800138088723,
+              "hMV": 925329.2121322732,
+              "aMV": 1133534.3417646745,
+              "lqrSens": 0.32565609556796343
+            }
+          },
+          {
+            "stage": "xgOverPerf",
+            "hBefore": 1.12405,
+            "hAfter": 1.157396,
+            "aBefore": 1.514857,
+            "aAfter": 1.541348,
+            "dLogH": 0.029234,
+            "dLogA": 0.017336,
+            "meta": {
+              "xgModHome": 1.0335917692263978,
+              "xgModAway": 1.0197859770855928,
+              "xgOverPerfHome": 1.1511193596643332,
+              "xgOverPerfAway": 1.089011214841231,
+              "xgSens": 0.2222863390965395,
+              "homeXGScored": null,
+              "awayXGScored": null,
+              "homeActualGoals": 2.45,
+              "awayActualGoals": 2.4,
+              "reliabilityHome": 0.8848219891058494,
+              "reliabilityAway": 0.8848219891058494
+            }
+          },
+          {
+            "stage": "refMod",
+            "hBefore": 1.157396,
+            "hAfter": 1.163067,
+            "aBefore": 1.541348,
+            "aAfter": 1.548901,
+            "dLogH": 0.004888,
+            "dLogA": 0.004888,
+            "meta": {
+              "refMod": 1.0049001783630083,
+              "refRatio": 1.0243719766495711,
+              "refSens": 0.20105789667636992,
+              "refGoalsPerMatch": 3.0689655172413794
+            }
+          },
+          {
+            "stage": "cleanSheet",
+            "hBefore": 1.163067,
+            "hAfter": 1.112607,
+            "aBefore": 1.548901,
+            "aAfter": 1.527531,
+            "dLogH": -0.044355,
+            "dLogA": -0.013892,
+            "meta": {
+              "csModHome": 0.9457426641145733,
+              "csModAway": 0.9830693956373526,
+              "homeCSR": 0.45330453166864526,
+              "awayCSR": 0.5727794999319357,
+              "lgCSR": 0.2747447519245844,
+              "floor": 0.6743439044320365,
+              "homeScoringRate": 0.8464104182833907,
+              "awayScoringRate": 0.9200057053387825,
+              "relHome": 0.8135843960445467,
+              "relAway": 0.7951058995402402
+            }
+          },
+          {
+            "stage": "referenceScaling",
+            "hBefore": 1.112607,
+            "hAfter": 1.573232,
+            "aBefore": 1.527531,
+            "aAfter": 2.159937,
+            "dLogH": 0.346426,
+            "dLogA": 0.346426,
+            "meta": {
+              "scalingFactor": 1.414004616539951,
+              "calibrationRatio": 1.5460413959751638,
+              "referenceTotalGoals": 4.081763557129372,
+              "referenceReliability": 0.7951058995402402,
+              "tolerance": 0.08141402389199086,
+              "exponent": 0.7951058995402402
+            }
+          },
+          {
+            "stage": "lineupAttack_h",
+            "hBefore": 1.573232,
+            "hAfter": 1.548946,
+            "aBefore": 2.159937,
+            "aAfter": 2.159937,
+            "dLogH": -0.015557,
+            "dLogA": 0,
+            "meta": {
+              "lineupRate": 1.5413799213482358,
+              "reliability": 0.7605965371214415,
+              "ratio": 0.9797539768848509,
+              "modifier": 0.9845633098274879,
+              "validStarters": 10,
+              "isFallback": false
+            }
+          },
+          {
+            "stage": "lineupAttack_a",
+            "hBefore": 1.548946,
+            "hAfter": 1.548946,
+            "aBefore": 2.159937,
+            "aAfter": 2.05491,
+            "dLogH": 0,
+            "dLogA": -0.049847,
+            "meta": {
+              "lineupRate": 2.006579953911504,
+              "reliability": 0.6768340372468565,
+              "ratio": 0.9289994880269382,
+              "modifier": 0.9513751087222108,
+              "validStarters": 9,
+              "isFallback": false
+            }
+          },
+          {
+            "stage": "lineupDefense_a",
+            "hBefore": 1.548946,
+            "hAfter": 1.548946,
+            "aBefore": 2.05491,
+            "aAfter": 1.265926,
+            "dLogH": 0,
+            "dLogA": -0.484428,
+            "meta": {
+              "homeDefRate": 16.247845379301747,
+              "peerDef": 8.593920899149161,
+              "reliability": 0.7605965371214415,
+              "ratio": 0.5289268022021567,
+              "modifier": 0.6160495317485633
+            }
+          },
+          {
+            "stage": "lineupDefense_h",
+            "hBefore": 1.548946,
+            "hAfter": 2.3837,
+            "aBefore": 1.265926,
+            "aAfter": 1.265926,
+            "dLogH": 0.431079,
+            "dLogA": 0,
+            "meta": {
+              "awayDefRate": 8.593920899149161,
+              "peerDef": 16.247845379301747,
+              "reliability": 0.6768340372468565,
+              "ratio": 1.8906207736808889,
+              "modifier": 1.538917328925145
+            }
+          },
+          {
+            "stage": "benchAttack_h",
+            "hBefore": 2.3837,
+            "hAfter": 2.332112,
+            "aBefore": 1.265926,
+            "aAfter": 1.265926,
+            "dLogH": -0.021879,
+            "dLogA": 0,
+            "meta": {
+              "benchRate": 0.6276632924255978,
+              "starterRate": 1.5413799213482358,
+              "benchRatio": 0.40720868601725685,
+              "effect": -0.021641856037984113,
+              "reliability": 0.36508389255201085,
+              "validBench": 5
+            }
+          },
+          {
+            "stage": "benchAttack_a",
+            "hBefore": 2.332112,
+            "hAfter": 2.332112,
+            "aBefore": 1.265926,
+            "aAfter": 1.226356,
+            "dLogH": 0,
+            "dLogA": -0.031757,
+            "meta": {
+              "benchRate": 0.49651974143166344,
+              "starterRate": 2.006579953911504,
+              "benchRatio": 0.24744577980248347,
+              "effect": -0.03125760494389546,
+              "reliability": 0.3738181740861461,
+              "validBench": 5
+            }
+          },
+          {
+            "stage": "finalM167",
+            "hBefore": null,
+            "hAfter": 2.332112,
+            "aBefore": null,
+            "aAfter": 1.226356,
+            "dLogH": null,
+            "dLogA": null,
+            "meta": {}
+          }
+        ]
+      }
+    }
+  ]
+}

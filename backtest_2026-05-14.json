@@ -1,0 +1,157 @@
+{
+  "date": "2026-05-14",
+  "endDate": "2026-05-14",
+  "total": 1,
+  "finishedTotal": 0,
+  "upcomingTotal": 1,
+  "tournamentFilter": "all",
+  "accuracy1X2": null,
+  "accuracyOU25": null,
+  "accuracyBTTS": null,
+  "accuracyScore": null,
+  "avgBrierScore": null,
+  "avgLogLoss": null,
+  "htAccuracy1X2": null,
+  "htAccuracyScore": null,
+  "htTotal": 0,
+  "htftAccuracy": null,
+  "htftTotal": 0,
+  "high": {
+    "count": 1,
+    "accuracy1X2": 0,
+    "accuracyOU25": 0,
+    "accuracyBTTS": 0,
+    "accuracyScore": 0,
+    "avgBrier": 0
+  },
+  "medium": null,
+  "low": null,
+  "poissonAccuracy1X2": 0,
+  "simulationAccuracy1X2": 0,
+  "drawDetection": {
+    "actual": 0,
+    "predicted": 0,
+    "recallRate": null,
+    "precisionRate": null
+  },
+  "valueBets": {
+    "count": 0,
+    "accuracy1X2": null
+  },
+  "byTournament": [
+    {
+      "tournamentId": 8,
+      "name": "LaLiga",
+      "total": 1,
+      "accuracy1X2": 0,
+      "accuracyOU25": 0,
+      "accuracyBTTS": 0,
+      "accuracyScore": 0,
+      "avgBrier": 0
+    }
+  ],
+  "results": [
+    {
+      "matchId": 14083639,
+      "matchStatus": "notstarted",
+      "match": "Valencia vs Rayo Vallecano",
+      "homeTeam": "Valencia",
+      "awayTeam": "Rayo Vallecano",
+      "tournament": "LaLiga",
+      "tournamentId": 8,
+      "matchDate": "2026-05-14",
+      "matchTime": "17:00",
+      "actual": null,
+      "actualResult": null,
+      "actualOU25": null,
+      "actualBTTS": null,
+      "predicted": "1-1",
+      "predictedResult": "X",
+      "predictedOU25": "Under",
+      "predictedBTTS": "No",
+      "simTopScore": "0-0",
+      "probHome": 35.5,
+      "probDraw": 31.8,
+      "probAway": 32.7,
+      "probOU25": 1.4,
+      "probBTTS": 3.5,
+      "actualHT": null,
+      "actualHTResult": null,
+      "predictedHT": "0-0",
+      "predictedHTResult": "X",
+      "simHTTopScore": "0-0",
+      "htHomeWinProb": 0,
+      "htDrawProb": 49.56,
+      "htAwayWinProb": 50.44,
+      "simHTHomeWin": 0.5,
+      "simHTDraw": 84.2,
+      "simHTAwayWin": 15.3,
+      "htft": {
+        "top1": "X/X",
+        "top3": [
+          {
+            "result": "X/X",
+            "prob": 62.2
+          },
+          {
+            "result": "2/2",
+            "prob": 13.7
+          },
+          {
+            "result": "X/1",
+            "prob": 11.2
+          }
+        ],
+        "probs": {
+          "1/1": 0.4,
+          "1/X": 0.1,
+          "1/2": 0,
+          "X/1": 11.2,
+          "X/X": 62.2,
+          "X/2": 10.8,
+          "2/1": 0,
+          "2/X": 1.6,
+          "2/2": 13.7
+        }
+      },
+      "actualHTFT": null,
+      "hitHTFT": null,
+      "hit1X2": null,
+      "hitOU25": null,
+      "hitBTTS": null,
+      "hitScore": null,
+      "hitHTResult": null,
+      "hitHTScore": null,
+      "brierScore": null,
+      "logLoss": null,
+      "confidenceTier": "HIGH",
+      "maxProbability": 63.9,
+      "isHighConfidence": true,
+      "poisson": {
+        "predicted": "1",
+        "homeWin": 44.77,
+        "draw": 22.37,
+        "awayWin": 32.85,
+        "topScore": "1-1",
+        "hit": false,
+        "lambdaHome": 1.06,
+        "lambdaAway": 1.17
+      },
+      "simulation": {
+        "predicted": "X",
+        "homeWin": 11.6,
+        "draw": 63.9,
+        "awayWin": 24.5,
+        "hit": false
+      },
+      "restDays": {
+        "home": 4,
+        "away": 3
+      },
+      "isValueBet": false,
+      "modelEdge": null,
+      "marketHome": 42.82,
+      "marketAway": 25.75
+    }
+  ]
+}

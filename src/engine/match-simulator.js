@@ -1202,7 +1202,7 @@ function simulateSingleRun({ homeMetrics, awayMetrics, selectedMetrics, lineups,
       // Referans noktaları (0.5 = ilk yarı simetri %50, 0.33 = son 30dk/3 zaman parçası)
       // matematiksel — futbol fiziği değişmez.
       const _fhR = isHome ? hProb.firstHalfGoalRate : aProb.firstHalfGoalRate;
-      const _ltR = isHome ? hProb.lateGoalRate       : aProb.lateGoalRate;
+      const _ltR = isHome ? hProb.lateGoalRate : aProb.lateGoalRate;
       const _lgCV_loop = (baseline?.leagueGoalVolatility != null && baseline?.leagueAvgGoals > 0)
         ? baseline.leagueGoalVolatility / baseline.leagueAvgGoals : null;
       let timeWindowMult = 1.0;
@@ -1669,7 +1669,7 @@ function simulateMultipleRuns(params) {
   const avgHTAway = totalHTAwayGoals / runs;
 
   // HT/FT 9-sınıflı dağılım — doğrudan simülasyon frekanslarından
-  const ALL_HTFT_COMBOS = ['1/1','1/X','1/2','X/1','X/X','X/2','2/1','2/X','2/2'];
+  const ALL_HTFT_COMBOS = ['1/1', '1/X', '1/2', 'X/1', 'X/X', 'X/2', '2/1', '2/X', '2/2'];
   const htftProbs = {};
   for (const combo of ALL_HTFT_COMBOS) {
     htftProbs[combo] = pct(htftMap[combo] || 0);
