@@ -7,10 +7,8 @@
 const api = require('../services/playwright-client');
 const { fetchAllMatchData } = require('../services/data-fetcher');
 const { applyAsOfFilter } = require('../services/as-of-filter');
-const { calculateAllMetrics } = require('./metric-calculator');
 const { generatePrediction } = require('./prediction-generator');
-const { getDynamicBaseline } = require('./dynamic-baseline');
-const { computePositionMVBreakdown } = require('./quality-factors');
+const { prepareMatchContext } = require('./match-context');
 const learning = require('../learning');
 
 // Top 5 ligi + önemli turnuvalar için filtreleme (opsiyonel)
@@ -124,31 +122,19 @@ async function runBacktest(date, matchLimit = 10, opts = {}) {
           }
         }
 
-        // Calculate metrics
-        const metrics = calculateAllMetrics(fullData);
-        
-        // Calculate dynamic baseline
-        const baseline = getDynamicBaseline(fullData);
-        
-        // Inject league physical parameters into baseline
-        baseline.leagueGoalVolatility = metrics.meta?.leagueGoalVolatility ?? null;
-        baseline.leaguePointDensity   = metrics.meta?.leaguePointDensity   ?? null;
-        baseline.medianGoalRate       = metrics.meta?.medianGoalRate       ?? null;
-        baseline.leagueTeamCount      = metrics.meta?.leagueTeamCount      ?? null;
-        baseline.ptsCV                = metrics.meta?.ptsCV                ?? null;
-        baseline.normMinRatio         = metrics.meta?.normMinRatio         ?? null;
-        baseline.normMaxRatio         = metrics.meta?.normMaxRatio         ?? null;
-        // HT/FT reversal oranları — morale cascade kalibrasyonu için
-        baseline._htLeadContinuation = metrics.dynamicLeagueAvgs?._htLeadContinuation ?? null;
-        baseline._htDrawToWinRate = metrics.dynamicLeagueAvgs?._htDrawToWinRate ?? null;
-        baseline._htReversalRate = metrics.dynamicLeagueAvgs?._htReversalRate ?? null;
+        // DRY: Backtest server.js predict endpoint'iyle birebir aynı pipeline.
+        // prepareMatchContext eskiden 7 satır manuel kuruluma karşılık geliyordu
+        // ve injectDBW / injectLQR / injectZQM / injectPVKD / GK integrity adımları
+        // backtest'te eksikti — bu yüzden homeDynamicBlockWeights null'a düşüp
+        // attackPower NaN sızdırıyordu. Tek noktadan kontrol artık.
+        const { data, metrics, baseline } = prepareMatchContext({
+          cachedData: fullData,
+          forBacktest: true,
+          logPrefix: 'BACKTEST',
+        });
 
-        // Inject Position-based Market Value Breakdown (PVKD)
-        baseline.homeMVBreakdown = computePositionMVBreakdown(fullData.homePlayers || []);
-        baseline.awayMVBreakdown = computePositionMVBreakdown(fullData.awayPlayers || []);
-        
-        // Generate prediction (with baseline and audit)
-        const report = generatePrediction(metrics, fullData, baseline, metrics.metricAudit, Math.random);
+        // Generate prediction (with baseline and audit) — server'la birebir aynı
+        const report = generatePrediction(metrics, data, baseline, metrics.metricAudit, Math.random);
 
         // Reality Check
         const realHS = match.homeScore.current;

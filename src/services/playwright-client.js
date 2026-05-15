@@ -111,17 +111,26 @@ async function initBrowser() {
 /**
  * Challenge geldiğinde sofascore.com'u yeniden ziyaret ederek trust kurar.
  * Cloudflare bot tespiti sıfırlanır, cookieler yenilenir.
+ * MUTEX: Eş zamanlı çağrılar tek bir restore'u beklesin — paralel page.goto()
+ * çakışmasını ("Navigation interrupted") önler.
  */
+let _trustRestorePromise = null;
 async function reEstablishTrust() {
   if (!page) return;
-  try {
-    console.warn('[Playwright] Re-establishing trust with sofascore.com...');
-    await page.goto('https://www.sofascore.com/', { waitUntil: 'domcontentloaded', timeout: 30000 });
-    await page.waitForTimeout(5000);
-    console.log('[Playwright] Trust re-established.');
-  } catch (e) {
-    console.error('[Playwright] Trust re-establishment failed:', e.message);
-  }
+  if (_trustRestorePromise) return _trustRestorePromise;
+  _trustRestorePromise = (async () => {
+    try {
+      console.warn('[Playwright] Re-establishing trust with sofascore.com...');
+      await page.goto('https://www.sofascore.com/', { waitUntil: 'domcontentloaded', timeout: 30000 });
+      await page.waitForTimeout(5000);
+      console.log('[Playwright] Trust re-established.');
+    } catch (e) {
+      console.error('[Playwright] Trust re-establishment failed:', e.message);
+    } finally {
+      _trustRestorePromise = null;
+    }
+  })();
+  return _trustRestorePromise;
 }
 
 async function closeBrowser() {

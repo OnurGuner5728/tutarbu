@@ -85,17 +85,8 @@ async function cachedManagerLastEvents(managerId) {
   return d;
 }
 
-async function cachedPlayerStats(playerId, tId, sId) {
-  const c = matchDB.getPlayer(playerId, tId, sId);
-  if (c) return c; // { seasonStats, attributes, characteristics }
-  const [seasonStats, attributes, characteristics] = await Promise.all([
-    api.getPlayerSeasonStats(playerId, tId, sId).catch(() => null),
-    api.getPlayerAttributes(playerId).catch(() => null),
-    api.getPlayerCharacteristics(playerId).catch(() => null),
-  ]);
-  matchDB.savePlayer(playerId, tId, sId, { seasonStats, attributes, characteristics });
-  return { seasonStats, attributes, characteristics };
-}
+// cachedPlayerStats kaldırıldı — DRY ihlali, hiçbir yerde çağrılmıyordu (dead code).
+// Tek oyuncu için stats lazımsa fetchPlayerStats([{player: {id}}], tId, sId) kullan.
 
 
 /**
@@ -770,12 +761,31 @@ async function fetchRecentMatchDetails(eventsArray, count = 5) {
  * Kadrodaki oyuncuların sezon istatistiklerini çeker.
  * İlk 11 + tüm yedekler — M067 (Yedek Rating) ve M088 (Bench/Starter değer oranı) için tam veri gereklidir.
  */
-async function fetchPlayerStats(players, tournamentId, seasonId) {
-  if (!players || !tournamentId || !seasonId) return { stats: [], log: [] };
+/**
+ * BİRLEŞTİRİLMİŞ TEK PLAYER STATS FETCHER.
+ *
+ * Eski: 3 farklı fonksiyon (cachedPlayerStats, fetchPlayerStats,
+ * fetchPlayerStatsForPlayers) — DRY ihlali. Hepsi tek fonksiyonda.
+ *
+ * @param {Array} players - oyuncu listesi { player: { id, name, position }, substitute, isReserve }
+ * @param {number} tournamentId
+ * @param {number} seasonId
+ * @param {object} opts
+ * @param {boolean} opts.filterStarters - true ise sadece starter+sub al (max 11+bench), false → tümü
+ * @returns {Promise<{ stats: Array, log: Array }>}
+ */
+async function fetchPlayerStats(players, tournamentId, seasonId, opts = {}) {
+  if (!players?.length || !tournamentId || !seasonId) return { stats: [], log: [] };
 
-  const starters = players.filter(p => !p.substitute).slice(0, 11);
-  const subs = players.filter(p => p.substitute);
-  const targetPlayers = [...starters, ...subs];
+  const filterStarters = opts.filterStarters !== false; // default true (backward compat)
+  let targetPlayers;
+  if (filterStarters) {
+    const starters = players.filter(p => !p.substitute).slice(0, 11);
+    const subs = players.filter(p => p.substitute);
+    targetPlayers = [...starters, ...subs];
+  } else {
+    targetPlayers = players;
+  }
 
   const stats = [];
   const log = [];
@@ -785,7 +795,6 @@ async function fetchPlayerStats(players, tournamentId, seasonId) {
     if (!playerId) return;
 
     const t0 = Date.now();
-    // DB'den kontrol — TTL: 24h
     const cached = matchDB.getPlayer(playerId, tournamentId, seasonId);
     let seasonStats, attributes, characteristics, fromCache = false;
 
@@ -805,9 +814,10 @@ async function fetchPlayerStats(players, tournamentId, seasonId) {
     stats.push({
       playerId,
       name: p.player.name,
-      position: p.player.position || p.position,
-      shirtNumber: p.shirtNumber,
+      position: p.player.position || p.position || 'M',
+      shirtNumber: p.shirtNumber || '',
       substitute: p.substitute || false,
+      isReserve: p.isReserve || false,
       seasonStats,
       attributes,
       characteristics,
@@ -918,39 +928,11 @@ function mergeAndSortEvents(page0, page1) {
 
 /**
  * Workshop için: belirli oyuncuların istatistiklerini fetch eder.
- * fetchPlayerStats ile aynı mantık — sadece filtre olmadan tüm oyuncuları alır.
- * @param {Array} players - { player: { id, name, position }, substitute, isReserve, ... }
- * @param {number} tournamentId
- * @param {number} seasonId
- * @returns {Promise<Array>} stats array (homePlayerStats / awayPlayerStats formatında)
+ * fetchPlayerStats(players, tId, sId, { filterStarters: false }) wrapper'ı.
+ * Geriye uyumluluk için bırakıldı; iç implementasyon birleştirildi (DRY).
  */
 async function fetchPlayerStatsForPlayers(players, tournamentId, seasonId) {
-  if (!players?.length || !tournamentId || !seasonId) return [];
-
-  const stats = [];
-  await Promise.all(players.map(async (p) => {
-    const playerId = p.player?.id;
-    if (!playerId) return;
-
-    const [seasonStats, attributes, characteristics] = await Promise.all([
-      api.getPlayerSeasonStats(playerId, tournamentId, seasonId).catch(() => null),
-      api.getPlayerAttributes(playerId).catch(() => null),
-      api.getPlayerCharacteristics(playerId).catch(() => null),
-    ]);
-
-    stats.push({
-      playerId,
-      name: p.player.name,
-      position: p.player.position || p.position || 'M',
-      shirtNumber: p.shirtNumber || '',
-      substitute: p.substitute || false,
-      isReserve: p.isReserve || false,
-      seasonStats,
-      attributes,
-      characteristics,
-    });
-  }));
-
+  const { stats } = await fetchPlayerStats(players, tournamentId, seasonId, { filterStarters: false });
   return stats;
 }
 
