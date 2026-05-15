@@ -1797,47 +1797,46 @@ function calculateAdvancedMetrics(allMetrics) {
           return { freq, sources: srcs };
         };
 
-        // empFreq + prob — PROBABILITY-SPACE BLEND (statik (1+f) boost değil)
-        // Eski: combined = prob × (1 + empFreq) — empFreq=0.05 boost sadece %5
-        //       (cluster sorununa neden oluyordu — Poisson PMF mode'u kazanıyor)
+        // empFreq — ADAPTIVE TIE-BREAKER
+        // Backtest bulgusu (10 maç): aggressive blend %1X2 60→40 düşürür,
+        // weak blend cluster geri döner. Çözüm: empirik etki gap-aware.
         //
-        // Yeni: empFreq'i candidate'lar arasında olasılık olarak değerlendir.
-        //   Σ empFreq across candidates → normalize → empProb
-        //   combined = (1-w) × prob_normalized + w × empProb
-        //   w = teamWeightSum / (teamWeightSum + 1/_kEff)
-        //     yüksek team data → w → 1 → empirik domine
-        //     veri yoksa → w → 0 → pure Poisson argmax
+        //   probGap = (topProb - secondProb) / topProb ∈ [0, 1]
+        //     1 → net argmax (top1 öne çıkmış) → empWeight ≈ 0, prob argmax kazanır
+        //     0 → yakın yarış (top1≈top2≈top3) → empWeight = 1, empirik karar verir
+        //   empWeight = (1 - probGap) × dataReliability
+        //     dataReliability = teamWeightSum / (teamWeightSum + log(_kEff+e))
         //
-        // Sıfır statik: w formülü Bayesian, scaling power kullanıcı verisinden.
+        // Sıfır statik: probGap matematiksel, dataReliability Bayesian.
         const _candidateData = _candidates.map(sp => {
           const key = `${sp.home}-${sp.away}`;
           const ef = _empFreqFor(key);
           return { sp, key, prob: sp.prob, empFreq: ef.freq, sources: ef.sources };
         });
-        // Normalize prob ve empFreq candidate set'i içinde
-        const _sumProb = _candidateData.reduce((s, c) => s + c.prob, 0) || 1;
-        const _sumEmpFreq = _candidateData.reduce((s, c) => s + c.empFreq, 0);
-        // Blend ağırlığı — team data güveniyle dinamik
-        const _empBlendW = _teamWeightSum > 0
-          ? _teamWeightSum / (_teamWeightSum + Math.max(1, _kEff))
+        const _topProb = _candidateData[0]?.prob || 0;
+        const _secondProb = _candidateData[1]?.prob || 0;
+        const _probGap = _topProb > 0 ? (_topProb - _secondProb) / _topProb : 0;
+        const _dataRel = _teamWeightSum > 0
+          ? _teamWeightSum / (_teamWeightSum + Math.log(_kEff + Math.E))
           : 0;
+        const _empWeight = (1 - _probGap) * _dataRel;
 
         let _best = _candidates[0];
         let _bestScore = -Infinity;
         const _scoreDebug = [];
         for (const cd of _candidateData) {
-          const probN = cd.prob / _sumProb;
-          const empN = _sumEmpFreq > 0 ? cd.empFreq / _sumEmpFreq : probN; // empFreq yoksa prob'a düş
-          const combined = (1 - _empBlendW) * probN + _empBlendW * empN;
-          _scoreDebug.push({ key: cd.key, prob: cd.prob, empFreq: cd.empFreq, probN, empN, combined, sources: cd.sources });
+          // Yakın yarışta empirik baskın, net argmax durumda prob kazanır
+          const combined = cd.prob * (1 + cd.empFreq * _empWeight);
+          _scoreDebug.push({ key: cd.key, prob: cd.prob, empFreq: cd.empFreq, combined, sources: cd.sources });
           if (combined > _bestScore) {
             _bestScore = combined;
             _best = cd.sp;
           }
         }
         mostLikelyScore = _best;
-        // _empBlendW görünür kıl
-        _ldDiag.empBlendW = _empBlendW;
+        _ldDiag.empWeight = _empWeight;
+        _ldDiag.probGap = _probGap;
+        _ldDiag.dataRel = _dataRel;
         // Skor seçim trace'i (kaynaklar görünür kıl)
         _ldDiag.scoreSelection = {
           chosen: `${_best.home}-${_best.away}`,
