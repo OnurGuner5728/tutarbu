@@ -1727,14 +1727,20 @@ function calculateAdvancedMetrics(allMetrics) {
       // Çözüm: top-K içinde toplam gol'ü λ_sum'a en yakın olan + olasılığı en yüksek.
       // K = entropy'den türetilir: dağılım ne kadar düz ise o kadar geniş top-K bakarız.
       // Sıfır statik. K = effective_K = exp(entropy).
-      // ── EXPECTED-VALUE SKOR SEÇİMİ — yüksek skorlu maçlar için ────────
-      // Sorun: argmax + 1D distance, λ_h=3.4/λ_a=4.7 olan Thun×YB tipi maçta
-      // hâlâ 1-2/2-1 cluster veriyor çünkü Poisson PMF düşük gözüken skorlara
-      // marjinal daha yüksek prob veriyor.
+      // ── EMPİRİK SKOR SEÇİMİ — Geçmiş Gerçek Skorlardan ────────────────
+      // round(λ) statik manipülasyon DEĞİL. Tahmini şu kaynaklardan oluşan
+      // ampirik joint distribution AĞIRLIKLI BLEND ile yapıyoruz:
       //
-      // Çözüm: Beklenen değer (round(λ_h), round(λ_a)) skoru top-K'da varsa
-      // direkt onu seç. Yoksa entropy-driven 2D distance fallback.
-      // Statik yok: round matematiksel; K_eff entropy'den.
+      //   1) homeScoreProfile.jointDist — bu home takımın son maçlardaki
+      //      gerçek "h-a" skor sıklığı (tournament-filtered)
+      //   2) awayScoreProfile.jointDist — bu away takımın son maçları
+      //   3) matchScoreProfile.jointDist — H2H tarihçesi (en güçlü sinyal)
+      //   4) leagueFingerprint.jointDist — lig genelinde aynı skor sıklığı
+      //
+      // Her kaynak kendi N'i ile ağırlıklı. Skor seçimi:
+      //   combined = blended_prob × (1 + empirical_frequency)
+      // Empirik sıklık varsa boost; yoksa pure blend argmax kazanır.
+      // Sıfır statik: empFreq lig + iki takımın gerçek maçlarından, ağırlıklar n.
       const _lambdaSum = (lambda_final_home ?? 0) + (lambda_final_away ?? 0);
       if (_lambdaSum > 0 && scoreProbs.length > 0) {
         const _topProbs = scoreProbs.slice(0, Math.min(15, scoreProbs.length));
@@ -1747,30 +1753,49 @@ function calculateAdvancedMetrics(allMetrics) {
         const _kEff = Math.max(3, Math.round(Math.exp(_entropy)));
         const _candidates = scoreProbs.slice(0, _kEff);
 
-        // 1. Adım: Beklenen değer (E[home], E[away]) skoru direkt aranır
-        const _expH = Math.round(lambda_final_home);
-        const _expA = Math.round(lambda_final_away);
-        const _expectedHit = _candidates.find(s => s.home === _expH && s.away === _expA);
-
-        if (_expectedHit) {
-          mostLikelyScore = _expectedHit;
-        } else {
-          // 2. Adım: 2D Euclidean mesafe ile en yakın (home & away ayrı)
-          let _best = _candidates[0];
-          let _bestScore = -Infinity;
-          for (const sp of _candidates) {
-            const dh = sp.home - lambda_final_home;
-            const da = sp.away - lambda_final_away;
-            const dist = Math.sqrt(dh * dh + da * da);
-            const distScore = 1 / (1 + dist);
-            const combined = sp.prob * distScore;
-            if (combined > _bestScore) {
-              _bestScore = combined;
-              _best = sp;
+        const _empFreqFor = (key) => {
+          const srcs = [];
+          // Takım profile jointDist'i jointDist[`s-c`] formatında (scored-conceded perspektifi).
+          // homeScoreProfile: home perspektifi → key 'h-a' = scored=h conceded=a
+          if (homeScoreProfile?.jointDist?.[key] != null && homeScoreProfile.n > 0) {
+            srcs.push({ f: homeScoreProfile.jointDist[key], w: homeScoreProfile.n });
+          }
+          // awayScoreProfile: away perspektifi → scored=a, conceded=h, key 'a-h' aranır
+          if (awayScoreProfile?.jointDist && awayScoreProfile.n > 0) {
+            const [h, a] = key.split('-').map(Number);
+            const awayKey = `${a}-${h}`;
+            if (awayScoreProfile.jointDist[awayKey] != null) {
+              srcs.push({ f: awayScoreProfile.jointDist[awayKey], w: awayScoreProfile.n });
             }
           }
-          mostLikelyScore = _best;
+          // matchScoreProfile (H2H): bu maçın home perspektifi key 'h-a'
+          if (matchScoreProfile?.jointDist?.[key] != null && matchScoreProfile.n > 0) {
+            // H2H direkt sinyal — 2× ağırlık (her iki takımın birlikte geçmişi)
+            srcs.push({ f: matchScoreProfile.jointDist[key], w: matchScoreProfile.n * 2 });
+          }
+          // leagueFingerprint: lig genel skor sıklığı
+          if (leagueFingerprint?.jointDist?.[key] != null && leagueFingerprint.poolSize > 0) {
+            srcs.push({ f: leagueFingerprint.jointDist[key], w: leagueFingerprint.poolSize });
+          }
+          if (srcs.length === 0) return 0;
+          const totalW = srcs.reduce((s, x) => s + x.w, 0);
+          return srcs.reduce((s, x) => s + x.f * x.w, 0) / totalW;
+        };
+
+        let _best = _candidates[0];
+        let _bestScore = -Infinity;
+        for (const sp of _candidates) {
+          const key = `${sp.home}-${sp.away}`;
+          const empFreq = _empFreqFor(key);
+          // combined = blended_prob × (1 + empFreq)
+          // empFreq ∈ [0, 1] → boost faktörü [1, 2]. Empirik veri yoksa boost=1 (pure blend).
+          const combined = sp.prob * (1 + empFreq);
+          if (combined > _bestScore) {
+            _bestScore = combined;
+            _best = sp;
+          }
         }
+        mostLikelyScore = _best;
       } else {
         mostLikelyScore = scoreProbs[0];
       }
